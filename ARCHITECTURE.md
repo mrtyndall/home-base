@@ -158,6 +158,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Improved task quick-add with a visible title label/placeholder and project chips instead of a project dropdown, while preserving instant title-first add.
 - Added a bounded Today task inbox for open unscheduled tasks, ordered by recent update so clearing a date keeps the task visible and easy to move back into Today/Tomorrow.
 - Moved Google Calendar sync freshness from a top-level Today alert into quiet metadata under Today's Calendar, escalating only by tone when missing/stale/failed.
+- Reworked the Today recent captures strip into explicit capture action rows with visible Sort/Open/Find buttons instead of passive receipt-style rows.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

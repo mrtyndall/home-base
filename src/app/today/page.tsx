@@ -12,6 +12,7 @@ import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
+import { getRecentCaptureAction } from "@/lib/today-capture-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -198,26 +199,41 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
     <section className="rounded-lg border border-stone-200 bg-white px-4 py-3">
       <div className="mb-2 flex items-center gap-2 text-stone-800">
         <Inbox size={16} />
-        <h2 className="text-sm font-semibold">Recently captured</h2>
+        <h2 className="text-sm font-semibold">Recent capture actions</h2>
       </div>
-      <div className="divide-y divide-stone-100">
+      <div className="space-y-2">
         {captures.slice(0, 5).map((capture) => {
           const outcome =
             formatCaptureOutcome(capture.createdItems) ??
             capture.parseStatus ??
             "saved";
           const href = getCaptureHref(capture);
+          const action = getRecentCaptureAction(
+            capture.createdItems,
+            capture.parseStatus,
+          );
 
           return (
             <Link
               key={capture.id}
               href={href}
-              className="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-4"
+              className="grid gap-3 rounded-lg border border-stone-200 bg-stone-50/60 p-3 transition hover:border-teal-400 hover:bg-white sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
-              <p className="min-w-0 truncate text-sm text-stone-900">
-                {capture.rawText}
-              </p>
-              <p className="text-xs text-stone-500 sm:text-right">{outcome}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-stone-900">
+                  {capture.rawText}
+                </p>
+                <p className="mt-1 text-xs text-stone-500">{outcome}</p>
+              </div>
+              <span
+                className={`inline-flex h-8 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-medium ${
+                  action.tone === "primary"
+                    ? "border-teal-600 bg-teal-50 text-teal-800"
+                    : "border-stone-300 bg-white text-stone-700"
+                }`}
+              >
+                {action.label}
+              </span>
             </Link>
           );
         })}
