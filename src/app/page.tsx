@@ -108,23 +108,32 @@ export default async function HomePage() {
         />
       </section>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-stone-900">
-              Recent capture
-            </h2>
-            <p className="mt-1 text-sm text-stone-600">
-              {homeData.latestCaptureText ?? "No captures recorded yet."}
-            </p>
+      {homeData.latestCaptureText ? (
+        <Link
+          href={homeData.latestCaptureHref}
+          className="group block rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:border-teal-400 hover:shadow-md"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-stone-900">
+                Recent capture
+              </h2>
+              <p className="mt-1 line-clamp-4 text-sm leading-6 text-stone-600">
+                {homeData.latestCaptureText}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-stone-500 transition group-hover:text-teal-700">
+              <span>{homeData.latestCaptureAction}</span>
+              <ArrowRight size={16} />
+            </div>
           </div>
           {homeData.latestCaptureAt ? (
-            <p className="shrink-0 text-sm text-stone-500">
+            <p className="mt-3 text-xs text-stone-500">
               {formatShortDate(homeData.latestCaptureAt)}
             </p>
           ) : null}
-        </div>
-      </section>
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -224,9 +233,60 @@ async function getHomeData() {
       pendingCaptureCount,
       latestCaptureText: latestCapture?.rawText ?? null,
       latestCaptureAt: latestCapture?.createdAt ?? null,
+      latestCaptureHref: latestCapture ? getCaptureHref(latestCapture) : "/search",
+      latestCaptureAction: latestCapture
+        ? getCaptureAction(latestCapture)
+        : "Search captures",
       latestIdeaTitle: latestIdea?.title ?? null,
     };
   } catch {
     return { ok: false as const };
   }
+}
+
+type CaptureForHome = {
+  rawText: string;
+  parseStatus: string | null;
+  createdItems: unknown;
+};
+
+function getCaptureHref(capture: CaptureForHome) {
+  const item = getLatestFiledItem(capture);
+  if (!item) return "/areas/area_inbox";
+  if (item.type === "task") return `/tasks/${item.id}`;
+  if (item.type === "project") return `/projects/${item.id}`;
+  if (item.type === "idea") return "/ideas";
+  return `/search?q=${encodeURIComponent(capture.rawText)}`;
+}
+
+function getCaptureAction(capture: CaptureForHome) {
+  const item = getLatestFiledItem(capture);
+  if (!item || capture.parseStatus !== "parsed") return "Sort in Inbox";
+  if (item.type === "task" || item.type === "project") return "Open item";
+  if (item.type === "idea") return "Open Ideas";
+  return "Find in Search";
+}
+
+function getLatestFiledItem(capture: CaptureForHome) {
+  const items = Array.isArray(capture.createdItems) ? capture.createdItems : [];
+  const filedItems = items
+    .filter(isCreatedItem)
+    .filter((item) => item.type !== "pending_capture");
+  return filedItems[filedItems.length - 1] ?? null;
+}
+
+function isCreatedItem(
+  item: unknown,
+): item is { type: string; id: string; label: string } {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    "type" in item &&
+    typeof item.type === "string" &&
+    item.type !== "notification" &&
+    "id" in item &&
+    typeof item.id === "string" &&
+    "label" in item &&
+    typeof item.label === "string"
+  );
 }

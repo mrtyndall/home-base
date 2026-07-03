@@ -420,6 +420,49 @@ export async function updateProjectState(formData: FormData) {
   redirect(`/projects/${projectId}`);
 }
 
+export async function updateProjectTimeframe(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  const targetDate = getTrimmedString(formData, "targetDate");
+  const openEnded = formData.get("openEnded") === "on";
+  if (!projectId) return;
+
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      targetDate: openEnded || !targetDate ? null : dateOnlyFromString(targetDate),
+    },
+  });
+
+  await prisma.projectActivity.create({
+    data: {
+      projectId,
+      entry: project.targetDate
+        ? `Project timeframe set to ${project.targetDate.toISOString().slice(0, 10)}.`
+        : "Project set as open ended.",
+      source: "manual",
+      stateSnapshot: {
+        status: project.status,
+        target_date: project.targetDate?.toISOString().slice(0, 10) ?? null,
+      },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "project_timeframe_updated",
+      title: "Project timeframe updated",
+      body: project.targetDate
+        ? `Target ${project.targetDate.toISOString().slice(0, 10)}`
+        : "Open ended",
+      sourceRef: { type: "project", id: project.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
 export async function updateAreaState(formData: FormData) {
   const areaId = getTrimmedString(formData, "areaId");
   const currentState = getTrimmedString(formData, "currentState");
@@ -597,6 +640,36 @@ export async function createEntityDoc(formData: FormData) {
   ) {
     return;
   }
+
+  await prisma.entityDoc.create({
+    data: {
+      parentType,
+      parentId,
+      title,
+      bodyMd,
+      source: "manual",
+    },
+  });
+
+  revalidateEntityParent(parentType, parentId);
+}
+
+export async function importEntityDocMarkdown(formData: FormData) {
+  const parentType = getTrimmedString(formData, "parentType");
+  const parentId = getTrimmedString(formData, "parentId");
+  const file = formData.get("markdownFile");
+  if (
+    (parentType !== "area" && parentType !== "project") ||
+    !parentId ||
+    !(file instanceof File) ||
+    file.size === 0
+  ) {
+    return;
+  }
+
+  const bodyMd = await file.text();
+  const fallbackTitle = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
+  const title = getTrimmedString(formData, "title") || fallbackTitle || "Imported doc";
 
   await prisma.entityDoc.create({
     data: {

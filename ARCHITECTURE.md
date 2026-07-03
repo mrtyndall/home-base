@@ -146,6 +146,9 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Split Home and Today into separate routes: `/` is the launch surface and `/today` keeps the focused today-plus-tomorrow workflow. Search remains a top utility instead of a bottom tab.
 - Improved Inbox pending captures so each raw capture renders as a distinct card with its own destination picker and conversion actions.
 - Updated the Today recently captured strip to prefer filed capture outcomes and links after pending captures are converted.
+- Made the Home recent capture surface actionable: pending captures route to Inbox sorting, filed captures route to the created item or Search.
+- Added a project timeframe control that makes target date/open-ended status more prominent than manual state.
+- Expanded docs creation into an in-page markdown editor/import surface with `.md` upload support.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Plus } from "lucide-react";
-import { addProjectTask, updateProjectState } from "@/app/actions";
+import { ArrowLeft, CalendarDays, Pencil, Plus } from "lucide-react";
+import {
+  addProjectTask,
+  updateProjectState,
+  updateProjectTimeframe,
+} from "@/app/actions";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { EntityDepth, MilestonesPanel } from "@/components/entity-depth";
@@ -66,6 +70,47 @@ export default async function ProjectDetailPage({
           <ProjectOverflowMenu projectId={project.id} status={project.status} />
         </div>
       </header>
+
+      <details className="rounded-lg border border-stone-200 bg-white p-4" open>
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
+          <CalendarDays size={15} />
+          Timeframe
+        </summary>
+        <form
+          action={updateProjectTimeframe}
+          className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+        >
+          <input type="hidden" name="projectId" value={project.id} />
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="block text-sm font-medium text-stone-700">
+              <span>Target date</span>
+              <input
+                type="date"
+                name="targetDate"
+                defaultValue={
+                  project.targetDate?.toISOString().slice(0, 10) ?? ""
+                }
+                className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              />
+            </label>
+            <label className="flex h-10 items-center gap-2 text-sm font-medium text-stone-700">
+              <input
+                type="checkbox"
+                name="openEnded"
+                defaultChecked={!project.targetDate}
+                className="h-4 w-4 rounded border-stone-300 text-teal-700"
+              />
+              Open ended
+            </label>
+          </div>
+          <button
+            type="submit"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
+          >
+            Save timeframe
+          </button>
+        </form>
+      </details>
 
       <details className="rounded-lg border border-stone-200 bg-white p-4">
         <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
