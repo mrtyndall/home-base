@@ -67,7 +67,7 @@ Tasks with a due date and no due time use the `default_due_date_reminder_time` a
 
 The REST API lives under `/api/v1` and uses bearer API keys stored as hashes in `api_keys`. Minimum scopes are `read`, `write`, and `capture`; write rate limits are conservative by default. API routes intentionally expose no delete method.
 
-The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streamable HTTP at `/api/mcp`. It provides tools for all-clear summary, search, task creation/completion, project state updates, park/unpark, idea capture/conversion, and calendar reads.
+The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streamable HTTP at `/api/mcp`. It provides tools for all-clear summary, search, task creation/completion, area reads/state updates, project creation/state updates, park/unpark, idea capture/conversion, shared markdown notes/docs, milestones, and calendar reads.
 
 ## Calendar Sync
 
@@ -121,6 +121,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 ### 2026-07-03
 
 - Migrated the data model to Domains -> Areas -> Projects -> Tasks. Added `areas`, shared markdown container tables, file attachment metadata, project milestones, someday project status, and someday tasks. Existing 3 projects and 12 tasks were mapped to areas with zero missing area assignments and zero row loss in the local alpha database.
+- Updated the REST API and MCP layer for the area hierarchy, someday projects/tasks, shared markdown notes/docs, milestones, area reads/state updates, and search across first-class containers. API proof covered bearer-auth area creation/update, someday project creation, project activation, entity notes/docs, milestone completion, search readback, and audited notifications.
 - Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
 - Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Reworked the Tasks tab into Today, Tomorrow, Upcoming grouped by date, and No date sections using the same row-level rescheduling and drop-zone primitives.

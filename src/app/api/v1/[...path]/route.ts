@@ -36,14 +36,54 @@ export async function GET(request: Request, context: RouteCtx) {
     if (resource === "domains") {
       if (id) {
         return {
-          domain: await prisma.domain.findUnique({ where: { id } }),
+          domain: await prisma.domain.findUnique({
+            where: { id },
+            include: { areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
+          }),
         };
       }
 
       return {
         domains: await prisma.domain.findMany({
           where: { active: true },
+          include: { areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        }),
+      };
+    }
+
+    if (resource === "areas") {
+      if (id) {
+        return {
+          area: await prisma.area.findUnique({
+            where: { id },
+            include: {
+              domain: true,
+              tasks: { where: { status: "open" }, orderBy: { createdAt: "desc" } },
+              projects: { orderBy: { createdAt: "desc" } },
+              ideas: { orderBy: { updatedAt: "desc" } },
+            },
+          }),
+          notes: await prisma.entityNote.findMany({
+            where: { parentType: "area", parentId: id },
+            orderBy: { createdAt: "desc" },
+          }),
+          docs: await prisma.entityDoc.findMany({
+            where: { parentType: "area", parentId: id },
+            orderBy: { updatedAt: "desc" },
+          }),
+          attachments: await prisma.document.findMany({
+            where: { parentType: "area", parentId: id },
+            orderBy: { createdAt: "desc" },
+          }),
+        };
+      }
+
+      return {
+        areas: await prisma.area.findMany({
+          include: { domain: true },
+          orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+          take: 100,
         }),
       };
     }
@@ -64,7 +104,7 @@ export async function GET(request: Request, context: RouteCtx) {
         return {
           task: await prisma.task.findUnique({
             where: { id },
-            include: { domain: true, project: true, subtasks: true },
+            include: { area: true, project: true, subtasks: true },
           }),
         };
       }
@@ -75,7 +115,7 @@ export async function GET(request: Request, context: RouteCtx) {
           where: query.q
             ? { title: { contains: query.q, mode: "insensitive" } }
             : undefined,
-          include: { domain: true, project: true, subtasks: true },
+          include: { area: true, project: true, subtasks: true },
           orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
           take: query.limit,
           ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
@@ -98,14 +138,18 @@ export async function GET(request: Request, context: RouteCtx) {
         return {
           project: await prisma.project.findUnique({
             where: { id },
-            include: { domain: true, activity: { orderBy: { createdAt: "desc" }, take: 20 } },
+            include: {
+              area: true,
+              activity: { orderBy: { createdAt: "desc" }, take: 20 },
+              milestones: { orderBy: [{ status: "asc" }, { sortOrder: "asc" }] },
+            },
           }),
         };
       }
 
       return {
         projects: await prisma.project.findMany({
-          include: { domain: true },
+          include: { area: true },
           orderBy: [{ status: "asc" }, { createdAt: "desc" }],
           take: 100,
         }),
@@ -126,14 +170,18 @@ export async function GET(request: Request, context: RouteCtx) {
         return {
           idea: await prisma.idea.findUnique({
             where: { id },
-            include: { domain: true, notes: { orderBy: { createdAt: "desc" } } },
+            include: {
+              area: true,
+              project: true,
+              notes: { orderBy: { createdAt: "desc" } },
+            },
           }),
         };
       }
 
       return {
         ideas: await prisma.idea.findMany({
-          include: { domain: true },
+          include: { area: true, project: true },
           orderBy: { updatedAt: "desc" },
           take: 100,
         }),
@@ -145,14 +193,14 @@ export async function GET(request: Request, context: RouteCtx) {
         return {
           reference: await prisma.reference.findUnique({
             where: { id },
-            include: { domain: true },
+            include: { area: true, project: true },
           }),
         };
       }
 
       return {
         references: await prisma.reference.findMany({
-          include: { domain: true },
+          include: { area: true, project: true },
           orderBy: { createdAt: "desc" },
           take: 100,
         }),
@@ -178,6 +226,33 @@ export async function GET(request: Request, context: RouteCtx) {
       return {
         notifications: await prisma.notification.findMany({
           orderBy: { createdAt: "desc" },
+          take: 100,
+        }),
+      };
+    }
+
+    if (resource === "entity-notes") {
+      return {
+        notes: await prisma.entityNote.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        }),
+      };
+    }
+
+    if (resource === "entity-docs") {
+      return {
+        docs: await prisma.entityDoc.findMany({
+          orderBy: { updatedAt: "desc" },
+          take: 100,
+        }),
+      };
+    }
+
+    if (resource === "milestones") {
+      return {
+        milestones: await prisma.milestone.findMany({
+          orderBy: [{ projectId: "asc" }, { sortOrder: "asc" }],
           take: 100,
         }),
       };
@@ -216,7 +291,13 @@ export async function POST(request: Request, context: RouteCtx) {
 
     if (resource === "tasks") {
       const parsed = createTaskSchema.parse(body);
-      const domainId = await resolveDomainId(parsed.domainId, parsed.domainName);
+      const project = parsed.projectId
+        ? await prisma.project.findUnique({
+            where: { id: parsed.projectId },
+            select: { areaId: true },
+          })
+        : null;
+      const areaId = project?.areaId ?? (await resolveAreaId(parsed.areaId, parsed.areaName));
       const task = await createTaskWithAudit(
         {
           title: parsed.title,
@@ -224,15 +305,38 @@ export async function POST(request: Request, context: RouteCtx) {
           dueDate: parseDateOnly(parsed.dueDate),
           dueTime: parsed.dueTime,
           priority: parsed.priority,
-          domainId,
+          areaId,
           projectId: parsed.projectId,
           parentTaskId: parsed.parentTaskId,
+          someday: parsed.someday,
           recurrenceRule: parsed.recurrenceRule,
           reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
+          source: `api:${apiKey.label}`,
         },
         { source: "api", label: apiKey.label },
       );
       return { task };
+    }
+
+    if (resource === "areas") {
+      const parsed = createAreaSchema.parse(body);
+      const domainId = await resolveDomainId(parsed.domainId, parsed.domainName);
+      const area = await prisma.area.create({
+        data: {
+          name: parsed.name,
+          domainId,
+          status: parsed.status ?? "active",
+          currentState: parsed.currentState,
+          nextStep: parsed.nextStep,
+          tendingCadence: parsed.tendingCadence,
+          sortOrder: parsed.sortOrder,
+        },
+      });
+      await auditApiWrite(apiKey, "area_created", "Area created", {
+        type: "area",
+        id: area.id,
+      });
+      return { area };
     }
 
     if (resource === "projects" && id && action === "activity") {
@@ -254,12 +358,18 @@ export async function POST(request: Request, context: RouteCtx) {
 
     if (resource === "projects") {
       const parsed = createProjectSchema.parse(body);
-      const domainId = await resolveDomainId(parsed.domainId, parsed.domainName);
+      const areaId = await resolveAreaId(parsed.areaId, parsed.areaName);
+      const now = new Date();
+      const status = parsed.status ?? "active";
       const project = await prisma.project.create({
         data: {
           name: parsed.name,
-          domainId,
+          areaId,
+          status,
           targetDate: parseDateOnly(parsed.targetDate),
+          parkedAt: status === "parked" ? now : undefined,
+          completedAt: status === "completed" ? now : undefined,
+          killedAt: status === "killed" ? now : undefined,
           currentState: parsed.currentState ?? "Created through API.",
           nextStep: parsed.nextStep ?? "Define the next physical step.",
           activity: {
@@ -269,6 +379,7 @@ export async function POST(request: Request, context: RouteCtx) {
               stateSnapshot: {
                 current_state: parsed.currentState ?? "Created through API.",
                 next_step: parsed.nextStep ?? "Define the next physical step.",
+                status,
               },
             },
           },
@@ -299,7 +410,7 @@ export async function POST(request: Request, context: RouteCtx) {
     }
 
     if (resource === "ideas" && id && action === "convert") {
-      const parsed = z.object({ to: z.enum(["task", "project"]), title: z.string().optional(), domainId: z.string().optional() }).parse(body);
+      const parsed = z.object({ to: z.enum(["task", "project"]), title: z.string().optional(), areaId: z.string().optional() }).parse(body);
       const idea = await prisma.idea.findUnique({ where: { id } });
       if (!idea) return notFound();
       if (parsed.to === "task") {
@@ -307,7 +418,7 @@ export async function POST(request: Request, context: RouteCtx) {
           {
             title: parsed.title ?? idea.title,
             notes: idea.body,
-            domainId: parsed.domainId ?? idea.domainId ?? (await getInboxDomainId()),
+            areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
             source: `api:${apiKey.label}`,
           },
           { source: "api", label: apiKey.label },
@@ -322,7 +433,7 @@ export async function POST(request: Request, context: RouteCtx) {
       const project = await prisma.project.create({
         data: {
           name: parsed.title ?? idea.title,
-          domainId: parsed.domainId ?? idea.domainId ?? (await getInboxDomainId()),
+          areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
           currentState: idea.body ?? "Converted from idea.",
           nextStep: "Define the next physical step.",
           activity: { create: { entry: "Converted from idea through API.", source: `api:${apiKey.label}` } },
@@ -342,7 +453,8 @@ export async function POST(request: Request, context: RouteCtx) {
         data: {
           title: parsed.title,
           body: parsed.body,
-          domainId: parsed.domainId,
+          areaId: parsed.areaId,
+          projectId: parsed.projectId,
           tags: parsed.tags ?? [],
           source: `api:${apiKey.label}`,
         },
@@ -358,7 +470,8 @@ export async function POST(request: Request, context: RouteCtx) {
           body: parsed.body,
           url: parsed.url,
           tags: parsed.tags ?? [],
-          domainId: parsed.domainId,
+          areaId: parsed.areaId,
+          projectId: parsed.projectId,
           relatedType: parsed.relatedType,
           relatedId: parsed.relatedId,
           source: `api:${apiKey.label}`,
@@ -369,6 +482,62 @@ export async function POST(request: Request, context: RouteCtx) {
         id: reference.id,
       });
       return { reference };
+    }
+
+    if (resource === "entity-notes") {
+      const parsed = createEntityNoteSchema.parse(body);
+      const note = await prisma.entityNote.create({
+        data: {
+          parentType: parsed.parentType,
+          parentId: parsed.parentId,
+          bodyMd: parsed.bodyMd,
+          source: `api:${apiKey.label}`,
+        },
+      });
+      await auditApiWrite(apiKey, "entity_note_created", "Note added", {
+        type: "entity_note",
+        id: note.id,
+        parentType: note.parentType,
+        parentId: note.parentId,
+      });
+      return { note };
+    }
+
+    if (resource === "entity-docs") {
+      const parsed = createEntityDocSchema.parse(body);
+      const doc = await prisma.entityDoc.create({
+        data: {
+          parentType: parsed.parentType,
+          parentId: parsed.parentId,
+          title: parsed.title,
+          bodyMd: parsed.bodyMd,
+          source: `api:${apiKey.label}`,
+        },
+      });
+      await auditApiWrite(apiKey, "entity_doc_created", "Doc created", {
+        type: "entity_doc",
+        id: doc.id,
+        parentType: doc.parentType,
+        parentId: doc.parentId,
+      });
+      return { doc };
+    }
+
+    if (resource === "milestones") {
+      const parsed = createMilestoneSchema.parse(body);
+      const milestone = await prisma.milestone.create({
+        data: {
+          projectId: parsed.projectId,
+          title: parsed.title,
+          sortOrder: parsed.sortOrder ?? 0,
+        },
+      });
+      await auditApiWrite(apiKey, "milestone_created", "Milestone created", {
+        type: "milestone",
+        id: milestone.id,
+        projectId: milestone.projectId,
+      });
+      return { milestone };
     }
 
     if (resource === "domains") {
@@ -418,6 +587,12 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (resource === "tasks") {
       const parsed = patchTaskSchema.parse(body);
+      const project = parsed.projectId
+        ? await prisma.project.findUnique({
+            where: { id: parsed.projectId },
+            select: { areaId: true },
+          })
+        : null;
       const task = await prisma.task.update({
         where: { id },
         data: {
@@ -427,8 +602,12 @@ export async function PATCH(request: Request, context: RouteCtx) {
           dueDate: parseDateOnly(parsed.dueDate),
           dueTime: parsed.dueTime,
           priority: parsed.priority,
+          areaId:
+            project?.areaId ??
+            (parsed.areaName ? await resolveAreaId(parsed.areaId, parsed.areaName) : parsed.areaId),
           projectId: parsed.projectId,
           parentTaskId: parsed.parentTaskId,
+          someday: parsed.someday,
           recurrenceRule: parsed.recurrenceRule,
           reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
           source: `api:${apiKey.label}`,
@@ -441,10 +620,14 @@ export async function PATCH(request: Request, context: RouteCtx) {
     if (resource === "projects") {
       const parsed = patchProjectSchema.parse(body);
       const now = new Date();
+      const areaId = parsed.areaName
+        ? await resolveAreaId(parsed.areaId, parsed.areaName)
+        : parsed.areaId;
       const project = await prisma.project.update({
         where: { id },
         data: {
           name: parsed.name,
+          areaId,
           status: parsed.status,
           currentState: parsed.currentState,
           nextStep: parsed.nextStep,
@@ -452,7 +635,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
           parkedAt:
             parsed.status === "parked"
               ? now
-              : parsed.status === "active"
+              : parsed.status === "active" || parsed.status === "someday"
                 ? null
                 : undefined,
           completedAt: parsed.status === "completed" ? now : undefined,
@@ -475,11 +658,40 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return { project };
     }
 
+    if (resource === "areas") {
+      const parsed = patchAreaSchema.parse(body);
+      const domainId = parsed.domainName
+        ? await resolveDomainId(parsed.domainId, parsed.domainName)
+        : parsed.domainId;
+      const area = await prisma.area.update({
+        where: { id },
+        data: {
+          name: parsed.name,
+          domainId,
+          status: parsed.status,
+          currentState: parsed.currentState,
+          nextStep: parsed.nextStep,
+          tendingCadence: parsed.tendingCadence,
+          sortOrder: parsed.sortOrder,
+        },
+      });
+      await auditApiWrite(apiKey, "area_updated", "Area updated", { type: "area", id });
+      return { area };
+    }
+
     if (resource === "ideas") {
       const parsed = patchIdeaSchema.parse(body);
       const idea = await prisma.idea.update({
         where: { id },
-        data: parsed,
+        data: {
+          title: parsed.title,
+          body: parsed.body,
+          areaId: parsed.areaId,
+          projectId: parsed.projectId,
+          tags: parsed.tags,
+          status: parsed.status,
+          source: `api:${apiKey.label}`,
+        },
       });
       await auditApiWrite(apiKey, "idea_updated", "Idea updated", { type: "idea", id });
       return { idea };
@@ -493,7 +705,8 @@ export async function PATCH(request: Request, context: RouteCtx) {
           body: parsed.body,
           url: parsed.url,
           tags: parsed.tags,
-          domainId: parsed.domainId,
+          areaId: parsed.areaId,
+          projectId: parsed.projectId,
           relatedType: parsed.relatedType,
           relatedId: parsed.relatedId,
           source: `api:${apiKey.label}`,
@@ -519,6 +732,42 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return { domain };
     }
 
+    if (resource === "entity-docs") {
+      const parsed = patchEntityDocSchema.parse(body);
+      const doc = await prisma.entityDoc.update({
+        where: { id },
+        data: {
+          title: parsed.title,
+          bodyMd: parsed.bodyMd,
+          status: parsed.status,
+          source: `api:${apiKey.label}`,
+        },
+      });
+      await auditApiWrite(apiKey, "entity_doc_updated", "Doc updated", {
+        type: "entity_doc",
+        id,
+      });
+      return { doc };
+    }
+
+    if (resource === "milestones") {
+      const parsed = patchMilestoneSchema.parse(body);
+      const milestone = await prisma.milestone.update({
+        where: { id },
+        data: {
+          title: parsed.title,
+          status: parsed.status,
+          sortOrder: parsed.sortOrder,
+          completedAt: parsed.status === "completed" ? new Date() : undefined,
+        },
+      });
+      await auditApiWrite(apiKey, "milestone_updated", "Milestone updated", {
+        type: "milestone",
+        id,
+      });
+      return { milestone };
+    }
+
     if (resource === "calendar-events") {
       const parsed = patchCalendarEventSchema.parse(body);
       const event = await prisma.calendarEvent.update({
@@ -542,13 +791,6 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     return notFound();
   });
-}
-
-export async function DELETE() {
-  return Response.json(
-    { error: "Delete endpoints do not exist. Use status changes instead." },
-    { status: 405, headers: { Allow: "GET, POST, PATCH" } },
-  );
 }
 
 async function handleApi(
@@ -605,12 +847,31 @@ async function resolveDomainId(domainId?: string, domainName?: string) {
     });
     if (domain) return domain.id;
   }
-  return getInboxDomainId();
+  const system = await prisma.domain.findUnique({ where: { name: "System" } });
+  if (system) return system.id;
+  const fallback = await prisma.domain.findFirst({
+    where: { active: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+  if (!fallback) throw new Error("No active domain is available.");
+  return fallback.id;
 }
 
-async function getInboxDomainId() {
-  const inbox = await prisma.domain.findUnique({ where: { name: "Inbox" } });
-  if (!inbox) throw new Error("Inbox domain is missing.");
+async function resolveAreaId(areaId?: string, areaName?: string) {
+  if (areaId) return areaId;
+  if (areaName) {
+    const area = await prisma.area.findFirst({
+      where: { name: { equals: areaName, mode: "insensitive" } },
+      orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+    });
+    if (area) return area.id;
+  }
+  return getInboxAreaId();
+}
+
+async function getInboxAreaId() {
+  const inbox = await prisma.area.findUnique({ where: { id: "area_inbox" } });
+  if (!inbox) throw new Error("Inbox area is missing.");
   return inbox.id;
 }
 
@@ -644,12 +905,38 @@ async function runSearch(query: string) {
     return { results: [] };
   }
 
-  const [captures, tasks, ideas, references, projectActivity] =
-    await Promise.all([
+  const [
+    captures,
+    areas,
+    projects,
+    tasks,
+    ideas,
+    references,
+    projectActivity,
+    entityNotes,
+    entityDocs,
+    milestones,
+  ] = await Promise.all([
       prisma.$queryRaw`
         SELECT 'capture' AS type, id, raw_text AS title, created_at
         FROM captures
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(raw_text, ''))
+          @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      prisma.$queryRaw`
+        SELECT 'area' AS type, id, name AS title, created_at
+        FROM areas
+        WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(name, '') || ' ' || COALESCE(current_state, '') || ' ' || COALESCE(next_step, ''))
+          @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      prisma.$queryRaw`
+        SELECT 'project' AS type, id, name AS title, created_at
+        FROM projects
+        WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(name, '') || ' ' || COALESCE(current_state, '') || ' ' || COALESCE(next_step, ''))
           @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
         ORDER BY created_at DESC
         LIMIT 20
@@ -686,15 +973,44 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
+      prisma.$queryRaw`
+        SELECT 'entity_note' AS type, id, body_md AS title, created_at
+        FROM entity_notes
+        WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(body_md, ''))
+          @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      prisma.$queryRaw`
+        SELECT 'entity_doc' AS type, id, title, created_at
+        FROM entity_docs
+        WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, '') || ' ' || COALESCE(body_md, ''))
+          @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      prisma.$queryRaw`
+        SELECT 'milestone' AS type, id, title, completed_at AS created_at
+        FROM milestones
+        WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, ''))
+          @@ websearch_to_tsquery('pg_catalog.english'::regconfig, ${query})
+        ORDER BY completed_at DESC NULLS LAST
+        LIMIT 20
+      `,
     ]);
 
   return {
     results: [
       ...(captures as unknown[]),
+      ...(areas as unknown[]),
+      ...(projects as unknown[]),
       ...(tasks as unknown[]),
       ...(ideas as unknown[]),
       ...(references as unknown[]),
       ...(projectActivity as unknown[]),
+      ...(entityNotes as unknown[]),
+      ...(entityDocs as unknown[]),
+      ...(milestones as unknown[]),
     ].slice(0, 50),
   };
 }
@@ -705,10 +1021,11 @@ const createTaskSchema = z.object({
   dueDate: z.string().optional(),
   dueTime: z.string().optional(),
   priority: z.string().optional(),
-  domainId: z.string().optional(),
-  domainName: z.string().optional(),
+  areaId: z.string().optional(),
+  areaName: z.string().optional(),
   projectId: z.string().optional(),
   parentTaskId: z.string().optional(),
+  someday: z.boolean().optional(),
   recurrenceRule: z.string().optional(),
   reminderOffsets: z.array(z.union([z.string(), z.number()])).optional(),
 });
@@ -724,22 +1041,36 @@ const patchTaskSchema = createTaskSchema.partial().extend({
 
 const createProjectSchema = z.object({
   name: z.string().min(1),
-  domainId: z.string().optional(),
-  domainName: z.string().optional(),
+  areaId: z.string().optional(),
+  areaName: z.string().optional(),
+  status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
   currentState: z.string().optional(),
   nextStep: z.string().optional(),
   targetDate: z.string().optional(),
 });
 
 const patchProjectSchema = createProjectSchema.partial().extend({
-  status: z.enum(["active", "parked", "completed", "killed"]).optional(),
   logEntry: z.string().optional(),
 });
+
+const createAreaSchema = z.object({
+  name: z.string().min(1),
+  domainId: z.string().optional(),
+  domainName: z.string().optional(),
+  status: z.enum(["active", "parked", "retired"]).optional(),
+  currentState: z.string().optional(),
+  nextStep: z.string().optional(),
+  tendingCadence: z.string().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+const patchAreaSchema = createAreaSchema.partial();
 
 const createIdeaSchema = z.object({
   title: z.string().min(1),
   body: z.string().optional(),
-  domainId: z.string().optional(),
+  areaId: z.string().optional(),
+  projectId: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -751,7 +1082,8 @@ const createReferenceSchema = z.object({
   body: z.string().min(1),
   url: z.string().url().optional(),
   tags: z.array(z.string()).optional(),
-  domainId: z.string().optional(),
+  areaId: z.string().optional(),
+  projectId: z.string().optional(),
   relatedType: z.string().optional(),
   relatedId: z.string().optional(),
 });
@@ -766,6 +1098,33 @@ const createDomainSchema = z.object({
 });
 
 const patchDomainSchema = createDomainSchema.partial();
+
+const createEntityNoteSchema = z.object({
+  parentType: z.enum(["area", "project"]),
+  parentId: z.string().min(1),
+  bodyMd: z.string().min(1),
+});
+
+const createEntityDocSchema = z.object({
+  parentType: z.enum(["area", "project"]),
+  parentId: z.string().min(1),
+  title: z.string().min(1),
+  bodyMd: z.string().default(""),
+});
+
+const patchEntityDocSchema = createEntityDocSchema.partial().extend({
+  status: z.enum(["active", "archived"]).optional(),
+});
+
+const createMilestoneSchema = z.object({
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  sortOrder: z.number().int().optional(),
+});
+
+const patchMilestoneSchema = createMilestoneSchema.partial().extend({
+  status: z.enum(["open", "completed"]).optional(),
+});
 
 const createCalendarEventSchema = z.object({
   title: z.string().min(1),

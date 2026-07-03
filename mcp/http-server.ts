@@ -36,7 +36,8 @@ function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "search",
     {
-      description: "Full-text search across captures, tasks, ideas, references, and project activity.",
+      description:
+        "Full-text search across captures, tasks, ideas, references, project activity, notes, and docs.",
       inputSchema: z.object({ query: z.string().min(1) }),
     },
     async ({ query }) =>
@@ -52,8 +53,10 @@ function registerTools(server: McpServer, bearerToken: string) {
         notes: z.string().optional(),
         dueDate: z.string().optional(),
         dueTime: z.string().optional(),
-        domainName: z.string().optional(),
+        areaId: z.string().optional(),
+        areaName: z.string().optional(),
         projectId: z.string().optional(),
+        someday: z.boolean().optional(),
         reminderOffsets: z.array(z.union([z.string(), z.number()])).optional(),
         recurrenceRule: z.string().optional(),
       }),
@@ -72,14 +75,83 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_areas",
+    {
+      description: "List Home Base areas, including their parent domains.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/areas")),
+  );
+
+  server.registerTool(
+    "read_area",
+    {
+      description: "Read an area with its open tasks, projects, notes, docs, and attachments.",
+      inputSchema: z.object({ areaId: z.string().min(1) }),
+    },
+    async ({ areaId }) => toToolResult(await apiFetch(bearerToken, `/areas/${areaId}`)),
+  );
+
+  server.registerTool(
+    "create_area",
+    {
+      description: "Create an area under an existing or named domain.",
+      inputSchema: z.object({
+        name: z.string().min(1),
+        domainId: z.string().optional(),
+        domainName: z.string().optional(),
+        currentState: z.string().optional(),
+        nextStep: z.string().optional(),
+        tendingCadence: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/areas", "POST", input)),
+  );
+
+  server.registerTool(
+    "update_area_state",
+    {
+      description: "Update an area's current state, next step, tending cadence, or status.",
+      inputSchema: z.object({
+        areaId: z.string().min(1),
+        currentState: z.string().optional(),
+        nextStep: z.string().optional(),
+        tendingCadence: z.string().optional(),
+        status: z.enum(["active", "parked", "retired"]).optional(),
+      }),
+    },
+    async ({ areaId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/areas/${areaId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      description: "Create a project in an area. Projects can start active or someday.",
+      inputSchema: z.object({
+        name: z.string().min(1),
+        areaId: z.string().optional(),
+        areaName: z.string().optional(),
+        status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
+        currentState: z.string().optional(),
+        nextStep: z.string().optional(),
+        targetDate: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/projects", "POST", input)),
+  );
+
+  server.registerTool(
     "update_project_state",
     {
       description: "Update project current state, next step, status, and activity log.",
       inputSchema: z.object({
         projectId: z.string().min(1),
+        areaId: z.string().optional(),
+        areaName: z.string().optional(),
         currentState: z.string().optional(),
         nextStep: z.string().optional(),
-        status: z.enum(["active", "parked", "completed", "killed"]).optional(),
+        status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
         logEntry: z.string().optional(),
       }),
     },
@@ -90,7 +162,7 @@ function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "park_project",
     {
-      description: "Park a project into Someday without deleting or hiding history.",
+      description: "Park a project without deleting or hiding history.",
       inputSchema: z.object({
         projectId: z.string().min(1),
         whereLeftOff: z.string().optional(),
@@ -128,6 +200,8 @@ function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({
         title: z.string().min(1),
         body: z.string().optional(),
+        areaId: z.string().optional(),
+        projectId: z.string().optional(),
         tags: z.array(z.string()).optional(),
       }),
     },
@@ -142,11 +216,80 @@ function registerTools(server: McpServer, bearerToken: string) {
         ideaId: z.string().min(1),
         to: z.enum(["task", "project"]),
         title: z.string().optional(),
-        domainId: z.string().optional(),
+        areaId: z.string().optional(),
       }),
     },
     async ({ ideaId, ...body }) =>
       toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}/convert`, "POST", body)),
+  );
+
+  server.registerTool(
+    "add_entity_note",
+    {
+      description: "Append a markdown note to an area or project.",
+      inputSchema: z.object({
+        parentType: z.enum(["area", "project"]),
+        parentId: z.string().min(1),
+        bodyMd: z.string().min(1),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/entity-notes", "POST", input)),
+  );
+
+  server.registerTool(
+    "create_entity_doc",
+    {
+      description: "Create a markdown doc on an area or project.",
+      inputSchema: z.object({
+        parentType: z.enum(["area", "project"]),
+        parentId: z.string().min(1),
+        title: z.string().min(1),
+        bodyMd: z.string().default(""),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/entity-docs", "POST", input)),
+  );
+
+  server.registerTool(
+    "update_entity_doc",
+    {
+      description: "Update or archive an area/project markdown doc.",
+      inputSchema: z.object({
+        docId: z.string().min(1),
+        title: z.string().optional(),
+        bodyMd: z.string().optional(),
+        status: z.enum(["active", "archived"]).optional(),
+      }),
+    },
+    async ({ docId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/entity-docs/${docId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
+    "create_milestone",
+    {
+      description: "Create a project milestone.",
+      inputSchema: z.object({
+        projectId: z.string().min(1),
+        title: z.string().min(1),
+        sortOrder: z.number().int().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/milestones", "POST", input)),
+  );
+
+  server.registerTool(
+    "complete_milestone",
+    {
+      description: "Mark a project milestone complete without deleting it.",
+      inputSchema: z.object({ milestoneId: z.string().min(1) }),
+    },
+    async ({ milestoneId }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/milestones/${milestoneId}`, "PATCH", {
+          status: "completed",
+        }),
+      ),
   );
 
   server.registerTool(

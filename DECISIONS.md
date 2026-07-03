@@ -21,6 +21,7 @@ These are the initial build defaults from SCOPE.md Section 16. They are written 
 - Use PostgreSQL with Prisma 7 and the `@prisma/adapter-pg` adapter.
 - Keep the capture ledger as the first persistence step for every capture request. Parser failure must not roll back the raw capture row.
 - Chat-style in-app search is paused. Agent access through REST API plus MCP is the third search mode for now.
+- Agent access follows the same hierarchy as the UI: domains are headers, areas and projects are writable containers, shared markdown notes/docs are first-class searchable depth, and all API writes create notification audit entries.
 - Use local `pg_dump` backups through `scripts/backup-database.ts`. Off-machine database backups are paused during alpha and should resume when daily reliance begins.
 - Pushover reminder delivery is the first production notification channel. Missing Pushover credentials must not create failed reminder delivery records.
 - Google OAuth refresh tokens are stored encrypted in the database. The encryption key itself must live in 1Password/Railway environment variables, not the repo.
