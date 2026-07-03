@@ -440,6 +440,154 @@ export async function updateAreaState(formData: FormData) {
   redirect(`/areas/${areaId}`);
 }
 
+export async function addEntityNote(formData: FormData) {
+  const parentType = getTrimmedString(formData, "parentType");
+  const parentId = getTrimmedString(formData, "parentId");
+  const bodyMd = getTrimmedString(formData, "bodyMd");
+  if ((parentType !== "area" && parentType !== "project") || !parentId || !bodyMd) {
+    return;
+  }
+
+  await prisma.entityNote.create({
+    data: {
+      parentType,
+      parentId,
+      bodyMd,
+      source: "manual",
+    },
+  });
+
+  revalidateEntityParent(parentType, parentId);
+}
+
+export async function createEntityDoc(formData: FormData) {
+  const parentType = getTrimmedString(formData, "parentType");
+  const parentId = getTrimmedString(formData, "parentId");
+  const title = getTrimmedString(formData, "title");
+  const bodyMd = getTrimmedString(formData, "bodyMd");
+  if (
+    (parentType !== "area" && parentType !== "project") ||
+    !parentId ||
+    !title ||
+    !bodyMd
+  ) {
+    return;
+  }
+
+  await prisma.entityDoc.create({
+    data: {
+      parentType,
+      parentId,
+      title,
+      bodyMd,
+      source: "manual",
+    },
+  });
+
+  revalidateEntityParent(parentType, parentId);
+}
+
+export async function updateEntityDoc(formData: FormData) {
+  const docId = getTrimmedString(formData, "docId");
+  const title = getTrimmedString(formData, "title");
+  const bodyMd = getTrimmedString(formData, "bodyMd");
+  if (!docId || !title || !bodyMd) return;
+
+  const doc = await prisma.entityDoc.update({
+    where: { id: docId },
+    data: { title, bodyMd },
+  });
+
+  revalidateEntityParent(doc.parentType, doc.parentId);
+}
+
+export async function archiveEntityDoc(formData: FormData) {
+  const docId = getTrimmedString(formData, "docId");
+  if (!docId) return;
+
+  const doc = await prisma.entityDoc.update({
+    where: { id: docId },
+    data: { status: "archived" },
+  });
+
+  revalidateEntityParent(doc.parentType, doc.parentId);
+}
+
+export async function addMilestone(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  const title = getTrimmedString(formData, "title");
+  if (!projectId || !title) return;
+
+  const last = await prisma.milestone.findFirst({
+    where: { projectId },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true },
+  });
+
+  await prisma.milestone.create({
+    data: {
+      projectId,
+      title,
+      sortOrder: (last?.sortOrder ?? 0) + 10,
+    },
+  });
+
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function completeMilestone(formData: FormData) {
+  const milestoneId = getTrimmedString(formData, "milestoneId");
+  if (!milestoneId) return;
+
+  const milestone = await prisma.milestone.update({
+    where: { id: milestoneId },
+    data: { status: "completed", completedAt: new Date() },
+  });
+
+  revalidatePath(`/projects/${milestone.projectId}`);
+}
+
+export async function moveMilestone(formData: FormData) {
+  const milestoneId = getTrimmedString(formData, "milestoneId");
+  const direction = getTrimmedString(formData, "direction");
+  if (!milestoneId || (direction !== "up" && direction !== "down")) return;
+
+  const milestone = await prisma.milestone.findUnique({
+    where: { id: milestoneId },
+  });
+  if (!milestone) return;
+
+  const sibling = await prisma.milestone.findFirst({
+    where: {
+      projectId: milestone.projectId,
+      status: "open",
+      sortOrder:
+        direction === "up"
+          ? { lt: milestone.sortOrder }
+          : { gt: milestone.sortOrder },
+    },
+    orderBy: { sortOrder: direction === "up" ? "desc" : "asc" },
+  });
+  if (!sibling) return;
+
+  await prisma.$transaction([
+    prisma.milestone.update({
+      where: { id: milestone.id },
+      data: { sortOrder: sibling.sortOrder },
+    }),
+    prisma.milestone.update({
+      where: { id: sibling.id },
+      data: { sortOrder: milestone.sortOrder },
+    }),
+  ]);
+
+  revalidatePath(`/projects/${milestone.projectId}`);
+}
+
+function revalidateEntityParent(parentType: "area" | "project", parentId: string) {
+  revalidatePath(parentType === "area" ? `/areas/${parentId}` : `/projects/${parentId}`);
+}
+
 export async function parkArea(formData: FormData) {
   await setAreaStatus(formData, "parked");
 }

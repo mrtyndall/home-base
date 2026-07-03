@@ -37,6 +37,7 @@ yarn-error.log*
 # generated database backups
 /backups
 *.dump
+/.data
 
 # vercel
 .vercel

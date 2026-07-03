@@ -9,7 +9,7 @@ import {
   updateAreaState,
 } from "@/app/actions";
 import { SetupNotice } from "@/components/setup-notice";
-import { formatShortDate } from "@/lib/dates";
+import { EntityDepth } from "@/components/entity-depth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -143,30 +143,6 @@ export default async function AreaPage({ params }: AreaPageProps) {
           ))}
         </Panel>
 
-        <Panel title="Notes" empty="No notes yet.">
-          {area.notes.map((note) => (
-            <div key={note.id} className="py-2">
-              <p className="whitespace-pre-wrap text-sm text-stone-800">
-                {note.bodyMd}
-              </p>
-              <p className="mt-0.5 text-xs text-stone-500">
-                {formatShortDate(note.createdAt)}
-              </p>
-            </div>
-          ))}
-        </Panel>
-
-        <Panel title="Docs" empty="No docs yet.">
-          {area.docs.map((doc) => (
-            <div key={doc.id} className="py-2">
-              <p className="text-sm font-medium text-stone-800">{doc.title}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-stone-500">
-                {doc.bodyMd}
-              </p>
-            </div>
-          ))}
-        </Panel>
-
         <Panel title="Linked ideas" empty="No linked ideas.">
           {area.ideas.map((idea) => (
             <Link
@@ -179,6 +155,14 @@ export default async function AreaPage({ params }: AreaPageProps) {
           ))}
         </Panel>
       </section>
+
+      <EntityDepth
+        parentType="area"
+        parentId={area.id}
+        notes={area.notes}
+        docs={area.docs}
+        attachments={area.attachments}
+      />
     </div>
   );
 }
@@ -256,7 +240,7 @@ async function loadArea(areaId: string) {
       },
     });
 
-    const [notes, docs] = area
+    const [notes, docs, attachments] = area
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
@@ -268,12 +252,17 @@ async function loadArea(areaId: string) {
             orderBy: { updatedAt: "desc" },
             take: 12,
           }),
+          prisma.document.findMany({
+            where: { parentType: "area", parentId: area.id },
+            orderBy: { createdAt: "desc" },
+            take: 12,
+          }),
         ])
-      : [[], []];
+      : [[], [], []];
 
     return {
       ok: true as const,
-      area: area ? { ...area, notes, docs } : null,
+      area: area ? { ...area, notes, docs, attachments } : null,
     };
   } catch {
     return { ok: false as const };

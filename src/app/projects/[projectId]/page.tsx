@@ -10,6 +10,7 @@ import {
   UnparkProjectButton,
 } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
+import { EntityDepth, MilestonesPanel } from "@/components/entity-depth";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 
@@ -178,6 +179,19 @@ export default async function ProjectDetailPage({
           )}
         </div>
       </section>
+
+      <MilestonesPanel
+        projectId={project.id}
+        milestones={project.milestones}
+      />
+
+      <EntityDepth
+        parentType="project"
+        parentId={project.id}
+        notes={project.notes}
+        docs={project.docs}
+        attachments={project.attachments}
+      />
     </div>
   );
 }
@@ -197,10 +211,36 @@ async function loadProject(projectId: string) {
           orderBy: { createdAt: "desc" },
           take: 12,
         },
+        milestones: {
+          orderBy: [{ status: "asc" }, { sortOrder: "asc" }],
+        },
       },
     });
 
-    return { ok: true as const, project };
+    const [notes, docs, attachments] = project
+      ? await Promise.all([
+          prisma.entityNote.findMany({
+            where: { parentType: "project", parentId: project.id },
+            orderBy: { createdAt: "desc" },
+            take: 12,
+          }),
+          prisma.entityDoc.findMany({
+            where: { parentType: "project", parentId: project.id, status: "active" },
+            orderBy: { updatedAt: "desc" },
+            take: 12,
+          }),
+          prisma.document.findMany({
+            where: { parentType: "project", parentId: project.id },
+            orderBy: { createdAt: "desc" },
+            take: 12,
+          }),
+        ])
+      : [[], [], []];
+
+    return {
+      ok: true as const,
+      project: project ? { ...project, notes, docs, attachments } : null,
+    };
   } catch {
     return { ok: false as const };
   }

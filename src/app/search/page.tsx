@@ -76,7 +76,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 async function runSearch(query: string) {
   try {
-    const [captures, tasks, projects, ideas, references] = await Promise.all([
+    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs] =
+      await Promise.all([
       prisma.capture.findMany({
         where: { rawText: { contains: query, mode: "insensitive" } },
         orderBy: { createdAt: "desc" },
@@ -123,6 +124,22 @@ async function runSearch(query: string) {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      prisma.entityNote.findMany({
+        where: { bodyMd: { contains: query, mode: "insensitive" } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.entityDoc.findMany({
+        where: {
+          status: "active",
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { bodyMd: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 20,
+      }),
     ]);
 
     const results = [
@@ -155,6 +172,18 @@ async function runSearch(query: string) {
         id: reference.id,
         title: reference.body,
         detail: reference.url ?? undefined,
+      })),
+      ...entityNotes.map((note) => ({
+        type: "Note",
+        id: note.id,
+        title: note.bodyMd,
+        detail: formatShortDate(note.createdAt),
+      })),
+      ...entityDocs.map((doc) => ({
+        type: "Doc",
+        id: doc.id,
+        title: doc.title,
+        detail: formatShortDate(doc.updatedAt),
       })),
     ].slice(0, 40);
 
