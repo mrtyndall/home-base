@@ -40,6 +40,19 @@ export function formatShortDate(value: Date | string | null | undefined) {
   }).format(date);
 }
 
+export function formatDateOnly(value: Date | string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 export function formatTime(value: Date | string) {
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("en-US", {

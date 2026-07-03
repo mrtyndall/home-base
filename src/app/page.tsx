@@ -6,8 +6,9 @@ import {
   RefreshCcw,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
-import { formatShortDate, formatTime } from "@/lib/dates";
+import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
 
 export const dynamic = "force-dynamic";
@@ -79,13 +80,16 @@ export default async function TodayPage() {
                       key={task.id}
                       className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4"
                     >
-                      <div>
+                      <Link
+                        href={`/tasks/${task.id}`}
+                        className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+                      >
                         <h3 className="font-medium">{task.title}</h3>
                         <p className="mt-1 text-sm text-stone-500">
                           {task.domain.name}
                           {task.project ? ` / ${task.project.name}` : ""}
                         </p>
-                      </div>
+                      </Link>
                       <TaskCompleteButton taskId={task.id} />
                     </div>
                   ))
@@ -112,12 +116,19 @@ export default async function TodayPage() {
                 {data.dueTomorrow.map((task) => (
                   <div
                     key={task.id}
-                    className="rounded-lg border border-stone-200 bg-white p-4"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4"
                   >
-                    <h3 className="font-medium">{task.title}</h3>
-                    <p className="mt-1 text-sm text-stone-500">
-                      {task.domain.name}
-                    </p>
+                    <Link
+                      href={`/tasks/${task.id}`}
+                      className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+                    >
+                      <h3 className="font-medium">{task.title}</h3>
+                      <p className="mt-1 text-sm text-stone-500">
+                        {task.domain.name}
+                        {task.project ? ` / ${task.project.name}` : ""}
+                      </p>
+                    </Link>
+                    <TaskCompleteButton taskId={task.id} />
                   </div>
                 ))}
                 {data.tomorrowEvents.length === 0 &&
@@ -210,7 +221,7 @@ function StatusLine({
     const nextCommitment = data.nextEvent
       ? `Next commitment ${formatShortDate(data.nextEvent.start)} at ${formatTime(data.nextEvent.start)}.`
       : data.nextTask
-        ? `Next task due ${formatShortDate(data.nextTask.dueDate)}.`
+        ? `Next task due ${formatDateOnly(data.nextTask.dueDate)}.`
         : "No upcoming dated commitments.";
 
     return (

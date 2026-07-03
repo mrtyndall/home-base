@@ -24,6 +24,25 @@ export type CreateTaskInput = {
   captureId?: string | null;
 };
 
+export type CreateTaskWithDefaultDomainInput = Omit<
+  CreateTaskInput,
+  "domainId"
+> & {
+  domainId?: string | null;
+};
+
+export async function createTaskWithDefaultDomain(
+  input: CreateTaskWithDefaultDomainInput,
+  actor: WriteActor,
+) {
+  const domainId = input.domainId ?? (await getDefaultDomainId());
+  if (!domainId) {
+    throw new Error("No active domain is available for task creation.");
+  }
+
+  return createTaskWithAudit({ ...input, domainId }, actor);
+}
+
 export async function createTaskWithAudit(
   input: CreateTaskInput,
   actor: WriteActor,
@@ -165,6 +184,24 @@ function getNextRecurrenceDue(task: Task) {
       `${formatInTimeZone(next, APP_TIMEZONE, "yyyy-MM-dd")}T00:00:00.000Z`,
     ),
   };
+}
+
+async function getDefaultDomainId() {
+  const inbox = await prisma.domain.findUnique({
+    where: { name: "Inbox" },
+    select: { id: true, active: true },
+  });
+  if (inbox?.active) {
+    return inbox.id;
+  }
+
+  const fallback = await prisma.domain.findFirst({
+    where: { active: true },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true },
+  });
+
+  return fallback?.id ?? null;
 }
 
 export function getTaskDueDateTime(

@@ -1,6 +1,6 @@
 import type { Domain, Project } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { formatShortDate } from "@/lib/dates";
+import { formatDateOnly } from "@/lib/dates";
 import { ParkProjectForm, UnparkProjectButton } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 
@@ -72,7 +72,7 @@ function ProjectShelf({
                   <p className="mt-1 text-sm text-stone-500">
                     {project.domain.name} / {project.status}
                     {project.targetDate
-                      ? ` / target ${formatShortDate(project.targetDate)}`
+                      ? ` / target ${formatDateOnly(project.targetDate)}`
                       : ""}
                   </p>
                 </div>

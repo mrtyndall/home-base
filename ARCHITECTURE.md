@@ -25,7 +25,7 @@ The current active runtime is local:
 
 - Database: Homebrew PostgreSQL database `home_base`
 - Local env: `.env.local` with `DATABASE_URL`
-- App server: LaunchAgent `com.mrtyndall.home-base`
+- App server: LaunchAgent `com.mrtyndall.home-base`, using the production standalone server with `.env.local` loaded at start
 - Reminder scheduler: LaunchAgent `com.mrtyndall.home-base-reminders`
 - Calendar sync scheduler: LaunchAgent `com.mrtyndall.home-base-calendar-sync`
 - App port: `127.0.0.1:3002`
@@ -114,6 +114,7 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 
 ### 2026-07-03
 
+- Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
 - Implemented the hosted Google OAuth path chosen by Matt: OAuth start/callback routes, encrypted refresh-token storage, sync-token based pull, local-event push to Google, and a 15-minute scheduler command.
 - Created the Railway `home-base` project with Postgres and deployed the app at `https://home-base-production-e3b7.up.railway.app/`.
 - Added Milestone 2 foundations: reminder deliveries, API keys, calendar sync state, REST API, MCP server, parked project UI, subtask UI, recurrence-on-completion behavior, and Apple Reminders CSV import.

@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { completeTaskById, createTaskWithAudit } from "@/lib/tasks";
+import { dateOnlyFromString } from "@/lib/dates";
+import {
+  completeTaskById,
+  createTaskWithAudit,
+  createTaskWithDefaultDomain,
+} from "@/lib/tasks";
 
 export async function completeTask(formData: FormData) {
   const taskId = formData.get("taskId");
@@ -14,6 +21,88 @@ export async function completeTask(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/tasks");
+}
+
+export async function createQuickTask(formData: FormData) {
+  const title = getTrimmedString(formData, "title");
+  if (!title) return;
+
+  const dueDateValue = getTrimmedString(formData, "dueDate");
+
+  await createTaskWithDefaultDomain(
+    {
+      title,
+      dueDate: dueDateValue ? dateOnlyFromString(dueDateValue) : null,
+    },
+    { source: "manual" },
+  );
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
+}
+
+export async function updateTaskDetail(formData: FormData) {
+  const taskId = getTrimmedString(formData, "taskId");
+  if (!taskId) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, title: true },
+  });
+  if (!task) return;
+
+  const domainId = getTrimmedString(formData, "domainId");
+  if (!domainId) return;
+
+  const projectId = getTrimmedString(formData, "projectId");
+  const validProject = projectId
+    ? await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          domainId,
+          status: { in: ["active", "parked"] },
+        },
+        select: { id: true },
+      })
+    : null;
+
+  const dueDate = getTrimmedString(formData, "dueDate");
+  const dueTime = getTrimmedString(formData, "dueTime");
+  const priority = getTrimmedString(formData, "priority");
+  const notes = getTrimmedString(formData, "notes");
+  const recurrenceRule = getTrimmedString(formData, "recurrenceRule");
+  const reminderOffsets = parseReminderOffsetsInput(
+    getTrimmedString(formData, "reminderOffsets"),
+  );
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      dueDate: dueDate ? dateOnlyFromString(dueDate) : null,
+      dueTime: dueTime || null,
+      priority: priority || null,
+      domainId,
+      projectId: validProject?.id ?? null,
+      notes: notes || null,
+      recurrenceRule: recurrenceRule || null,
+      reminderOffsets:
+        reminderOffsets.length > 0 ? reminderOffsets : Prisma.JsonNull,
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "task_updated",
+      title: "Task updated",
+      body: updated.title,
+      sourceRef: { type: "task", id: updated.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
+  revalidatePath(`/tasks/${taskId}`);
+  redirect(`/tasks/${taskId}`);
 }
 
 export async function addSubtask(formData: FormData) {
@@ -46,6 +135,7 @@ export async function addSubtask(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/tasks");
+  revalidatePath(`/tasks/${parentTaskId}`);
 }
 
 export async function parkProject(formData: FormData) {
@@ -91,6 +181,21 @@ export async function parkProject(formData: FormData) {
   });
 
   revalidatePath("/projects");
+}
+
+function getTrimmedString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function parseReminderOffsetsInput(value: string) {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isFinite(item) && item >= 0)
+    .map((item) => Math.trunc(item));
 }
 
 export async function unparkProject(formData: FormData) {
