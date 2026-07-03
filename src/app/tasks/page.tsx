@@ -1,10 +1,10 @@
 import type { Domain, Project, Task } from "@prisma/client";
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { addSubtask } from "@/app/actions";
 import { prisma } from "@/lib/db";
-import { formatDateOnly } from "@/lib/dates";
+import { addDaysToDateString, formatDateOnly, localDateString } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { DraggableTaskLink } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
 
@@ -21,6 +21,8 @@ export default async function TasksPage() {
   }
 
   const { tasks } = result;
+  const today = localDateString();
+  const tomorrow = addDaysToDateString(today, 1);
 
   return (
     <div className="space-y-5">
@@ -40,24 +42,18 @@ export default async function TasksPage() {
               className="rounded-lg border border-stone-200 bg-white p-4"
             >
               <div className="flex items-start justify-between gap-3">
-                <Link
+                <DraggableTaskLink
+                  taskId={task.id}
                   href={`/tasks/${task.id}`}
-                  className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
-                >
-                  <h2 className="font-medium">{task.title}</h2>
-                  <p className="mt-1 text-sm text-stone-500">
-                    {task.domain.name}
-                    {task.project ? ` / ${task.project.name}` : ""}
-                    {task.dueDate ? ` / ${formatDateOnly(task.dueDate)}` : ""}
-                    {task.recurrenceRule ? " / repeats" : ""}
-                  </p>
-                  {task.notes ? (
-                    <p className="mt-2 text-sm text-stone-700">{task.notes}</p>
-                  ) : null}
-                </Link>
+                  title={task.title}
+                  detail={formatTaskDetail(task)}
+                  currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+                  today={today}
+                  tomorrow={tomorrow}
+                />
                 <TaskCompleteButton taskId={task.id} />
               </div>
-              <SubtaskList subtasks={task.subtasks} />
+              <SubtaskList subtasks={task.subtasks} today={today} tomorrow={tomorrow} />
               <AddSubtaskForm parentTaskId={task.id} />
             </article>
           ))
@@ -67,7 +63,15 @@ export default async function TasksPage() {
   );
 }
 
-function SubtaskList({ subtasks }: { subtasks: TaskListItem["subtasks"] }) {
+function SubtaskList({
+  subtasks,
+  today,
+  tomorrow,
+}: {
+  subtasks: TaskListItem["subtasks"];
+  today: string;
+  tomorrow: string;
+}) {
   if (subtasks.length === 0) {
     return null;
   }
@@ -76,17 +80,15 @@ function SubtaskList({ subtasks }: { subtasks: TaskListItem["subtasks"] }) {
     <div className="mt-3 divide-y divide-stone-100 border-t border-stone-100 pt-2">
       {subtasks.map((subtask) => (
         <div key={subtask.id} className="flex items-center justify-between gap-3 py-2">
-          <Link
+          <DraggableTaskLink
+            taskId={subtask.id}
             href={`/tasks/${subtask.id}`}
-            className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
-          >
-            <p className="text-sm font-medium text-stone-800">{subtask.title}</p>
-            {subtask.dueDate ? (
-              <p className="mt-0.5 text-xs text-stone-500">
-                {formatDateOnly(subtask.dueDate)}
-              </p>
-            ) : null}
-          </Link>
+            title={subtask.title}
+            detail={subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"}
+            currentDueDate={subtask.dueDate?.toISOString().slice(0, 10) ?? null}
+            today={today}
+            tomorrow={tomorrow}
+          />
           <TaskCompleteButton taskId={subtask.id} />
         </div>
       ))}
@@ -119,6 +121,17 @@ type TaskListItem = Task & {
   project: Project | null;
   subtasks: Task[];
 };
+
+function formatTaskDetail(task: TaskListItem) {
+  return [
+    task.domain.name,
+    task.project?.name,
+    task.dueDate ? formatDateOnly(task.dueDate) : null,
+    task.recurrenceRule ? "repeats" : null,
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join(" / ");
+}
 
 async function loadTasks() {
   try {

@@ -104,6 +104,7 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 - `src/app/api/v1/[...path]/route.ts`: REST API for agent access.
 - `src/app/api/google/oauth/start/route.ts`: Google OAuth authorization start.
 - `src/app/api/google/oauth/callback/route.ts`: Google OAuth callback and initial sync.
+- `src/app/api/tasks/[taskId]/schedule/route.ts`: narrow manual task rescheduling endpoint used by row menus and drag/drop.
 - `mcp/http-server.ts`: streamable HTTP MCP wrapper around the REST API.
 - `src/lib/calendar/google.ts`: Google OAuth, encrypted token storage, push/pull sync, and conflict handling.
 - `src/lib/db.ts`: Prisma client configured for PostgreSQL.
@@ -115,6 +116,7 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 ### 2026-07-03
 
 - Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
+- Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Implemented the hosted Google OAuth path chosen by Matt: OAuth start/callback routes, encrypted refresh-token storage, sync-token based pull, local-event push to Google, and a 15-minute scheduler command.
 - Created the Railway `home-base` project with Postgres and deployed the app at `https://home-base-production-e3b7.up.railway.app/`.
 - Added Milestone 2 foundations: reminder deliveries, API keys, calendar sync state, REST API, MCP server, parked project UI, subtask UI, recurrence-on-completion behavior, and Apple Reminders CSV import.

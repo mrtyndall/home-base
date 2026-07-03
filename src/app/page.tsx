@@ -6,10 +6,10 @@ import {
   RefreshCcw,
   type LucideIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 
 export const dynamic = "force-dynamic";
 
@@ -71,30 +71,20 @@ export default async function TodayPage() {
 
             <div className="space-y-3">
               <SectionHeader icon={Clock3} title="Due Today" />
-              <div className="space-y-2">
-                {data.dueToday.length === 0 ? (
-                  <EmptyLine text="No tasks due today." />
-                ) : (
-                  data.dueToday.map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4"
-                    >
-                      <Link
-                        href={`/tasks/${task.id}`}
-                        className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
-                      >
-                        <h3 className="font-medium">{task.title}</h3>
-                        <p className="mt-1 text-sm text-stone-500">
-                          {task.domain.name}
-                          {task.project ? ` / ${task.project.name}` : ""}
-                        </p>
-                      </Link>
-                      <TaskCompleteButton taskId={task.id} />
-                    </div>
-                  ))
-                )}
-              </div>
+              <TaskDropZone
+                targetDate={data.today}
+                isEmpty={data.dueToday.length === 0}
+                emptyText="No tasks due today."
+              >
+                {data.dueToday.map((task) => (
+                  <TodayTaskRow
+                    key={task.id}
+                    task={task}
+                    today={data.today}
+                    tomorrow={data.tomorrow}
+                  />
+                ))}
+              </TaskDropZone>
             </div>
           </section>
 
@@ -113,28 +103,24 @@ export default async function TodayPage() {
                     <h3 className="mt-1 font-medium">{event.title}</h3>
                   </div>
                 ))}
-                {data.dueTomorrow.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4"
-                  >
-                    <Link
-                      href={`/tasks/${task.id}`}
-                      className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
-                    >
-                      <h3 className="font-medium">{task.title}</h3>
-                      <p className="mt-1 text-sm text-stone-500">
-                        {task.domain.name}
-                        {task.project ? ` / ${task.project.name}` : ""}
-                      </p>
-                    </Link>
-                    <TaskCompleteButton taskId={task.id} />
-                  </div>
-                ))}
-                {data.tomorrowEvents.length === 0 &&
-                data.dueTomorrow.length === 0 ? (
-                  <EmptyLine text="Nothing due tomorrow." />
-                ) : null}
+                <TaskDropZone
+                  targetDate={data.tomorrow}
+                  isEmpty={data.dueTomorrow.length === 0}
+                  emptyText={
+                    data.tomorrowEvents.length === 0
+                      ? "Nothing due tomorrow."
+                      : "No tasks due tomorrow."
+                  }
+                >
+                  {data.dueTomorrow.map((task) => (
+                    <TodayTaskRow
+                      key={task.id}
+                      task={task}
+                      today={data.today}
+                      tomorrow={data.tomorrow}
+                    />
+                  ))}
+                </TaskDropZone>
               </div>
             </div>
 
@@ -165,6 +151,41 @@ export default async function TodayPage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+type TodayTask = {
+  id: string;
+  title: string;
+  dueDate: Date | null;
+  domain: { name: string };
+  project: { name: string } | null;
+};
+
+function TodayTaskRow({
+  task,
+  today,
+  tomorrow,
+}: {
+  task: TodayTask;
+  today: string;
+  tomorrow: string;
+}) {
+  const detail = `${task.domain.name}${task.project ? ` / ${task.project.name}` : ""}`;
+
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">
+      <DraggableTaskLink
+        taskId={task.id}
+        href={`/tasks/${task.id}`}
+        title={task.title}
+        detail={detail}
+        currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+        today={today}
+        tomorrow={tomorrow}
+      />
+      <TaskCompleteButton taskId={task.id} />
     </div>
   );
 }
