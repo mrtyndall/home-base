@@ -13,10 +13,17 @@ type SavedTask = {
   projectName: string | null;
 };
 
-export function TaskQuickAdd() {
+export type QuickAddProject = {
+  id: string;
+  name: string;
+  domainName: string;
+};
+
+export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [savedTask, setSavedTask] = useState<SavedTask | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -34,7 +41,7 @@ export function TaskQuickAdd() {
       const response = await fetch("/api/tasks/quick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmedTitle, dueDate }),
+        body: JSON.stringify({ title: trimmedTitle, dueDate, projectId }),
       });
 
       if (!response.ok) {
@@ -87,6 +94,22 @@ export function TaskQuickAdd() {
             aria-label="Set due date"
           />
         </label>
+        {projects.length > 0 ? (
+          <select
+            name="projectId"
+            aria-label="Project"
+            value={projectId}
+            onChange={(event) => setProjectId(event.target.value)}
+            className="h-10 max-w-36 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-44"
+          >
+            <option value="">No project</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name} / {project.domainName}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <button
           type="submit"
           disabled={pending || title.trim().length === 0}

@@ -120,6 +120,7 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 - Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Reworked the Tasks tab into Today, Tomorrow, Upcoming grouped by date, and No date sections using the same row-level rescheduling and drop-zone primitives.
 - Added project creation from the Projects tab, project detail editing for current state/next step, explicit completed/killed status actions, and project keyword search coverage.
+- Added task-to-project assignment paths: domain-filtered task detail picker, optional project selector on quick-add, project-page task creation, and capture parser project-match domain alignment.
 - Implemented the hosted Google OAuth path chosen by Matt: OAuth start/callback routes, encrypted refresh-token storage, sync-token based pull, local-event push to Google, and a 15-minute scheduler command.
 - Created the Railway `home-base` project with Postgres and deployed the app at `https://home-base-production-e3b7.up.railway.app/`.
 - Added Milestone 2 foundations: reminder deliveries, API keys, calendar sync state, REST API, MCP server, parked project UI, subtask UI, recurrence-on-completion behavior, and Apple Reminders CSV import.

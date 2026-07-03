@@ -292,11 +292,13 @@ async function createTask(
   action: Extract<ExecutableAction, { type: "create_task" }>,
   context: ExecutionContext,
 ) {
-  const domainId =
-    matchDomainId(action.domain_match, context.domains) ?? context.inboxDomainId;
-  const projectId = action.project_match
-    ? await matchProjectId(action.project_match)
+  const project = action.project_match
+    ? await matchProject(action.project_match)
     : undefined;
+  const domainId =
+    matchDomainId(action.domain_match, context.domains) ??
+    project?.domainId ??
+    context.inboxDomainId;
 
   const task = await prisma.task.create({
     data: {
@@ -307,7 +309,7 @@ async function createTask(
       priority: action.priority,
       reminderOffsets: action.reminder_offsets as Prisma.InputJsonValue,
       domainId,
-      projectId,
+      projectId: project?.id,
       source: context.writeSource,
       captureId: context.captureId,
     },
@@ -601,15 +603,21 @@ function matchDomainId(
 }
 
 async function matchProjectId(projectMatch: string) {
+  const project = await matchProject(projectMatch);
+  return project?.id;
+}
+
+async function matchProject(projectMatch: string) {
   const project = await prisma.project.findFirst({
     where: {
       status: { in: ["active", "parked"] },
       name: { contains: projectMatch, mode: "insensitive" },
     },
+    select: { id: true, domainId: true },
     orderBy: { createdAt: "desc" },
   });
 
-  return project?.id;
+  return project;
 }
 
 function normalizeMatch(value: string) {

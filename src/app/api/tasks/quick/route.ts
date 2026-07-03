@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { dateOnlyFromString } from "@/lib/dates";
+import { prisma } from "@/lib/db";
 import { createTaskWithDefaultDomain } from "@/lib/tasks";
 
 export async function POST(request: Request) {
@@ -10,13 +11,24 @@ export async function POST(request: Request) {
     typeof body?.dueDate === "string" && body.dueDate.trim().length > 0
       ? dateOnlyFromString(body.dueDate.trim())
       : null;
+  const projectId =
+    typeof body?.projectId === "string" && body.projectId.trim().length > 0
+      ? body.projectId.trim()
+      : null;
 
   if (!title) {
     return NextResponse.json({ error: "Task title is required." }, { status: 400 });
   }
 
+  const project = projectId
+    ? await prisma.project.findFirst({
+        where: { id: projectId, status: { in: ["active", "parked"] } },
+        select: { id: true, domainId: true },
+      })
+    : null;
+
   const task = await createTaskWithDefaultDomain(
-    { title, dueDate },
+    { title, dueDate, domainId: project?.domainId, projectId: project?.id },
     { source: "manual" },
   );
 

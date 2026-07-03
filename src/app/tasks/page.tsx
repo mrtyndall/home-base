@@ -20,7 +20,7 @@ export default async function TasksPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { tasks } = result;
+  const { tasks, projects } = result;
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
   const sections = groupTasks(tasks, today, tomorrow);
@@ -30,7 +30,13 @@ export default async function TasksPage() {
       <header>
         <h1 className="text-3xl font-semibold tracking-normal">Tasks</h1>
       </header>
-      <TaskQuickAdd />
+      <TaskQuickAdd
+        projects={projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          domainName: project.domain.name,
+        }))}
+      />
       <TaskSection
         title="Today"
         empty="No tasks due today."
@@ -288,21 +294,28 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
 
 async function loadTasks() {
   try {
-    const tasks = await prisma.task.findMany({
-      where: { status: "open", parentTaskId: null },
-      include: {
-        domain: true,
-        project: true,
-        subtasks: {
-          where: { status: "open" },
-          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    const [tasks, projects] = await Promise.all([
+      prisma.task.findMany({
+        where: { status: "open", parentTaskId: null },
+        include: {
+          domain: true,
+          project: true,
+          subtasks: {
+            where: { status: "open" },
+            orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+          },
         },
-      },
-      orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-      take: 80,
-    });
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        take: 80,
+      }),
+      prisma.project.findMany({
+        where: { status: { in: ["active", "parked"] } },
+        include: { domain: true },
+        orderBy: [{ domain: { sortOrder: "asc" } }, { name: "asc" }],
+      }),
+    ]);
 
-    return { ok: true as const, tasks };
+    return { ok: true as const, tasks, projects };
   } catch {
     return { ok: false as const };
   }

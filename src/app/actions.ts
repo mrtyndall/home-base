@@ -28,11 +28,20 @@ export async function createQuickTask(formData: FormData) {
   if (!title) return;
 
   const dueDateValue = getTrimmedString(formData, "dueDate");
+  const projectId = getTrimmedString(formData, "projectId");
+  const project = projectId
+    ? await prisma.project.findFirst({
+        where: { id: projectId, status: { in: ["active", "parked"] } },
+        select: { id: true, domainId: true },
+      })
+    : null;
 
   await createTaskWithDefaultDomain(
     {
       title,
       dueDate: dueDateValue ? dateOnlyFromString(dueDateValue) : null,
+      domainId: project?.domainId,
+      projectId: project?.id,
     },
     { source: "manual" },
   );
@@ -136,6 +145,31 @@ export async function addSubtask(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${parentTaskId}`);
+}
+
+export async function addProjectTask(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  const title = getTrimmedString(formData, "title");
+  if (!projectId || !title) return;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, status: { in: ["active", "parked"] } },
+    select: { id: true, domainId: true },
+  });
+  if (!project) return;
+
+  await createTaskWithAudit(
+    {
+      title,
+      domainId: project.domainId,
+      projectId: project.id,
+    },
+    { source: "manual" },
+  );
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
+  revalidatePath(`/projects/${project.id}`);
 }
 
 export async function parkProject(formData: FormData) {

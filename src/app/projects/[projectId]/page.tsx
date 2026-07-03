@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { updateProjectState } from "@/app/actions";
+import { ArrowLeft, Plus } from "lucide-react";
+import { addProjectTask, updateProjectState } from "@/app/actions";
 import {
   CompleteProjectButton,
   KillProjectButton,
@@ -122,6 +122,24 @@ export default async function ProjectDetailPage({
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
           <h2 className="text-base font-semibold text-stone-800">Open tasks</h2>
+          {project.status === "active" || project.status === "parked" ? (
+            <form action={addProjectTask} className="flex gap-2">
+              <input type="hidden" name="projectId" value={project.id} />
+              <input
+                name="title"
+                required
+                placeholder="Add task to project"
+                className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              />
+              <button
+                type="submit"
+                title="Add task to project"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800"
+              >
+                <Plus size={16} />
+              </button>
+            </form>
+          ) : null}
           {project.tasks.length === 0 ? (
             <p className="text-sm text-stone-500">No open tasks.</p>
           ) : (
