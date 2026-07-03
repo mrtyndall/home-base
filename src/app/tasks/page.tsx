@@ -4,7 +4,7 @@ import { addSubtask } from "@/app/actions";
 import { prisma } from "@/lib/db";
 import { addDaysToDateString, formatDateOnly, localDateString } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
-import { DraggableTaskLink } from "@/components/task-scheduling";
+import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
 
@@ -23,6 +23,7 @@ export default async function TasksPage() {
   const { tasks } = result;
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
+  const sections = groupTasks(tasks, today, tomorrow);
 
   return (
     <div className="space-y-5">
@@ -30,36 +31,150 @@ export default async function TasksPage() {
         <h1 className="text-3xl font-semibold tracking-normal">Tasks</h1>
       </header>
       <TaskQuickAdd />
-      <section className="space-y-2">
-        {tasks.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-            No open tasks.
-          </div>
-        ) : (
-          tasks.map((task) => (
-            <article
-              key={task.id}
-              className="rounded-lg border border-stone-200 bg-white p-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <DraggableTaskLink
-                  taskId={task.id}
-                  href={`/tasks/${task.id}`}
-                  title={task.title}
-                  detail={formatTaskDetail(task)}
-                  currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
-                  today={today}
-                  tomorrow={tomorrow}
-                />
-                <TaskCompleteButton taskId={task.id} />
-              </div>
-              <SubtaskList subtasks={task.subtasks} today={today} tomorrow={tomorrow} />
-              <AddSubtaskForm parentTaskId={task.id} />
-            </article>
-          ))
-        )}
-      </section>
+      <TaskSection
+        title="Today"
+        empty="No tasks due today."
+        targetDate={today}
+        tasks={sections.today}
+        today={today}
+        tomorrow={tomorrow}
+      />
+      <TaskSection
+        title="Tomorrow"
+        empty="No tasks due tomorrow."
+        targetDate={tomorrow}
+        tasks={sections.tomorrow}
+        today={today}
+        tomorrow={tomorrow}
+      />
+      <UpcomingSection
+        groups={sections.upcoming}
+        today={today}
+        tomorrow={tomorrow}
+      />
+      <TaskSection
+        title="No date"
+        empty="No undated tasks."
+        targetDate={null}
+        tasks={sections.noDate}
+        today={today}
+        tomorrow={tomorrow}
+      />
     </div>
+  );
+}
+
+function TaskSection({
+  title,
+  empty,
+  targetDate,
+  tasks,
+  today,
+  tomorrow,
+}: {
+  title: string;
+  empty: string;
+  targetDate: string | null;
+  tasks: TaskListItem[];
+  today: string;
+  tomorrow: string;
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">{title}</h2>
+      <TaskDropZone
+        targetDate={targetDate}
+        isEmpty={tasks.length === 0}
+        emptyText={empty}
+      >
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              today={today}
+              tomorrow={tomorrow}
+            />
+          ))}
+        </div>
+      </TaskDropZone>
+    </section>
+  );
+}
+
+function UpcomingSection({
+  groups,
+  today,
+  tomorrow,
+}: {
+  groups: Array<{ date: string; tasks: TaskListItem[] }>;
+  today: string;
+  tomorrow: string;
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">Upcoming</h2>
+      {groups.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+          No upcoming dated tasks.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <div key={group.date} className="space-y-2">
+              <h3 className="text-sm font-medium text-stone-600">
+                {formatDateOnly(group.date)}
+              </h3>
+              <TaskDropZone
+                targetDate={group.date}
+                isEmpty={group.tasks.length === 0}
+                emptyText={`No tasks on ${formatDateOnly(group.date)}.`}
+              >
+                <div className="space-y-2">
+                  {group.tasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      today={today}
+                      tomorrow={tomorrow}
+                    />
+                  ))}
+                </div>
+              </TaskDropZone>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TaskCard({
+  task,
+  today,
+  tomorrow,
+}: {
+  task: TaskListItem;
+  today: string;
+  tomorrow: string;
+}) {
+  return (
+    <article className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <DraggableTaskLink
+          taskId={task.id}
+          href={`/tasks/${task.id}`}
+          title={task.title}
+          detail={formatTaskDetail(task)}
+          currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+          today={today}
+          tomorrow={tomorrow}
+        />
+        <TaskCompleteButton taskId={task.id} />
+      </div>
+      <SubtaskList subtasks={task.subtasks} today={today} tomorrow={tomorrow} />
+      <AddSubtaskForm parentTaskId={task.id} />
+    </article>
   );
 }
 
@@ -131,6 +246,44 @@ function formatTaskDetail(task: TaskListItem) {
   ]
     .filter((item): item is string => Boolean(item))
     .join(" / ");
+}
+
+function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
+  const todayTasks: TaskListItem[] = [];
+  const tomorrowTasks: TaskListItem[] = [];
+  const noDate: TaskListItem[] = [];
+  const upcomingByDate = new Map<string, TaskListItem[]>();
+
+  for (const task of tasks) {
+    const dueDate = task.dueDate?.toISOString().slice(0, 10) ?? null;
+    if (!dueDate) {
+      noDate.push(task);
+      continue;
+    }
+
+    if (dueDate <= today) {
+      todayTasks.push(task);
+      continue;
+    }
+
+    if (dueDate === tomorrow) {
+      tomorrowTasks.push(task);
+      continue;
+    }
+
+    const group = upcomingByDate.get(dueDate) ?? [];
+    group.push(task);
+    upcomingByDate.set(dueDate, group);
+  }
+
+  return {
+    today: todayTasks,
+    tomorrow: tomorrowTasks,
+    upcoming: Array.from(upcomingByDate.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, groupedTasks]) => ({ date, tasks: groupedTasks })),
+    noDate,
+  };
 }
 
 async function loadTasks() {

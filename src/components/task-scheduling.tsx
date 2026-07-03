@@ -16,7 +16,7 @@ import { CalendarDays } from "lucide-react";
 let activeMouseDragTaskId: string | null = null;
 
 type TaskDropZoneProps = {
-  targetDate: string;
+  targetDate: string | null;
   isEmpty: boolean;
   emptyText: string;
   children: ReactNode;
@@ -77,7 +77,7 @@ export function TaskDropZone({
 
   return (
     <div
-      data-drop-date={targetDate}
+      data-drop-date={targetDate ?? "none"}
       onMouseUp={handleMouseUp}
       onDragEnter={() => setIsActive(true)}
       onDragLeave={() => setIsActive(false)}
@@ -166,8 +166,9 @@ export function DraggableTaskLink({
     const dropTarget = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>("[data-drop-date]");
-    const targetDate = dropTarget?.dataset.dropDate;
-    if (!targetDate) return;
+    const targetDateValue = dropTarget?.dataset.dropDate;
+    const targetDate = targetDateValue === "none" ? null : targetDateValue;
+    if (targetDate === undefined) return;
 
     event.preventDefault();
     setDragPending(true);
