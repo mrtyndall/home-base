@@ -12,7 +12,10 @@ import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
-import { getRecentCaptureAction } from "@/lib/today-capture-actions";
+import {
+  getRecentCaptureAction,
+  getRecentCaptureHref,
+} from "@/lib/today-capture-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -207,7 +210,7 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
             formatCaptureOutcome(capture.createdItems) ??
             capture.parseStatus ??
             "saved";
-          const href = getCaptureHref(capture);
+          const href = getRecentCaptureHref(capture);
           const action = getRecentCaptureAction(
             capture.createdItems,
             capture.parseStatus,
@@ -240,25 +243,6 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
       </div>
     </section>
   );
-}
-
-function getCaptureHref(capture: Capture) {
-  const items = Array.isArray(capture.createdItems) ? capture.createdItems : [];
-  const actionableItems = items
-    .filter(isCreatedItem)
-    .filter((item) => item.type !== "pending_capture");
-  const firstItem =
-    actionableItems[actionableItems.length - 1] ?? items.find(isCreatedItem);
-
-  if (!firstItem) {
-    return `/areas/area_inbox`;
-  }
-
-  if (firstItem.type === "task") return `/tasks/${firstItem.id}`;
-  if (firstItem.type === "project") return `/projects/${firstItem.id}`;
-  if (firstItem.type === "idea") return `/ideas`;
-  if (firstItem.type === "pending_capture") return `/areas/area_inbox`;
-  return `/search?q=${encodeURIComponent(capture.rawText)}`;
 }
 
 function CalendarSyncMeta({
