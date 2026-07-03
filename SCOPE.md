@@ -20,7 +20,7 @@ Three consequences flow from this purpose and govern every design decision:
 
 ## Section 2: What This Is and Is Not
 
-**Is:** A single-user, self-hosted web app (PWA) holding Matt's personal tasks, calendar, projects, side quests, ideas, and captures. Voice and typed capture through one door, parsed by Claude into structured data.
+**Is:** A single-user, self-hosted web app (PWA) holding Matt's personal tasks, calendar, areas, projects, side quests, ideas, and captures. Voice and typed capture through one door, parsed by Claude into structured data.
 
 **Is not:**
 
@@ -53,11 +53,12 @@ This is where the mental load lives and where the system succeeds or dies. It is
 
 **Tasks:**
 - Title, notes, status, due date, optional due time, priority
-- Domain (life area) assignment, required, defaulting to Inbox
-- Optional project assignment
+- Area assignment, required, defaulting to the Inbox system area
+- Optional project assignment; a project implies its area
 - Subtasks (parent_task_id)
 - Recurrence (RRULE)
 - Reminders (offset array, delivered via Pushover and in-app)
+- Someday flag for dateless, aspirational tasks shown only in the Tasks tab's Someday section and on their parent area/project, never on Today
 - Source tracking (typed, voice, shortcut, manual)
 - Completion is instant and absolute: completed tasks disappear from active views immediately and remain searchable forever
 
@@ -73,26 +74,40 @@ This is where the mental load lives and where the system succeeds or dies. It is
 - Overdue and long-open items appear in their normal position with no special guilt treatment
 - Strict item ceiling to stay glanceable ("capture liberal, display conservative," kept from the original guide)
 
-### Pillar 2 — Projects, Hobbies, and Side Quests
+### Pillar 2 — Areas, Projects, Hobbies, and Side Quests
 
-Personal projects (homelab builds, radio work, solar research, hobby threads) die from expensive re-entry, not lost interest. After weeks away, reconstructing "where was I?" costs more than the next step itself. This pillar makes re-entry a ten-second read.
+Personal areas and projects (ham radio, car upkeep, homelab builds, solar research, hobby threads) die from expensive re-entry, not lost interest. After weeks away, reconstructing "where was I?" costs more than the next step itself. This pillar makes re-entry a ten-second read.
 
-**Every project carries living state:**
+**Every area and project carries living state:**
 - `current_state`: one or two sentences, always current, describing exactly where things stand
 - `next_step`: the single next physical action
 - Both updated through the capture door: "log on the Proxmox build: motherboard arrived, next step is rack rails" updates both fields and appends to the activity log
-- Activity log preserves full history of state changes and log entries
+- Activity logs preserve full history of state changes and log entries
 
-**Status model:**
-- `active` — currently being worked
-- `parked` — consciously dormant, guilt-free, fully preserved. Parked is a normal, healthy state, not a warning. Parked projects are excluded from slipping detection entirely.
-- `completed` and `killed` — explicit, Matt-only actions. Killed projects stay searchable with their full history.
+**Areas are ongoing responsibilities:**
+- Areas are fuzzy, durable responsibilities with no finish line. Examples: Ham Radio under Hobbies, Car Upkeep under Home.
+- Areas hold tasks, projects, notes, docs, file attachments, linked ideas, current_state, next_step, and activity.
+- Lifecycle is `active`, `parked`, or `retired`. These are statuses, never deletes.
+- Areas have no target date, no completed state, no milestones, and never appear in slipping logic.
+- Optional tending cadence surfaces as plain fact only, never as a nag.
+
+**Projects are finishable:**
+- Every project belongs to exactly one area.
+- Projects hold tasks, notes, docs, file attachments, linked ideas, current_state, next_step, activity, optional milestones, target_date, completion, slipping logic, and idea lineage.
+
+**Project status model:**
+- `someday` — wanted, not committed. A full container that can incubate ideas, docs, and tasks indefinitely. No target date required. Excluded from slipping.
+- `active` — currently being worked.
+- `parked` — started, consciously set down. Parked is a normal, healthy state, not a warning. Excluded from slipping.
+- `completed` and `killed` — explicit, Matt-only status changes. Killed projects stay searchable with their full history.
+- Status flow enforcement in UI: "start now" versus "someday" is offered at creation; park appears only on active projects. Never present someday and parked as a pick-one dropdown in the same moment. Any status is correctable later from the project detail view.
 
 **Views:**
-- A projects shelf grouped by domain, each card showing name, status, current_state, and next_step at a glance
-- Re-entry view: open a project and immediately see where you left off, the next step, and recent activity
+- A projects shelf grouped into Active, Someday, and Parked, each card showing name, status, current_state, and next_step at a glance
+- Area re-entry view: open an area and immediately see current state, next step, standing tasks, child projects, notes, docs, attachments, linked ideas, and recent activity
+- Project re-entry view: open a project and immediately see where you left off, the next step, tasks, notes, docs, attachments, linked ideas, milestones, and recent activity
 
-**Slipping (feeds the nudge system):** an `active` project with a target date approaching and no activity, or an active project untouched beyond a per-project threshold. Parked projects never slip. Thresholds are tunable per project.
+**Slipping (feeds the nudge system):** an `active` project with a target date approaching and no activity, or an active project untouched beyond a per-project threshold. Someday and parked projects never slip. Areas never slip. Thresholds are tunable per project.
 
 ### Pillar 3 — Ideas (Secondary)
 
@@ -113,7 +128,7 @@ One door, every source, nothing lost.
 2. Raw input is written to the `captures` ledger immediately, before any parsing. This write is the sacred step. If everything downstream fails, the capture survives.
 3. Backend calls the Claude API with the parser system prompt (Section 10) and current context
 4. Parser returns structured actions; server executes them and links created items back to the capture record
-5. UI shows confirmation: what was created and where it landed ("Task created in Home, due Friday"). Mobile shortcuts receive a spoken/text confirmation.
+5. UI shows confirmation: what was created and where it landed ("Task created in Ham Radio, due Friday"). Mobile shortcuts receive a spoken/text confirmation.
 6. Ambiguous parses land in the Inbox: a visible, first-class holding area, never a hidden queue. Inbox items are complete captures awaiting routing, not degraded data.
 
 **Parsing disposition:** auto-file with best guess and visible confirmation. Matt corrects misfiles when he sees them; search guarantees misfiles are always recoverable. Inbox is reserved for genuine ambiguity only. Never let Inbox become a triage obligation.
@@ -128,15 +143,40 @@ Search is a data-integrity feature, not a convenience. To Matt, a capture that c
 
 1. **Instant keyword filter** — results appear as you type, across all item types including raw captures, completed, killed, and parked items. Fast full-text (Postgres FTS).
 2. **Chat-style questions** — "what was that idea about the podcast intro?" answered by Claude querying the database. Same API, retrieval instead of parsing.
-3. **Browse** — by domain, by type, by project. Search as backup, structure as primary.
+3. **Browse** — by domain, area, type, and project. Search as backup, structure as primary.
 
 Nothing is excluded from search. Ever.
 
-## Section 7: Domains
+## Section 7: Hierarchy, Areas, and Portable Content
 
-Matt thinks in life areas. Initial domain list to confirm at kickoff, drawn from: Home, Family, Health, Creative, Hobbies/Homelab, plus the system Inbox. Target 5 to 8. Work is deliberately absent; work lives in Production Hub.
+Matt thinks in life areas, but the system needs one clear meaning per level. The hierarchy is:
 
-Kept from the original guide: build the final domain model from the start (Domains → Projects → Tasks, Inbox as catch-all system domain, no "Areas" concept).
+**Domains -> Areas -> Projects -> Tasks.**
+
+Nesting is capped here permanently. There are no sub-areas and no sub-projects; subtasks cover task-level decomposition. Enforce this structurally: no self-referencing parent columns on areas or projects.
+
+**Domains are pure organization.** They hold no tasks, no projects, no notes, no state, and no lifecycle. They exist only to group areas in navigation and pickers. Domains are never parked, completed, or killed. Target 4 to 7, such as Home, Family, Health, Hobbies, and Creative. Work is deliberately absent; work lives in Production Hub.
+
+**Areas are ongoing responsibilities.** Areas are PARA-style responsibilities with no finish line. Examples: Ham Radio under Hobbies, Car Upkeep under Home. Areas hold tasks, projects, notes, docs, file attachments, linked ideas, current_state, next_step, and activity. Area lifecycle is `active`, `parked`, and `retired`; all are statuses, never deletes. Areas have no target_date, no completed state, no milestones, and never appear in slipping logic. Optional tending_cadence surfaces as plain fact only, never as a nag.
+
+**Projects are finishable.** Every project belongs to exactly one area. Projects hold tasks, notes, docs, file attachments, linked ideas, current_state, next_step, activity log, target_date, optional milestones, completion, slipping logic, and idea lineage.
+
+**Project statuses:** `someday`, `active`, `parked`, `completed`, and `killed`.
+
+- `someday` means wanted, not committed. A someday project is a full container that can incubate ideas, docs, and tasks indefinitely. It requires no target date and is excluded from slipping.
+- `parked` means started, consciously set down. It is guilt-free and excluded from slipping.
+- `completed` and `killed` are explicit status changes, never deletes. Killed items stay searchable forever.
+- Status flow enforcement in UI: creation offers "start now" versus "someday"; park appears only on active projects. Never present someday and parked as a pick-one dropdown in the same moment. Any status is correctable later from project detail.
+
+**Tasks** attach to an area or a project; a project implies its area. Tasks never attach directly to a domain. Tasks can be marked someday: dateless, aspirational, shown only in the Tasks tab's Someday section and on their parent area/project, never on Today.
+
+**Inbox is a system area** under a hidden system domain. Quick-add and unrouted captures land there. Inbox remains visible and first-class, never a hidden queue and never a guilt pile. It is the only catch-all; do not auto-create "General" areas per domain.
+
+**Litmus test for UI copy, agents, and the parser prompt:** if it can be finished, it is a project. If Matt would still be responsible for it a year from now regardless, it is an area. If it is just a category of life, it is a domain. Someday means wanted, not committed; parked means started, set down.
+
+**Markdown is canonical.** All text-bearing content (notes, docs, idea bodies, state fields) is stored as plain markdown, rendered in-app, and edited as markdown with a simple editor plus preview. No proprietary rich-text format anywhere. This preserves portability, full-text search, agent-friendliness, and a future Obsidian export path as a plain file write.
+
+**Container symmetry rule.** Areas and projects share the identical container set: tasks, notes, docs, attachments, linked ideas, current_state, next_step, and activity log. The only differences are lifecycle and project-specific finishable features. Projects have target_date, milestones, completion, slipping, and idea lineage. Areas have tending_cadence and retired status. Implement shared containers once; do not let area and project pages drift.
 
 ## Section 8: Notifications and Nudges
 
@@ -158,28 +198,35 @@ Adapted from the original guide's Section 7. The parser receives raw input plus 
 
 **Context per request (rebuilt fresh every request, never cached as content):**
 - Current date/time, America/New_York
-- Active domains (IDs, names)
-- Active and parked projects (IDs, names, domain, current_state)
+- Active domains and areas as a tree (IDs, names, status)
+- Active, someday, and parked projects (IDs, names, area, current_state)
 - Recent ideas (last 60 days, IDs and titles)
 - Capture source
 
 **Action types:**
-- `create_task` { domain_match?, project_match?, title, due_date?, due_time?, priority?, parent_task_match?, reminder_offsets? }
+- `create_task` { area_match?, project_match?, title, due_date?, due_time?, priority?, parent_task_match?, reminder_offsets?, someday? }
 - `complete_task` { task_match }
-- `create_project` { name, domain_match, target_date? }
+- `create_area` { name, domain_match }
+- `update_area_state` { area_match, current_state?, next_step?, status?, log_entry? }
+- `create_project` { name, area_match, target_date?, status? }
 - `update_project_state` { project_match, current_state?, next_step?, log_entry?, status? }
 - `create_calendar_event` { title, start, end, location? }
-- `create_idea` { title, body?, domain_match?, tags? }
+- `create_idea` { title, body?, area_match?, project_match?, tags? }
 - `append_to_idea` { idea_match, body }
 - `convert_idea` { idea_match, to: task|project, ...target fields }
-- `create_reference` { body, tags?, related_match? }
+- `create_reference` { body, tags?, area_match?, project_match?, related_match? }
+- `create_entity_note` { parent_type: area|project, area_match?, project_match?, body_md }
+- `create_entity_doc` { parent_type: area|project, area_match?, project_match?, title, body_md }
 
 **Rules (kept and adapted from the guide):**
 - Return only valid JSON, array of actions, multiple actions per utterance common
 - Fuzzy matching on names
 - Ambiguity returns `{ needs_disambiguation: true, candidates: [...] }` → Inbox
 - Unparseable input returns an error object → Inbox with raw text intact
-- No domain named → Inbox
+- No area or project named → Inbox system area
+- Area and project routing follow the litmus test in Section 7: finishable is project, durable responsibility is area, category is domain
+- "Someday project" creates a project with status `someday`; "someday task" creates a task with `someday = true`
+- "Parked" means started and set down; "someday" means wanted and not committed. The parser must not use them interchangeably.
 - Date phrases resolve to ISO in America/New_York
 - Prompt caching on the static portion of the system prompt; Sonnet for parsing, Haiku for cheap routes
 
@@ -214,12 +261,20 @@ captures                  — Append-only raw ledger. THE sacred table.
   created_at
   — Never updated destructively, never deleted.
 
-domains                   — Life areas
+domains                   — Pure organization headers
   id, name, description, sort_order, is_system (bool), active
+  — Hold no tasks, projects, notes, state, or lifecycle.
 
-projects                  — Pillar 2
-  id, name, domain_id, status (active/parked/completed/killed),
-  current_state (text), next_step (text),
+areas                     — Ongoing responsibilities
+  id, name, domain_id, status (active/parked/retired),
+  current_state (markdown), next_step (markdown),
+  tending_cadence?, sort_order, is_system (bool),
+  created_at, updated_at
+  — No target_date, no completed state, no milestones, no slipping logic.
+
+projects                  — Finishable outcomes
+  id, name, area_id, status (someday/active/parked/completed/killed),
+  current_state (markdown), next_step (markdown),
   target_date?, slip_threshold_days (default per settings),
   parked_at?, completed_at?, killed_at?, created_at
 
@@ -230,13 +285,14 @@ project_activity          — Append-only project history
 tasks
   id, title, notes, status (open/completed/killed),
   due_date?, due_time?, priority?,
-  domain_id (required, FK, Inbox default),
-  project_id?, parent_task_id?,
+  area_id (required, FK, Inbox area default),
+  project_id? (project implies same area), parent_task_id?,
+  someday (bool default false),
   recurrence_rule?, reminder_offsets (jsonb),
   source, capture_id?, created_at, completed_at?
 
 ideas                     — Pillar 3
-  id, title, body, domain_id?, tags[],
+  id, title, body (markdown), area_id?, project_id?, tags[],
   status (seed/developing/converted/killed),
   converted_to_type?, converted_to_id?,
   capture_id?, created_at, updated_at
@@ -245,8 +301,24 @@ idea_notes                — Appended thoughts over time
   id, idea_id, body, capture_id?, created_at
 
 references                — Links, recs, things people mention
-  id, body, url?, tags[], domain_id?,
+  id, body, url?, tags[], area_id?, project_id?,
   related_type?, related_id?, capture_id?, created_at
+
+entity_notes              — Shared area/project notes
+  id, parent_type (area/project), parent_id,
+  body_md, source?, capture_id?, created_at
+
+entity_docs               — Shared area/project markdown docs
+  id, parent_type (area/project), parent_id,
+  title, body_md, status (active/archived),
+  source?, capture_id?, created_at, updated_at
+
+documents                 — File attachment metadata
+  id, parent_type (area/project), parent_id,
+  filename, r2_key, mime, size, created_at
+
+milestones                — Project-only checklist
+  id, project_id, title, status, sort_order, completed_at?
 
 calendar_events
   id, google_event_id, title, start, end, location?,
@@ -271,8 +343,9 @@ app_settings
 **Integrity rules:**
 - No hard deletes anywhere except capture_tokens revocation. "Killed" and "completed" are statuses.
 - Every AI-created row links back to its capture_id.
-- Postgres FTS indexes on captures.raw_text, tasks.title+notes, ideas, references, project_activity.
+- Postgres FTS indexes on captures.raw_text, tasks.title+notes, ideas, references, project_activity, entity_notes.body_md, and entity_docs.title+body_md.
 - Nightly automated backup of the full database to off-Railway storage (R2 or local pull). Non-negotiable given the trust requirement.
+- No self-referencing parent columns on areas or projects. Hierarchy stops at Domains -> Areas -> Projects -> Tasks.
 
 ## Section 13: Implementation Sequence
 
@@ -280,7 +353,7 @@ This is one holistic design. The sequence below is engineering order, not a prod
 
 1. **Foundation:** Railway project, Postgres, migrations, auth, backup job
 2. **The sacred path:** captures ledger + `/api/capture` + parser + confirmation. Capture must work before anything else looks good.
-3. **Tasks + domains + Inbox** with full CRUD, recurrence, reminders
+3. **Tasks + hierarchy + Inbox area** with full CRUD, recurrence, reminders
 4. **Today screen** including the all-clear state and recently captured strip
 5. **Google Calendar sync** with visible sync timestamp
 6. **Search**, all three modes
@@ -320,11 +393,13 @@ Failure signals: Inbox becoming a guilt pile, gardening required to keep views a
 
 ## Section 16: Open Decisions (Resolve at Kickoff)
 
-1. Final domain list (target 5 to 8)
-2. Clustering nudge threshold and theme-detection approach (start conservative)
-3. Visual direction: designed and calm vs. designed and bold
-4. Parked-project weighting: is the pain of dead projects mostly lost context, lost visibility, or too many open threads? (Interview left this unresolved; affects how prominent the projects shelf is.)
-5. Whether references get their own tab or live under Search/browse only
+1. Cloudflare R2 for file attachments versus Railway volume
+2. Final domain list (target 4 to 7) and initial areas under each
+3. Clustering nudge threshold and theme-detection approach (start conservative)
+4. Visual direction: designed and calm vs. designed and bold
+5. Parked-project weighting: is the pain of dead projects mostly lost context, lost visibility, or too many open threads? (Interview left this unresolved; affects how prominent the projects shelf is.)
+6. Whether references get their own tab or live under Search/browse only
+7. Confirm Inbox remains the only catch-all; no per-domain "General" areas
 
 ## Section 17: Kickoff Prompt for Claude Code
 
