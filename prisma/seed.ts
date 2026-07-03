@@ -13,40 +13,103 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const domains = [
   {
-    name: "Inbox",
-    description: "System catch-all for genuinely ambiguous captures.",
+    name: "System",
+    description: "Hidden system grouping for the Inbox area.",
     sortOrder: 0,
     isSystem: true,
+    active: false,
   },
   {
     name: "Home",
     description: "House, errands, maintenance, admin, and family logistics.",
     sortOrder: 10,
     isSystem: false,
+    active: true,
   },
   {
     name: "Family",
     description: "Family commitments, plans, and follow-ups.",
     sortOrder: 20,
     isSystem: false,
+    active: true,
   },
   {
     name: "Health",
     description: "Health, appointments, fitness, and care tasks.",
     sortOrder: 30,
     isSystem: false,
+    active: true,
   },
   {
     name: "Creative",
     description: "Personal writing, podcast, media, and creative threads.",
     sortOrder: 40,
     isSystem: false,
+    active: true,
   },
   {
-    name: "Hobbies/Homelab",
+    name: "Hobbies",
     description: "Radio, homelab, solar research, and side builds.",
     sortOrder: 50,
     isSystem: false,
+    active: true,
+  },
+];
+
+type SeedArea = {
+  id?: string;
+  name: string;
+  domainName: string;
+  sortOrder: number;
+  isSystem?: boolean;
+  currentState?: string;
+  nextStep?: string;
+};
+
+const areas: SeedArea[] = [
+  {
+    id: "area_inbox",
+    name: "Inbox",
+    domainName: "System",
+    sortOrder: 0,
+    isSystem: true,
+    currentState: "System catch-all for quick-add and genuinely ambiguous captures.",
+    nextStep: "Route items when the right area becomes clear.",
+  },
+  {
+    name: "Home",
+    domainName: "Home",
+    sortOrder: 10,
+  },
+  {
+    name: "Family",
+    domainName: "Family",
+    sortOrder: 20,
+  },
+  {
+    name: "Health",
+    domainName: "Health",
+    sortOrder: 30,
+  },
+  {
+    name: "Creative",
+    domainName: "Creative",
+    sortOrder: 40,
+  },
+  {
+    name: "Ham Radio",
+    domainName: "Hobbies",
+    sortOrder: 10,
+  },
+  {
+    name: "Homelab",
+    domainName: "Hobbies",
+    sortOrder: 20,
+  },
+  {
+    name: "Magic/Pokemon",
+    domainName: "Hobbies",
+    sortOrder: 30,
   },
 ];
 
@@ -55,8 +118,44 @@ async function main() {
     await prisma.domain.upsert({
       where: { name: domain.name },
       update: domain,
-      create: { ...domain, active: true },
+      create: domain,
     });
+  }
+
+  for (const area of areas) {
+    const domain = await prisma.domain.findUniqueOrThrow({
+      where: { name: area.domainName },
+    });
+    const areaId = "id" in area ? area.id : `area_seed_${area.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+    const existingArea = await prisma.area.findFirst({
+      where: { name: area.name, domainId: domain.id },
+    });
+
+    if (existingArea) {
+      await prisma.area.update({
+        where: { id: existingArea.id },
+        data: {
+          name: area.name,
+          domainId: domain.id,
+          sortOrder: area.sortOrder,
+          isSystem: area.isSystem ?? false,
+          currentState: area.currentState ?? existingArea.currentState,
+          nextStep: area.nextStep ?? existingArea.nextStep,
+        },
+      });
+    } else {
+      await prisma.area.create({
+        data: {
+          id: areaId,
+          name: area.name,
+          domainId: domain.id,
+          sortOrder: area.sortOrder,
+          isSystem: area.isSystem ?? false,
+          currentState: area.currentState ?? null,
+          nextStep: area.nextStep ?? null,
+        },
+      });
+    }
   }
 
   const settings = [

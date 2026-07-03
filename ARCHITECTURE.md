@@ -1,6 +1,6 @@
 # Home Base Architecture
 
-Home Base is a single-user personal operations system for tasks, calendar, projects, ideas, captures, and search. The product requirement is trust: raw captures are preserved before parsing, active views must not show stale completed items, and completed, killed, or parked records remain searchable.
+Home Base is a single-user personal operations system for tasks, calendar, areas, projects, ideas, captures, and search. The product requirement is trust: raw captures are preserved before parsing, active views must not show stale completed items, and completed, killed, someday, or parked records remain searchable.
 
 ## Stack
 
@@ -50,6 +50,8 @@ tailscale serve status
 - Parser failures update the capture status but do not remove or overwrite raw input.
 - No app data uses hard deletes. Completed, killed, and parked are statuses.
 - AI-created rows link back to `capture_id`.
+- The hierarchy is capped at Domains -> Areas -> Projects -> Tasks. Areas and projects have no self-referencing parent columns.
+- Tasks attach to an area or a project; project assignment implies the task area. A database trigger keeps task/project area alignment intact.
 - Agent writes use `source = api:<key label>` where the table has a source field, and every API write creates a notification feed entry.
 - Search must include raw captures and inactive records.
 - Local database backups are part of the foundation, not a later operational cleanup.
@@ -88,9 +90,11 @@ The sync worker pushes unsynced Home Base calendar events to Google, then pulls 
 
 The Railway app service is deployed. Railway cron still needs to be configured in the service settings after Google secrets are added: `*/15 * * * *` running `npm run calendar:sync`.
 
-## Parked Projects
+## Hierarchy And Containers
 
-Project statuses are `active`, `parked`, `completed`, and `killed`. Parked projects stay browsable on a separate Projects shelf, carry current state and next step, and are excluded from slipping logic. Parking can happen through UI, capture, REST API, or MCP.
+Domains are organization headers only. Areas are ongoing responsibilities with `active`, `parked`, and `retired` statuses. Projects are finishable containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic.
+
+Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export.
 
 ## Current Components
 
@@ -116,6 +120,7 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 
 ### 2026-07-03
 
+- Migrated the data model to Domains -> Areas -> Projects -> Tasks. Added `areas`, shared markdown container tables, file attachment metadata, project milestones, someday project status, and someday tasks. Existing 3 projects and 12 tasks were mapped to areas with zero missing area assignments and zero row loss in the local alpha database.
 - Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
 - Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Reworked the Tasks tab into Today, Tomorrow, Upcoming grouped by date, and No date sections using the same row-level rescheduling and drop-zone primitives.

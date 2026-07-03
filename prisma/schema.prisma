@@ -21,6 +21,7 @@ enum CaptureParseStatus {
 }
 
 enum ProjectStatus {
+  someday
   active
   parked
   completed
@@ -74,6 +75,27 @@ enum CalendarSyncStatus {
   not_configured
 }
 
+enum AreaStatus {
+  active
+  parked
+  retired
+}
+
+enum EntityParentType {
+  area
+  project
+}
+
+enum EntityDocStatus {
+  active
+  archived
+}
+
+enum MilestoneStatus {
+  open
+  completed
+}
+
 model Capture {
   id            String              @id @default(uuid())
   rawText       String              @map("raw_text")
@@ -85,6 +107,8 @@ model Capture {
   createdAt     DateTime            @default(now()) @map("created_at")
 
   calendarEvents  CalendarEvent[]
+  entityDocs      EntityDoc[]
+  entityNotes     EntityNote[]
   ideaNotes       IdeaNote[]
   ideas           Idea[]
   projectActivity ProjectActivity[]
@@ -104,19 +128,40 @@ model Domain {
   isSystem    Boolean @default(false) @map("is_system")
   active      Boolean @default(true)
 
-  ideas      Idea[]
-  projects   Project[]
-  references Reference[]
-  tasks      Task[]
+  areas Area[]
 
   @@index([active, sortOrder])
   @@map("domains")
 }
 
+model Area {
+  id             String     @id @default(uuid())
+  name           String
+  domainId       String     @map("domain_id")
+  status         AreaStatus @default(active)
+  currentState   String?    @map("current_state")
+  nextStep       String?    @map("next_step")
+  tendingCadence String?    @map("tending_cadence")
+  sortOrder      Int        @default(0) @map("sort_order")
+  isSystem       Boolean    @default(false) @map("is_system")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  domain     Domain      @relation(fields: [domainId], references: [id])
+  ideas      Idea[]
+  projects   Project[]
+  references Reference[]
+  tasks      Task[]
+
+  @@index([domainId, status, sortOrder])
+  @@index([status, sortOrder])
+  @@map("areas")
+}
+
 model Project {
   id                String        @id @default(uuid())
   name              String
-  domainId          String        @map("domain_id")
+  areaId            String        @map("area_id")
   status            ProjectStatus @default(active)
   currentState      String        @map("current_state")
   nextStep          String        @map("next_step")
@@ -127,11 +172,14 @@ model Project {
   killedAt          DateTime?     @map("killed_at")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  domain   Domain            @relation(fields: [domainId], references: [id])
-  activity ProjectActivity[]
-  tasks    Task[]
+  area       Area              @relation(fields: [areaId], references: [id])
+  activity   ProjectActivity[]
+  ideas      Idea[]
+  references Reference[]
+  milestones Milestone[]
+  tasks      Task[]
 
-  @@index([domainId, status])
+  @@index([areaId, status])
   @@index([targetDate])
   @@map("projects")
 }
@@ -161,9 +209,10 @@ model Task {
   dueDate         DateTime?  @map("due_date") @db.Date
   dueTime         String?    @map("due_time")
   priority        String?
-  domainId        String     @map("domain_id")
+  areaId          String     @default("area_inbox") @map("area_id")
   projectId       String?    @map("project_id")
   parentTaskId    String?    @map("parent_task_id")
+  someday         Boolean    @default(false)
   recurrenceRule  String?    @map("recurrence_rule")
   reminderOffsets Json?      @map("reminder_offsets")
   source          String?
@@ -173,13 +222,14 @@ model Task {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   capture            Capture?           @relation(fields: [captureId], references: [id])
-  domain             Domain             @relation(fields: [domainId], references: [id])
+  area               Area               @relation(fields: [areaId], references: [id])
   parent             Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
   project            Project?           @relation(fields: [projectId], references: [id])
   reminderDeliveries ReminderDelivery[]
   subtasks           Task[]             @relation("TaskSubtasks")
 
-  @@index([domainId, status])
+  @@index([areaId, status])
+  @@index([someday, status])
   @@index([dueDate, dueTime])
   @@index([projectId])
   @@index([captureId])
@@ -190,7 +240,8 @@ model Idea {
   id              String           @id @default(uuid())
   title           String
   body            String?
-  domainId        String?          @map("domain_id")
+  areaId          String?          @map("area_id")
+  projectId       String?          @map("project_id")
   tags            String[]         @default([])
   status          IdeaStatus       @default(seed)
   convertedToType ConvertedToType? @map("converted_to_type")
@@ -201,10 +252,12 @@ model Idea {
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
   capture Capture?   @relation(fields: [captureId], references: [id])
-  domain  Domain?    @relation(fields: [domainId], references: [id])
+  area    Area?      @relation(fields: [areaId], references: [id])
+  project Project?   @relation(fields: [projectId], references: [id])
   notes   IdeaNote[]
 
-  @@index([domainId, status])
+  @@index([areaId, status])
+  @@index([projectId, status])
   @@index([captureId])
   @@map("ideas")
 }
@@ -230,7 +283,8 @@ model Reference {
   body        String
   url         String?
   tags        String[] @default([])
-  domainId    String?  @map("domain_id")
+  areaId      String?  @map("area_id")
+  projectId   String?  @map("project_id")
   relatedType String?  @map("related_type")
   relatedId   String?  @map("related_id")
   source      String?
@@ -238,11 +292,76 @@ model Reference {
   createdAt   DateTime @default(now()) @map("created_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
-  domain  Domain?  @relation(fields: [domainId], references: [id])
+  area    Area?    @relation(fields: [areaId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
 
-  @@index([domainId])
+  @@index([areaId])
+  @@index([projectId])
   @@index([captureId])
   @@map("references")
+}
+
+model EntityNote {
+  id         String           @id @default(uuid())
+  parentType EntityParentType @map("parent_type")
+  parentId   String           @map("parent_id")
+  bodyMd     String           @map("body_md")
+  source     String?
+  captureId  String?          @map("capture_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([parentType, parentId, createdAt])
+  @@index([captureId])
+  @@map("entity_notes")
+}
+
+model EntityDoc {
+  id         String           @id @default(uuid())
+  parentType EntityParentType @map("parent_type")
+  parentId   String           @map("parent_id")
+  title      String
+  bodyMd     String           @map("body_md")
+  status     EntityDocStatus  @default(active)
+  source     String?
+  captureId  String?          @map("capture_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([parentType, parentId, status])
+  @@index([captureId])
+  @@map("entity_docs")
+}
+
+model Document {
+  id         String           @id @default(uuid())
+  parentType EntityParentType @map("parent_type")
+  parentId   String           @map("parent_id")
+  filename   String
+  r2Key      String           @map("r2_key")
+  mime       String
+  size       Int
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([parentType, parentId])
+  @@map("documents")
+}
+
+model Milestone {
+  id          String          @id @default(uuid())
+  projectId   String          @map("project_id")
+  title       String
+  status      MilestoneStatus @default(open)
+  sortOrder   Int             @default(0) @map("sort_order")
+  completedAt DateTime?       @map("completed_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, status, sortOrder])
+  @@map("milestones")
 }
 
 model CalendarEvent {
