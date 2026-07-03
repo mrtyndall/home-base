@@ -163,8 +163,8 @@ model Project {
   name              String
   areaId            String        @map("area_id")
   status            ProjectStatus @default(active)
-  currentState      String        @map("current_state")
-  nextStep          String        @map("next_step")
+  currentState      String?       @map("current_state")
+  nextStep          String?       @map("next_step")
   targetDate        DateTime?     @map("target_date") @db.Date
   slipThresholdDays Int           @default(14) @map("slip_threshold_days")
   parkedAt          DateTime?     @map("parked_at")

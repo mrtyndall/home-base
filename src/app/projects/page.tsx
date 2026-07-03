@@ -1,14 +1,16 @@
-import type { Area, Domain, Project } from "@prisma/client";
+import type {
+  Area,
+  Domain,
+  EntityNote,
+  Project,
+  ProjectActivity,
+  Task,
+} from "@prisma/client";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { createProject } from "@/app/actions";
 import { prisma } from "@/lib/db";
-import { formatDateOnly } from "@/lib/dates";
-import {
-  ActivateProjectButton,
-  ParkProjectForm,
-  UnparkProjectButton,
-} from "@/components/project-actions";
+import { formatDateOnly, formatShortDate } from "@/lib/dates";
+import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +25,7 @@ export default async function ProjectsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { projects, domains } = result;
+  const { projects } = result;
   const activeProjects = projects.filter((project) => project.status === "active");
   const somedayProjects = projects.filter((project) => project.status === "someday");
   const parkedProjects = projects.filter((project) => project.status === "parked");
@@ -33,85 +35,29 @@ export default async function ProjectsPage() {
       <header>
         <h1 className="text-3xl font-semibold tracking-normal">Projects</h1>
       </header>
-      <CreateProjectForm domains={domains} />
+      <Link
+        href="/projects/new"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
+      >
+        <Plus size={16} />
+        New project
+      </Link>
       <ProjectShelf
         title="Active"
         empty="No active projects."
         projects={activeProjects}
-        mode="active"
       />
       <ProjectShelf
         title="Someday"
         empty="No someday projects."
         projects={somedayProjects}
-        mode="someday"
       />
       <ProjectShelf
         title="Parked"
         empty="No parked projects."
         projects={parkedProjects}
-        mode="parked"
       />
     </div>
-  );
-}
-
-function CreateProjectForm({
-  domains,
-}: {
-  domains: Array<Domain & { areas: Area[] }>;
-}) {
-  return (
-    <form
-      action={createProject}
-      className="grid gap-2 rounded-lg border border-stone-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_12rem_10rem_8rem_auto]"
-    >
-      <input
-        name="name"
-        required
-        placeholder="New project"
-        className="h-10 min-w-0 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      />
-      <select
-        name="areaId"
-        required
-        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-        defaultValue={domains[0]?.areas[0]?.id ?? ""}
-      >
-        {domains.map((domain) => (
-          <optgroup key={domain.id} label={domain.name}>
-            {domain.areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <input
-        type="date"
-        name="targetDate"
-        aria-label="Target date"
-        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      />
-      <select
-        name="startMode"
-        aria-label="Start mode"
-        defaultValue="active"
-        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      >
-        <option value="active">Start now</option>
-        <option value="someday">Someday</option>
-      </select>
-      <button
-        type="submit"
-        title="Create project"
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-      >
-        <Plus size={16} />
-        Create
-      </button>
-    </form>
   );
 }
 
@@ -119,16 +65,16 @@ function ProjectShelf({
   title,
   empty,
   projects,
-  mode,
 }: {
   title: string;
   empty: string;
   projects: ProjectListItem[];
-  mode: "active" | "someday" | "parked";
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">{title}</h2>
+      <h2 className="text-base font-semibold text-stone-800">
+        {title} <span className="font-normal text-stone-500">{projects.length}</span>
+      </h2>
       <div className="grid gap-3 md:grid-cols-2">
         {projects.length === 0 ? (
           <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
@@ -147,28 +93,34 @@ function ProjectShelf({
                 >
                   <h2 className="font-semibold">{project.name}</h2>
                   <p className="mt-1 text-sm text-stone-500">
-                    {project.area.name} / {project.status}
+                    {project.area.domain.name} / {project.area.name}
                     {project.targetDate
                       ? ` / target ${formatDateOnly(project.targetDate)}`
                       : ""}
                   </p>
                 </Link>
+                <ProjectOverflowMenu projectId={project.id} status={project.status} />
               </div>
               <Link href={`/projects/${project.id}`} className="block">
-                <p className="mt-3 text-sm text-stone-800">
-                  {project.currentState}
+                <p className="mt-3 text-sm font-medium text-stone-800">
+                  {getTaskSummary(project)}
                 </p>
-                <p className="mt-3 border-l-2 border-teal-600 pl-3 text-sm text-stone-700">
-                  {project.nextStep}
-                </p>
+                {getLastTouched(project) ? (
+                  <p className="mt-1 text-xs text-stone-500">
+                    Touched {formatShortDate(getLastTouched(project)!)}
+                  </p>
+                ) : null}
+                {project.currentState?.trim() ? (
+                  <p className="mt-3 text-sm text-stone-700">
+                    {project.currentState}
+                  </p>
+                ) : null}
+                {getFreshNote(project) ? (
+                  <p className="mt-3 border-l-2 border-stone-200 pl-3 text-sm text-stone-600">
+                    {getFreshNote(project)}
+                  </p>
+                ) : null}
               </Link>
-              {mode === "active" ? (
-                <ParkProjectForm projectId={project.id} />
-              ) : mode === "someday" ? (
-                <ActivateProjectButton projectId={project.id} />
-              ) : (
-                <UnparkProjectButton projectId={project.id} />
-              )}
             </article>
           ))
         )}
@@ -177,30 +129,87 @@ function ProjectShelf({
   );
 }
 
-type ProjectListItem = Project & { area: Area };
+type ProjectListItem = Project & {
+  area: Area & { domain: Domain };
+  tasks: Array<Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">>;
+  activity: Array<Pick<ProjectActivity, "createdAt">>;
+  notes: Array<Pick<EntityNote, "bodyMd" | "createdAt">>;
+};
+
+function getTaskSummary(project: ProjectListItem) {
+  const openTasks = project.tasks.filter((task) => task.status === "open");
+  const nextDatedTask = openTasks
+    .filter((task) => task.dueDate)
+    .sort((a, b) => Number(a.dueDate) - Number(b.dueDate))[0];
+
+  if (nextDatedTask?.dueDate) {
+    return `${nextDatedTask.title} / ${formatDateOnly(nextDatedTask.dueDate)}`;
+  }
+
+  return `${openTasks.length} open ${openTasks.length === 1 ? "task" : "tasks"}`;
+}
+
+function getLastTouched(project: ProjectListItem) {
+  const dates = [
+    ...project.tasks
+      .map((task) => task.completedAt)
+      .filter((date): date is Date => Boolean(date)),
+    ...project.activity.map((entry) => entry.createdAt),
+    ...project.notes.map((note) => note.createdAt),
+  ];
+
+  return dates.sort((a, b) => Number(b) - Number(a))[0] ?? null;
+}
+
+function getFreshNote(project: ProjectListItem) {
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const note = project.notes.find((item) => Number(item.createdAt) >= cutoff);
+  if (!note) return null;
+  return note.bodyMd.length > 140 ? `${note.bodyMd.slice(0, 137)}...` : note.bodyMd;
+}
 
 async function loadProjects() {
   try {
-    const [projects, domains] = await Promise.all([
-      prisma.project.findMany({
-        where: { status: { in: ["active", "someday", "parked"] } },
-        include: { area: true },
-        orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
-        take: 80,
-      }),
-      prisma.domain.findMany({
-        where: { active: true, isSystem: false },
-        orderBy: { sortOrder: "asc" },
-        include: {
-          areas: {
-            where: { status: "active" },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
+    const projects = await prisma.project.findMany({
+      where: { status: { in: ["active", "someday", "parked"] } },
+      include: {
+        area: { include: { domain: true } },
+        tasks: {
+          where: { status: { in: ["open", "completed"] } },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+          take: 60,
         },
-      }),
-    ]);
+        activity: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+      },
+      orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
+      take: 80,
+    });
 
-    return { ok: true as const, projects, domains };
+    const notes = projects.length
+      ? await prisma.entityNote.findMany({
+          where: {
+            parentType: "project",
+            parentId: { in: projects.map((project) => project.id) },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 160,
+        })
+      : [];
+    const notesByProject = new Map<string, EntityNote[]>();
+    for (const note of notes) {
+      const group = notesByProject.get(note.parentId) ?? [];
+      group.push(note);
+      notesByProject.set(note.parentId, group);
+    }
+    const projectsWithNotes = projects.map((project) => ({
+      ...project,
+      notes: notesByProject.get(project.id) ?? [],
+    }));
+
+    return { ok: true as const, projects: projectsWithNotes };
   } catch {
     return { ok: false as const };
   }

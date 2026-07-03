@@ -370,15 +370,15 @@ export async function POST(request: Request, context: RouteCtx) {
           parkedAt: status === "parked" ? now : undefined,
           completedAt: status === "completed" ? now : undefined,
           killedAt: status === "killed" ? now : undefined,
-          currentState: parsed.currentState ?? "Created through API.",
-          nextStep: parsed.nextStep ?? "Define the next physical step.",
+          currentState: parsed.currentState,
+          nextStep: parsed.nextStep,
           activity: {
             create: {
               entry: "Project created through API.",
               source: `api:${apiKey.label}`,
               stateSnapshot: {
-                current_state: parsed.currentState ?? "Created through API.",
-                next_step: parsed.nextStep ?? "Define the next physical step.",
+                current_state: parsed.currentState ?? null,
+                next_step: parsed.nextStep ?? null,
                 status,
               },
             },
@@ -435,7 +435,6 @@ export async function POST(request: Request, context: RouteCtx) {
           name: parsed.title ?? idea.title,
           areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
           currentState: idea.body ?? "Converted from idea.",
-          nextStep: "Define the next physical step.",
           activity: { create: { entry: "Converted from idea through API.", source: `api:${apiKey.label}` } },
         },
       });

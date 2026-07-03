@@ -493,8 +493,6 @@ async function createProject(
       areaId,
       status: action.status ?? "active",
       targetDate: parseDateOnly(action.target_date),
-      currentState: "Created from capture. Current state needs detail.",
-      nextStep: "Define the next physical step.",
       activity: {
         create: {
           entry: `Project created from capture: ${context.rawText}`,

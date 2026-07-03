@@ -181,28 +181,23 @@ export async function addProjectTask(formData: FormData) {
 
 export async function parkProject(formData: FormData) {
   const projectId = formData.get("projectId");
-  const whereLeftOff = formData.get("whereLeftOff");
   if (typeof projectId !== "string" || projectId.length === 0) return;
+  await parkProjectById(projectId);
+}
 
+export async function parkProjectById(projectId: string) {
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
       status: "parked",
       parkedAt: new Date(),
-      currentState:
-        typeof whereLeftOff === "string" && whereLeftOff.trim().length > 0
-          ? whereLeftOff.trim()
-          : undefined,
     },
   });
 
   await prisma.projectActivity.create({
     data: {
       projectId,
-      entry:
-        typeof whereLeftOff === "string" && whereLeftOff.trim().length > 0
-          ? `Parked: ${whereLeftOff.trim()}`
-          : "Project parked.",
+      entry: "Project parked.",
       source: "manual",
       stateSnapshot: {
         status: project.status,
@@ -243,7 +238,10 @@ function parseReminderOffsetsInput(value: string) {
 export async function unparkProject(formData: FormData) {
   const projectId = formData.get("projectId");
   if (typeof projectId !== "string" || projectId.length === 0) return;
+  await unparkProjectById(projectId);
+}
 
+export async function unparkProjectById(projectId: string) {
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
@@ -281,7 +279,10 @@ export async function unparkProject(formData: FormData) {
 export async function activateProject(formData: FormData) {
   const projectId = getTrimmedString(formData, "projectId");
   if (!projectId) return;
+  await activateProjectById(projectId);
+}
 
+export async function activateProjectById(projectId: string) {
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
@@ -329,24 +330,18 @@ export async function createProject(formData: FormData) {
   });
   if (!area) return;
 
-  const currentState = "Created from Projects.";
-  const nextStep = "Define the next physical step.";
   const project = await prisma.project.create({
     data: {
       name,
       areaId: area.id,
       status: startMode === "someday" ? "someday" : "active",
       targetDate: targetDate ? dateOnlyFromString(targetDate) : null,
-      currentState,
-      nextStep,
       activity: {
         create: {
           entry: "Project created.",
           source: "manual",
           stateSnapshot: {
             status: startMode === "someday" ? "someday" : "active",
-            current_state: currentState,
-            next_step: nextStep,
           },
         },
       },
@@ -370,11 +365,14 @@ export async function updateProjectState(formData: FormData) {
   const projectId = getTrimmedString(formData, "projectId");
   const currentState = getTrimmedString(formData, "currentState");
   const nextStep = getTrimmedString(formData, "nextStep");
-  if (!projectId || !currentState || !nextStep) return;
+  if (!projectId) return;
 
   const project = await prisma.project.update({
     where: { id: projectId },
-    data: { currentState, nextStep },
+    data: {
+      currentState: currentState || null,
+      nextStep: nextStep || null,
+    },
   });
 
   await prisma.projectActivity.create({
@@ -589,24 +587,39 @@ function revalidateEntityParent(parentType: "area" | "project", parentId: string
 }
 
 export async function parkArea(formData: FormData) {
-  await setAreaStatus(formData, "parked");
+  const areaId = getTrimmedString(formData, "areaId");
+  if (!areaId) return;
+  await setAreaStatusById(areaId, "parked");
 }
 
 export async function unparkArea(formData: FormData) {
-  await setAreaStatus(formData, "active");
+  const areaId = getTrimmedString(formData, "areaId");
+  if (!areaId) return;
+  await setAreaStatusById(areaId, "active");
 }
 
 export async function retireArea(formData: FormData) {
-  await setAreaStatus(formData, "retired");
-}
-
-async function setAreaStatus(
-  formData: FormData,
-  status: "active" | "parked" | "retired",
-) {
   const areaId = getTrimmedString(formData, "areaId");
   if (!areaId) return;
+  await setAreaStatusById(areaId, "retired");
+}
 
+export async function parkAreaById(areaId: string) {
+  await setAreaStatusById(areaId, "parked");
+}
+
+export async function unparkAreaById(areaId: string) {
+  await setAreaStatusById(areaId, "active");
+}
+
+export async function retireAreaById(areaId: string) {
+  await setAreaStatusById(areaId, "retired");
+}
+
+async function setAreaStatusById(
+  areaId: string,
+  status: "active" | "parked" | "retired",
+) {
   const area = await prisma.area.update({
     where: { id: areaId },
     data: { status },
@@ -635,20 +648,29 @@ async function setAreaStatus(
 }
 
 export async function completeProject(formData: FormData) {
-  await setProjectTerminalStatus(formData, "completed");
+  const projectId = getTrimmedString(formData, "projectId");
+  if (!projectId) return;
+  await setProjectTerminalStatusById(projectId, "completed");
 }
 
 export async function killProject(formData: FormData) {
-  await setProjectTerminalStatus(formData, "killed");
-}
-
-async function setProjectTerminalStatus(
-  formData: FormData,
-  status: "completed" | "killed",
-) {
   const projectId = getTrimmedString(formData, "projectId");
   if (!projectId) return;
+  await setProjectTerminalStatusById(projectId, "killed");
+}
 
+export async function completeProjectById(projectId: string) {
+  await setProjectTerminalStatusById(projectId, "completed");
+}
+
+export async function killProjectById(projectId: string) {
+  await setProjectTerminalStatusById(projectId, "killed");
+}
+
+async function setProjectTerminalStatusById(
+  projectId: string,
+  status: "completed" | "killed",
+) {
   const project = await prisma.project.update({
     where: { id: projectId },
     data:

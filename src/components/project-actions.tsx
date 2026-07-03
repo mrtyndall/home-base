@@ -1,88 +1,124 @@
-import { ArchiveRestore, Check, Pause, X } from "lucide-react";
+"use client";
+
+import type { ProjectStatus } from "@prisma/client";
+import type { ReactNode } from "react";
 import {
-  activateProject,
-  completeProject,
-  killProject,
-  parkProject,
-  unparkProject,
-} from "@/app/actions";
+  ArchiveRestore,
+  Check,
+  Ellipsis,
+  Pause,
+  Play,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export function ParkProjectForm({ projectId }: { projectId: string }) {
+export function ProjectOverflowMenu({
+  projectId,
+  status,
+}: {
+  projectId: string;
+  status: ProjectStatus;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  if (status === "completed" || status === "killed") {
+    return null;
+  }
+
+  async function updateStatus(nextStatus: "active" | "parked" | "completed" | "killed") {
+    if (pending) return;
+    setPending(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!response.ok) {
+        throw new Error("Project status update failed.");
+      }
+      if (nextStatus === "completed" || nextStatus === "killed") {
+        router.push("/projects");
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={parkProject} className="mt-4 flex flex-col gap-2">
-      <input type="hidden" name="projectId" value={projectId} />
-      <input
-        name="whereLeftOff"
-        placeholder="Where I left off"
-        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      />
-      <button
-        type="submit"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+    <details className="relative">
+      <summary
+        title="Project actions"
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-950 [&::-webkit-details-marker]:hidden"
       >
-        <Pause size={15} />
-        Park
-      </button>
-    </form>
+        <Ellipsis size={17} />
+      </summary>
+      <div className="absolute right-0 z-10 mt-2 w-44 rounded-md border border-stone-200 bg-white p-1 shadow-lg">
+        {status === "active" ? (
+          <MenuButton
+            disabled={pending}
+            label="Park"
+            icon={<Pause size={15} />}
+            onClick={() => updateStatus("parked")}
+          />
+        ) : null}
+        {status === "parked" ? (
+          <MenuButton
+            disabled={pending}
+            label="Unpark"
+            icon={<ArchiveRestore size={15} />}
+            onClick={() => updateStatus("active")}
+          />
+        ) : null}
+        {status === "someday" ? (
+          <MenuButton
+            disabled={pending}
+            label="Activate"
+            icon={<Play size={15} />}
+            onClick={() => updateStatus("active")}
+          />
+        ) : null}
+        <MenuButton
+          disabled={pending}
+          label="Complete"
+          icon={<Check size={15} />}
+          onClick={() => updateStatus("completed")}
+        />
+        <MenuButton
+          disabled={pending}
+          label="Kill"
+          icon={<X size={15} />}
+          onClick={() => updateStatus("killed")}
+        />
+      </div>
+    </details>
   );
 }
 
-export function UnparkProjectButton({ projectId }: { projectId: string }) {
+function MenuButton({
+  disabled,
+  label,
+  icon,
+  onClick,
+}: {
+  disabled: boolean;
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
   return (
-    <form action={unparkProject} className="mt-4">
-      <input type="hidden" name="projectId" value={projectId} />
-      <button
-        type="submit"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-      >
-        <ArchiveRestore size={15} />
-        Unpark
-      </button>
-    </form>
-  );
-}
-
-export function ActivateProjectButton({ projectId }: { projectId: string }) {
-  return (
-    <form action={activateProject} className="mt-4">
-      <input type="hidden" name="projectId" value={projectId} />
-      <button
-        type="submit"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-      >
-        <ArchiveRestore size={15} />
-        Activate
-      </button>
-    </form>
-  );
-}
-
-export function CompleteProjectButton({ projectId }: { projectId: string }) {
-  return (
-    <form action={completeProject}>
-      <input type="hidden" name="projectId" value={projectId} />
-      <button
-        type="submit"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
-      >
-        <Check size={15} />
-        Complete
-      </button>
-    </form>
-  );
-}
-
-export function KillProjectButton({ projectId }: { projectId: string }) {
-  return (
-    <form action={killProject}>
-      <input type="hidden" name="projectId" value={projectId} />
-      <button
-        type="submit"
-        className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-500 hover:text-stone-950"
-      >
-        <X size={15} />
-        Kill
-      </button>
-    </form>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-stone-950 disabled:cursor-wait disabled:opacity-60"
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Ellipsis, Pencil } from "lucide-react";
 import {
-  parkArea,
-  retireArea,
-  unparkArea,
+  parkAreaById,
+  retireAreaById,
+  unparkAreaById,
   updateAreaState,
 } from "@/app/actions";
 import { SetupNotice } from "@/components/setup-notice";
@@ -45,25 +45,34 @@ export default async function AreaPage({ params }: AreaPageProps) {
           <ArrowLeft size={16} />
           Projects
         </Link>
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-            Area
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-            {area.name}
-          </h1>
-          <p className="mt-1 text-sm text-stone-500">
-            {area.domain.name} / {area.status}
-            {area.tendingCadence ? ` / ${area.tendingCadence}` : ""}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
+              {area.domain.name}
+            </p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-normal">
+              {area.name}
+            </h1>
+            <p className="mt-1 text-sm text-stone-500">
+              {area.status}
+              {area.tendingCadence ? ` / ${area.tendingCadence}` : ""}
+            </p>
+            {area.currentState?.trim() ? (
+              <p className="mt-3 max-w-2xl text-sm text-stone-700">
+                {area.currentState}
+              </p>
+            ) : null}
+          </div>
+          <AreaOverflowMenu areaId={area.id} status={area.status} />
         </div>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_18rem]">
-        <form
-          action={updateAreaState}
-          className="space-y-4 rounded-lg border border-stone-200 bg-white p-4"
-        >
+      <details className="rounded-lg border border-stone-200 bg-white p-4">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
+          <Pencil size={15} />
+          Edit state
+        </summary>
+        <form action={updateAreaState} className="mt-4 space-y-4">
           <input type="hidden" name="areaId" value={area.id} />
           <label className="block text-sm font-medium text-stone-700">
             <span>Current state</span>
@@ -92,28 +101,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
             </button>
           </div>
         </form>
-
-        <aside className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-          <h2 className="text-base font-semibold text-stone-800">Status</h2>
-          {area.status === "active" ? (
-            <div className="space-y-2">
-              <AreaStatusButton action={parkArea} areaId={area.id} label="Park" />
-              <AreaStatusButton
-                action={retireArea}
-                areaId={area.id}
-                label="Retire"
-                tone="quiet"
-              />
-            </div>
-          ) : area.status === "parked" ? (
-            <AreaStatusButton action={unparkArea} areaId={area.id} label="Unpark" />
-          ) : (
-            <p className="text-sm text-stone-600">
-              This area remains searchable with its notes and history.
-            </p>
-          )}
-        </aside>
-      </section>
+      </details>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Panel title="Standing tasks" empty="No open standing tasks.">
@@ -167,27 +155,58 @@ export default async function AreaPage({ params }: AreaPageProps) {
   );
 }
 
-function AreaStatusButton({
-  action,
+function AreaOverflowMenu({
   areaId,
-  label,
-  tone = "primary",
+  status,
 }: {
-  action: (formData: FormData) => Promise<void>;
   areaId: string;
+  status: "active" | "parked" | "retired";
+}) {
+  if (status === "retired") {
+    return null;
+  }
+
+  return (
+    <details className="relative">
+      <summary
+        title="Area actions"
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-950 [&::-webkit-details-marker]:hidden"
+      >
+        <Ellipsis size={17} />
+      </summary>
+      <div className="absolute right-0 z-10 mt-2 w-40 rounded-md border border-stone-200 bg-white p-1 shadow-lg">
+        {status === "active" ? (
+          <>
+            <AreaMenuAction action={parkAreaById.bind(null, areaId)} label="Park" />
+            <AreaMenuAction
+              action={retireAreaById.bind(null, areaId)}
+              label="Retire"
+            />
+          </>
+        ) : null}
+        {status === "parked" ? (
+          <AreaMenuAction
+            action={unparkAreaById.bind(null, areaId)}
+            label="Unpark"
+          />
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function AreaMenuAction({
+  action,
+  label,
+}: {
+  action: () => Promise<void>;
   label: string;
-  tone?: "primary" | "quiet";
 }) {
   return (
     <form action={action}>
-      <input type="hidden" name="areaId" value={areaId} />
       <button
         type="submit"
-        className={
-          tone === "primary"
-            ? "inline-flex h-9 w-full items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-            : "inline-flex h-9 w-full items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-400"
-        }
+        className="flex h-9 w-full items-center rounded px-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
       >
         {label}
       </button>

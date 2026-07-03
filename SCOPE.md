@@ -79,10 +79,10 @@ This is where the mental load lives and where the system succeeds or dies. It is
 
 Personal areas and projects (ham radio, car upkeep, homelab builds, solar research, hobby threads) die from expensive re-entry, not lost interest. After weeks away, reconstructing "where was I?" costs more than the next step itself. This pillar makes re-entry a ten-second read.
 
-**Every area and project carries living state:**
-- `current_state`: one or two sentences, always current, describing exactly where things stand
-- `next_step`: the single next physical action
-- Both updated through the capture door: "log on the Proxmox build: motherboard arrived, next step is rack rails" updates both fields and appends to the activity log
+**Every area and project can carry living state:**
+- `current_state`: one or two sentences, describing exactly where things stand when the system has real state to record
+- `next_step`: the single next physical action, when one has been captured or explicitly set
+- Both are optional, never prompted for on resting views, and updated through the capture door or an explicit edit action: "log on the Proxmox build: motherboard arrived, next step is rack rails" updates both fields and appends to the activity log
 - Activity logs preserve full history of state changes and log entries
 
 **Areas are ongoing responsibilities:**
@@ -104,9 +104,9 @@ Personal areas and projects (ham radio, car upkeep, homelab builds, solar resear
 - Status flow enforcement in UI: "start now" versus "someday" is offered at creation; park appears only on active projects. Never present someday and parked as a pick-one dropdown in the same moment. Any status is correctable later from the project detail view.
 
 **Views:**
-- A projects shelf grouped into Active, Someday, and Parked, each card showing name, status, current_state, and next_step at a glance
-- Area re-entry view: open an area and immediately see current state, next step, standing tasks, child projects, notes, docs, attachments, linked ideas, and recent activity
-- Project re-entry view: open a project and immediately see where you left off, the next step, tasks, notes, docs, attachments, linked ideas, milestones, and recent activity
+- A projects shelf grouped into Active, Someday, and Parked. Cards surface derived facts: name, domain/area, next dated task or open-task count, last touched, and fresh note snippets. Optional current_state renders only when it exists.
+- Area re-entry view: open an area and immediately see optional state, standing tasks, child projects, notes, docs, attachments, linked ideas, and recent activity without being prompted to fill anything in.
+- Project re-entry view: open a project and immediately see optional state, tasks, notes, docs, attachments, linked ideas, milestones when present, and recent activity without being prompted to fill anything in.
 
 **Slipping (feeds the nudge system):** an `active` project with a target date approaching and no activity, or an active project untouched beyond a per-project threshold. Someday and parked projects never slip. Areas never slip. Thresholds are tunable per project.
 

@@ -14,7 +14,7 @@ type ParserContext = {
     id: string;
     name: string;
     area: string;
-    current_state: string;
+    current_state: string | null;
   }>;
   recentIdeas: Array<{ id: string; title: string }>;
 };

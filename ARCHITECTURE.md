@@ -94,7 +94,7 @@ The Railway app service is deployed. Railway cron still needs to be configured i
 
 Domains are organization headers only. Areas are ongoing responsibilities with `active`, `parked`, and `retired` statuses. Projects are finishable containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic.
 
-Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export.
+Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export. Area/project state fields are optional and are shown only when the system already has real data; list cards favor derived task, activity, and note signals.
 
 ## Current Components
 
@@ -122,6 +122,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 
 - Migrated the data model to Domains -> Areas -> Projects -> Tasks. Added `areas`, shared markdown container tables, file attachment metadata, project milestones, someday project status, and someday tasks. Existing 3 projects and 12 tasks were mapped to areas with zero missing area assignments and zero row loss in the local alpha database.
 - Updated the REST API and MCP layer for the area hierarchy, someday projects/tasks, shared markdown notes/docs, milestones, area reads/state updates, and search across first-class containers. API proof covered bearer-auth area creation/update, someday project creation, project activation, entity notes/docs, milestone completion, search readback, and audited notifications.
+- Remediated project/area surfaces to derive card content from tasks, notes, and activity instead of asking for state. Project state fields became nullable, creation paths stopped generating placeholder state, and park/status actions moved into overflow controls.
 - Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
 - Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Reworked the Tasks tab into Today, Tomorrow, Upcoming grouped by date, and No date sections using the same row-level rescheduling and drop-zone primitives.
