@@ -33,7 +33,7 @@ export default async function IdeasPage() {
             >
               <h2 className="font-semibold">{idea.title}</h2>
               <p className="mt-1 text-sm text-stone-500">
-                {idea.domain?.name ?? "No domain"} / {idea.status}
+                {idea.project?.name ?? idea.area?.name ?? "No area"} / {idea.status}
               </p>
               {idea.body ? (
                 <p className="mt-3 text-sm text-stone-800">{idea.body}</p>
@@ -55,7 +55,7 @@ async function loadIdeas() {
   try {
     const ideas = await prisma.idea.findMany({
       where: { status: { in: ["seed", "developing"] } },
-      include: { domain: true },
+      include: { area: true, project: true },
       orderBy: { updatedAt: "desc" },
       take: 80,
     });

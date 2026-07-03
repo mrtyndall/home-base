@@ -1,4 +1,4 @@
-import type { Domain, Project } from "@prisma/client";
+import type { Area, Domain, Project } from "@prisma/client";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createProject } from "@/app/actions";
@@ -45,7 +45,11 @@ export default async function ProjectsPage() {
   );
 }
 
-function CreateProjectForm({ domains }: { domains: Domain[] }) {
+function CreateProjectForm({
+  domains,
+}: {
+  domains: Array<Domain & { areas: Area[] }>;
+}) {
   return (
     <form
       action={createProject}
@@ -58,15 +62,19 @@ function CreateProjectForm({ domains }: { domains: Domain[] }) {
         className="h-10 min-w-0 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
       />
       <select
-        name="domainId"
+        name="areaId"
         required
         className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-        defaultValue={domains[0]?.id ?? ""}
+        defaultValue={domains[0]?.areas[0]?.id ?? ""}
       >
         {domains.map((domain) => (
-          <option key={domain.id} value={domain.id}>
-            {domain.name}
-          </option>
+          <optgroup key={domain.id} label={domain.name}>
+            {domain.areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.name}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <input
@@ -119,7 +127,7 @@ function ProjectShelf({
                 >
                   <h2 className="font-semibold">{project.name}</h2>
                   <p className="mt-1 text-sm text-stone-500">
-                    {project.domain.name} / {project.status}
+                    {project.area.name} / {project.status}
                     {project.targetDate
                       ? ` / target ${formatDateOnly(project.targetDate)}`
                       : ""}
@@ -147,20 +155,26 @@ function ProjectShelf({
   );
 }
 
-type ProjectListItem = Project & { domain: Domain };
+type ProjectListItem = Project & { area: Area };
 
 async function loadProjects() {
   try {
     const [projects, domains] = await Promise.all([
       prisma.project.findMany({
         where: { status: { in: ["active", "parked"] } },
-        include: { domain: true },
-        orderBy: [{ domain: { sortOrder: "asc" } }, { createdAt: "desc" }],
+        include: { area: true },
+        orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
         take: 80,
       }),
       prisma.domain.findMany({
-        where: { active: true },
+        where: { active: true, isSystem: false },
         orderBy: { sortOrder: "asc" },
+        include: {
+          areas: {
+            where: { status: "active" },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
+        },
       }),
     ]);
 

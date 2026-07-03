@@ -55,7 +55,7 @@ export default async function ProjectDetailPage({
             {project.name}
           </h1>
           <p className="mt-1 text-sm text-stone-500">
-            {project.domain.name} / {project.status}
+            {project.area.domain.name} / {project.area.name} / {project.status}
             {project.targetDate
               ? ` / target ${formatDateOnly(project.targetDate)}`
               : ""}
@@ -184,7 +184,7 @@ async function loadProject(projectId: string) {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
-        domain: true,
+        area: { include: { domain: true } },
         tasks: {
           where: { status: "open" },
           orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],

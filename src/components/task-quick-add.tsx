@@ -9,25 +9,42 @@ import { createQuickTask } from "@/app/actions";
 type SavedTask = {
   id: string;
   title: string;
-  domainName: string;
+  areaName: string;
   projectName: string | null;
 };
 
 export type QuickAddProject = {
   id: string;
   name: string;
-  domainName: string;
+  areaId: string;
+  areaName: string;
 };
 
-export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }) {
+export type QuickAddAreaGroup = {
+  domainName: string;
+  areas: Array<{ id: string; name: string }>;
+};
+
+export function TaskQuickAdd({
+  areaGroups = [],
+  projects = [],
+}: {
+  areaGroups?: QuickAddAreaGroup[];
+  projects?: QuickAddProject[];
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [areaId, setAreaId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [savedTask, setSavedTask] = useState<SavedTask | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
+
+  const filteredProjects = areaId
+    ? projects.filter((project) => project.areaId === areaId)
+    : projects;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +58,7 @@ export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }
       const response = await fetch("/api/tasks/quick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmedTitle, dueDate, projectId }),
+        body: JSON.stringify({ title: trimmedTitle, dueDate, areaId, projectId }),
       });
 
       if (!response.ok) {
@@ -52,6 +69,8 @@ export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }
       setSavedTask(result.task);
       setTitle("");
       setDueDate("");
+      setAreaId("");
+      setProjectId("");
       startTransition(() => router.refresh());
     } catch {
       setError("Task was not saved. Try again.");
@@ -94,21 +113,46 @@ export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }
             aria-label="Set due date"
           />
         </label>
-        {projects.length > 0 ? (
-          <select
-            name="projectId"
-            aria-label="Project"
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-            className="h-10 max-w-36 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-44"
-          >
-            <option value="">No project</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name} / {project.domainName}
-              </option>
-            ))}
-          </select>
+        {areaGroups.length > 0 ? (
+          <>
+            <select
+              name="areaId"
+              aria-label="Area"
+              value={areaId}
+              onChange={(event) => {
+                setAreaId(event.target.value);
+                setProjectId("");
+              }}
+              className="h-10 max-w-32 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-40"
+            >
+              <option value="">Inbox</option>
+              {areaGroups.map((group) => (
+                <optgroup key={group.domainName} label={group.domainName}>
+                  {group.areas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {projects.length > 0 ? (
+              <select
+                name="projectId"
+                aria-label="Project"
+                value={projectId}
+                onChange={(event) => setProjectId(event.target.value)}
+                className="h-10 max-w-36 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-44"
+              >
+                <option value="">No project</option>
+                {filteredProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} / {project.areaName}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </>
         ) : null}
         <button
           type="submit"
@@ -124,7 +168,7 @@ export function TaskQuickAdd({ projects = [] }: { projects?: QuickAddProject[] }
           href={`/tasks/${savedTask.id}`}
           className="block rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-950 transition hover:border-teal-400"
         >
-          Saved: {savedTask.title} / {savedTask.domainName}
+          Saved: {savedTask.title} / {savedTask.areaName}
           {savedTask.projectName ? ` / ${savedTask.projectName}` : ""}
         </Link>
       ) : null}

@@ -37,18 +37,20 @@ export async function getTodayDashboard() {
       prisma.task.findMany({
         where: {
           status: "open",
+          someday: false,
           dueDate: { lte: todayDate },
         },
-        include: { domain: true, project: true },
+        include: { area: true, project: true },
         orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }, { createdAt: "asc" }],
         take: 12,
       }),
       prisma.task.findMany({
         where: {
           status: "open",
+          someday: false,
           dueDate: tomorrowDate,
         },
-        include: { domain: true, project: true },
+        include: { area: true, project: true },
         orderBy: [{ dueTime: "asc" }, { createdAt: "asc" }],
         take: 8,
       }),
@@ -73,6 +75,7 @@ export async function getTodayDashboard() {
       prisma.task.findFirst({
         where: {
           status: "open",
+          someday: false,
           dueDate: { gt: tomorrowDate },
         },
         orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }],

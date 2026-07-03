@@ -1,4 +1,4 @@
-import type { Domain, Project, Task } from "@prisma/client";
+import type { Area, Project, Task } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { addSubtask } from "@/app/actions";
 import { prisma } from "@/lib/db";
@@ -20,7 +20,7 @@ export default async function TasksPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { tasks, projects } = result;
+  const { tasks, projects, domains } = result;
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
   const sections = groupTasks(tasks, today, tomorrow);
@@ -31,10 +31,15 @@ export default async function TasksPage() {
         <h1 className="text-3xl font-semibold tracking-normal">Tasks</h1>
       </header>
       <TaskQuickAdd
+        areaGroups={domains.map((domain) => ({
+          domainName: domain.name,
+          areas: domain.areas.map((area) => ({ id: area.id, name: area.name })),
+        }))}
         projects={projects.map((project) => ({
           id: project.id,
           name: project.name,
-          domainName: project.domain.name,
+          areaId: project.areaId,
+          areaName: project.area.name,
         }))}
       />
       <TaskSection
@@ -238,14 +243,14 @@ function AddSubtaskForm({ parentTaskId }: { parentTaskId: string }) {
 }
 
 type TaskListItem = Task & {
-  domain: Domain;
+  area: Area;
   project: Project | null;
   subtasks: Task[];
 };
 
 function formatTaskDetail(task: TaskListItem) {
   return [
-    task.domain.name,
+    task.area.name,
     task.project?.name,
     task.dueDate ? formatDateOnly(task.dueDate) : null,
     task.recurrenceRule ? "repeats" : null,
@@ -294,11 +299,11 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
 
 async function loadTasks() {
   try {
-    const [tasks, projects] = await Promise.all([
+    const [tasks, projects, domains] = await Promise.all([
       prisma.task.findMany({
         where: { status: "open", parentTaskId: null },
         include: {
-          domain: true,
+          area: true,
           project: true,
           subtasks: {
             where: { status: "open" },
@@ -309,13 +314,25 @@ async function loadTasks() {
         take: 80,
       }),
       prisma.project.findMany({
-        where: { status: { in: ["active", "parked"] } },
-        include: { domain: true },
-        orderBy: [{ domain: { sortOrder: "asc" } }, { name: "asc" }],
+        where: { status: { in: ["active", "parked", "someday"] } },
+        include: { area: true },
+        orderBy: [{ area: { sortOrder: "asc" } }, { name: "asc" }],
+      }),
+      prisma.domain.findMany({
+        where: {
+          OR: [{ active: true, isSystem: false }, { isSystem: true }],
+        },
+        include: {
+          areas: {
+            where: { status: "active" },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
+        },
+        orderBy: { sortOrder: "asc" },
       }),
     ]);
 
-    return { ok: true as const, tasks, projects };
+    return { ok: true as const, tasks, projects, domains };
   } catch {
     return { ok: false as const };
   }

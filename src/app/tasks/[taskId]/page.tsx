@@ -52,7 +52,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
               {task.title}
             </h1>
             <p className="mt-1 text-sm text-stone-500">
-              {task.domain.name}
+              {task.area.name}
               {task.project ? ` / ${task.project.name}` : ""}
               {task.dueDate ? ` / ${formatDateOnly(task.dueDate)}` : ""}
             </p>
@@ -96,16 +96,20 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
               <option value="high">High</option>
             </select>
           </Field>
-          <Field label="Domain">
+          <Field label="Area">
             <select
-              name="domainId"
-              defaultValue={task.domainId}
+              name="areaId"
+              defaultValue={task.areaId}
               className={inputClassName}
             >
               {domains.map((domain) => (
-                <option key={domain.id} value={domain.id}>
-                  {domain.name}
-                </option>
+                <optgroup key={domain.id} label={domain.name}>
+                  {domain.areas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Field>
@@ -234,7 +238,7 @@ async function loadTaskDetail(taskId: string) {
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
-        domain: true,
+        area: true,
         project: true,
         subtasks: {
           where: { status: "open" },
@@ -249,13 +253,21 @@ async function loadTaskDetail(taskId: string) {
 
     const [domains, projects] = await Promise.all([
       prisma.domain.findMany({
-        where: { active: true },
+        where: {
+          OR: [{ active: true, isSystem: false }, { isSystem: true }],
+        },
         orderBy: { sortOrder: "asc" },
+        include: {
+          areas: {
+            where: { status: "active" },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
+        },
       }),
       prisma.project.findMany({
         where: {
-          domainId: task.domainId,
-          status: { in: ["active", "parked"] },
+          areaId: task.areaId,
+          status: { in: ["active", "parked", "someday"] },
         },
         orderBy: { name: "asc" },
       }),

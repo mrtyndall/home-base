@@ -159,7 +159,7 @@ type TodayTask = {
   id: string;
   title: string;
   dueDate: Date | null;
-  domain: { name: string };
+  area: { name: string };
   project: { name: string } | null;
 };
 
@@ -172,7 +172,7 @@ function TodayTaskRow({
   today: string;
   tomorrow: string;
 }) {
-  const detail = `${task.domain.name}${task.project ? ` / ${task.project.name}` : ""}`;
+  const detail = `${task.area.name}${task.project ? ` / ${task.project.name}` : ""}`;
 
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">

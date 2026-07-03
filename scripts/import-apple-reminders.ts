@@ -82,10 +82,12 @@ async function main() {
 }
 
 async function importReminder(reminder: NormalizedReminder, inputPath: string) {
-  const domainId = await resolveDomainId(reminder.domainName);
   const projectId = reminder.projectName
     ? await resolveProjectId(reminder.projectName)
     : undefined;
+  const areaId = projectId
+    ? await resolveProjectAreaId(projectId)
+    : await resolveAreaId(reminder.domainName);
 
   return getPrisma().$transaction(async (tx) => {
     const capture = await tx.capture.create({
@@ -110,7 +112,7 @@ async function importReminder(reminder: NormalizedReminder, inputPath: string) {
         dueDate: reminder.dueDate,
         dueTime: reminder.dueTime,
         priority: reminder.priority,
-        domainId,
+        areaId,
         projectId,
         source: "apple_reminders_import",
         captureId: capture.id,
@@ -224,35 +226,57 @@ function getPrisma() {
   return prisma;
 }
 
-async function resolveDomainId(name?: string) {
+async function resolveAreaId(name?: string) {
   if (name) {
-    const domain = await getPrisma().domain.findFirst({
+    const area = await getPrisma().area.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
       select: { id: true },
     });
-    if (domain) return domain.id;
+    if (area) return area.id;
   }
 
-  const inbox = await getPrisma().domain.upsert({
-    where: { name: "Inbox" },
-    update: { active: true, isSystem: true },
+  const systemDomain = await getPrisma().domain.upsert({
+    where: { name: "System" },
+    update: { active: false, isSystem: true },
     create: {
-      name: "Inbox",
-      description: "System catch-all for imported or ambiguous items.",
+      name: "System",
+      description: "Hidden system grouping for imported or ambiguous items.",
       sortOrder: 0,
       isSystem: true,
-      active: true,
+      active: false,
+    },
+  });
+
+  const inbox = await getPrisma().area.upsert({
+    where: { id: "area_inbox" },
+    update: { name: "Inbox", domainId: systemDomain.id, isSystem: true },
+    create: {
+      id: "area_inbox",
+      name: "Inbox",
+      domainId: systemDomain.id,
+      isSystem: true,
+      currentState: "System catch-all for quick-add and ambiguous imports.",
+      nextStep: "Route items when the right area becomes clear.",
     },
   });
 
   return inbox.id;
 }
 
+async function resolveProjectAreaId(projectId: string) {
+  const project = await getPrisma().project.findUnique({
+    where: { id: projectId },
+    select: { areaId: true },
+  });
+
+  return project?.areaId ?? resolveAreaId();
+}
+
 async function resolveProjectId(name: string) {
   const project = await getPrisma().project.findFirst({
     where: {
       name: { contains: name, mode: "insensitive" },
-      status: { in: ["active", "parked"] },
+      status: { in: ["active", "parked", "someday"] },
     },
     select: { id: true },
     orderBy: { createdAt: "desc" },

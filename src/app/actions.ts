@@ -8,7 +8,7 @@ import { dateOnlyFromString } from "@/lib/dates";
 import {
   completeTaskById,
   createTaskWithAudit,
-  createTaskWithDefaultDomain,
+  createTaskWithDefaultArea,
 } from "@/lib/tasks";
 
 export async function completeTask(formData: FormData) {
@@ -29,18 +29,25 @@ export async function createQuickTask(formData: FormData) {
 
   const dueDateValue = getTrimmedString(formData, "dueDate");
   const projectId = getTrimmedString(formData, "projectId");
+  const selectedAreaId = getTrimmedString(formData, "areaId");
   const project = projectId
     ? await prisma.project.findFirst({
-        where: { id: projectId, status: { in: ["active", "parked"] } },
-        select: { id: true, domainId: true },
+        where: { id: projectId, status: { in: ["active", "parked", "someday"] } },
+        select: { id: true, areaId: true },
+      })
+    : null;
+  const area = !project && selectedAreaId
+    ? await prisma.area.findFirst({
+        where: { id: selectedAreaId, status: "active" },
+        select: { id: true },
       })
     : null;
 
-  await createTaskWithDefaultDomain(
+  await createTaskWithDefaultArea(
     {
       title,
       dueDate: dueDateValue ? dateOnlyFromString(dueDateValue) : null,
-      domainId: project?.domainId,
+      areaId: project?.areaId ?? area?.id,
       projectId: project?.id,
     },
     { source: "manual" },
@@ -60,18 +67,18 @@ export async function updateTaskDetail(formData: FormData) {
   });
   if (!task) return;
 
-  const domainId = getTrimmedString(formData, "domainId");
-  if (!domainId) return;
+  const areaId = getTrimmedString(formData, "areaId");
+  if (!areaId) return;
 
   const projectId = getTrimmedString(formData, "projectId");
   const validProject = projectId
     ? await prisma.project.findFirst({
         where: {
           id: projectId,
-          domainId,
-          status: { in: ["active", "parked"] },
+          areaId,
+          status: { in: ["active", "parked", "someday"] },
         },
-        select: { id: true },
+        select: { id: true, areaId: true },
       })
     : null;
 
@@ -90,7 +97,7 @@ export async function updateTaskDetail(formData: FormData) {
       dueDate: dueDate ? dateOnlyFromString(dueDate) : null,
       dueTime: dueTime || null,
       priority: priority || null,
-      domainId,
+      areaId: validProject?.areaId ?? areaId,
       projectId: validProject?.id ?? null,
       notes: notes || null,
       recurrenceRule: recurrenceRule || null,
@@ -128,14 +135,14 @@ export async function addSubtask(formData: FormData) {
 
   const parent = await prisma.task.findUnique({
     where: { id: parentTaskId },
-    select: { domainId: true, projectId: true },
+    select: { areaId: true, projectId: true },
   });
   if (!parent) return;
 
   await createTaskWithAudit(
     {
       title: title.trim(),
-      domainId: parent.domainId,
+      areaId: parent.areaId,
       projectId: parent.projectId,
       parentTaskId,
     },
@@ -153,15 +160,15 @@ export async function addProjectTask(formData: FormData) {
   if (!projectId || !title) return;
 
   const project = await prisma.project.findFirst({
-    where: { id: projectId, status: { in: ["active", "parked"] } },
-    select: { id: true, domainId: true },
+    where: { id: projectId, status: { in: ["active", "parked", "someday"] } },
+    select: { id: true, areaId: true },
   });
   if (!project) return;
 
   await createTaskWithAudit(
     {
       title,
-      domainId: project.domainId,
+      areaId: project.areaId,
       projectId: project.id,
     },
     { source: "manual" },
@@ -273,22 +280,22 @@ export async function unparkProject(formData: FormData) {
 
 export async function createProject(formData: FormData) {
   const name = getTrimmedString(formData, "name");
-  const domainId = getTrimmedString(formData, "domainId");
+  const areaId = getTrimmedString(formData, "areaId");
   const targetDate = getTrimmedString(formData, "targetDate");
-  if (!name || !domainId) return;
+  if (!name || !areaId) return;
 
-  const domain = await prisma.domain.findFirst({
-    where: { id: domainId, active: true },
+  const area = await prisma.area.findFirst({
+    where: { id: areaId, status: "active" },
     select: { id: true },
   });
-  if (!domain) return;
+  if (!area) return;
 
   const currentState = "Created from Projects.";
   const nextStep = "Define the next physical step.";
   const project = await prisma.project.create({
     data: {
       name,
-      domainId: domain.id,
+      areaId: area.id,
       targetDate: targetDate ? dateOnlyFromString(targetDate) : null,
       currentState,
       nextStep,
@@ -355,6 +362,88 @@ export async function updateProjectState(formData: FormData) {
   revalidatePath("/projects");
   revalidatePath(`/projects/${projectId}`);
   redirect(`/projects/${projectId}`);
+}
+
+export async function updateAreaState(formData: FormData) {
+  const areaId = getTrimmedString(formData, "areaId");
+  const currentState = getTrimmedString(formData, "currentState");
+  const nextStep = getTrimmedString(formData, "nextStep");
+  if (!areaId) return;
+
+  const area = await prisma.area.update({
+    where: { id: areaId },
+    data: {
+      currentState: currentState || null,
+      nextStep: nextStep || null,
+    },
+  });
+
+  await prisma.entityNote.create({
+    data: {
+      parentType: "area",
+      parentId: area.id,
+      bodyMd: "Area state updated.",
+      source: "manual",
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "area_updated",
+      title: "Area updated",
+      body: area.name,
+      sourceRef: { type: "area", id: area.id, source: "manual" },
+    },
+  });
+
+  revalidatePath(`/areas/${areaId}`);
+  redirect(`/areas/${areaId}`);
+}
+
+export async function parkArea(formData: FormData) {
+  await setAreaStatus(formData, "parked");
+}
+
+export async function unparkArea(formData: FormData) {
+  await setAreaStatus(formData, "active");
+}
+
+export async function retireArea(formData: FormData) {
+  await setAreaStatus(formData, "retired");
+}
+
+async function setAreaStatus(
+  formData: FormData,
+  status: "active" | "parked" | "retired",
+) {
+  const areaId = getTrimmedString(formData, "areaId");
+  if (!areaId) return;
+
+  const area = await prisma.area.update({
+    where: { id: areaId },
+    data: { status },
+  });
+
+  await prisma.entityNote.create({
+    data: {
+      parentType: "area",
+      parentId: area.id,
+      bodyMd: `Area status changed to ${status}.`,
+      source: "manual",
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: `area_${status}`,
+      title: status === "active" ? "Area active" : status === "parked" ? "Area parked" : "Area retired",
+      body: area.name,
+      sourceRef: { type: "area", id: area.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  revalidatePath(`/areas/${areaId}`);
 }
 
 export async function completeProject(formData: FormData) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { dateOnlyFromString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { createTaskWithDefaultDomain } from "@/lib/tasks";
+import { createTaskWithDefaultArea } from "@/lib/tasks";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -15,6 +15,10 @@ export async function POST(request: Request) {
     typeof body?.projectId === "string" && body.projectId.trim().length > 0
       ? body.projectId.trim()
       : null;
+  const areaId =
+    typeof body?.areaId === "string" && body.areaId.trim().length > 0
+      ? body.areaId.trim()
+      : null;
 
   if (!title) {
     return NextResponse.json({ error: "Task title is required." }, { status: 400 });
@@ -22,13 +26,19 @@ export async function POST(request: Request) {
 
   const project = projectId
     ? await prisma.project.findFirst({
-        where: { id: projectId, status: { in: ["active", "parked"] } },
-        select: { id: true, domainId: true },
+        where: { id: projectId, status: { in: ["active", "parked", "someday"] } },
+        select: { id: true, areaId: true },
+      })
+    : null;
+  const area = !project && areaId
+    ? await prisma.area.findFirst({
+        where: { id: areaId, status: "active" },
+        select: { id: true },
       })
     : null;
 
-  const task = await createTaskWithDefaultDomain(
-    { title, dueDate, domainId: project?.domainId, projectId: project?.id },
+  const task = await createTaskWithDefaultArea(
+    { title, dueDate, areaId: project?.areaId ?? area?.id, projectId: project?.id },
     { source: "manual" },
   );
 
@@ -39,7 +49,7 @@ export async function POST(request: Request) {
     task: {
       id: task.id,
       title: task.title,
-      domainName: task.domain.name,
+      areaName: task.area.name,
       projectName: task.project?.name ?? null,
       dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
     },
