@@ -3,6 +3,7 @@ import { google, type calendar_v3 } from "googleapis";
 import crypto from "node:crypto";
 import { APP_TIMEZONE } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { logCalendarInteractions } from "@/lib/people";
 
 const GOOGLE_SYNC_ID = "google-primary";
 const GOOGLE_CALENDAR_SCOPES = [
@@ -143,6 +144,10 @@ export async function syncGoogleCalendar(options: { forceFull?: boolean } = {}) 
     const pulled = await pullGoogleEvents(calendar, calendarId, {
       forceFull: options.forceFull,
     });
+
+    // Derived, zero-entry: synced events with attendees matching known
+    // people log interactions. Failure here must not fail the sync.
+    await logCalendarInteractions().catch(() => 0);
 
     await prisma.calendarSyncState.upsert({
       where: { id: GOOGLE_SYNC_ID },
@@ -436,6 +441,13 @@ async function upsertGoogleEvent(
     end,
     location: event.location ?? null,
     status: event.status ?? "confirmed",
+    attendees: event.attendees
+      ? (event.attendees.map((attendee) => ({
+          email: attendee.email ?? null,
+          displayName: attendee.displayName ?? null,
+          responseStatus: attendee.responseStatus ?? null,
+        })) as Prisma.InputJsonValue)
+      : Prisma.JsonNull,
     googleCalendarId: calendarId,
     googleEtag: event.etag ?? null,
     googleUpdatedAt,

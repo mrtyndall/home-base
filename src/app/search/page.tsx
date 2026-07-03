@@ -76,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 async function runSearch(query: string) {
   try {
-    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs, checkIns, journalEntries] =
+    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs, checkIns, journalEntries, people, personFacts] =
       await Promise.all([
       prisma.capture.findMany({
         where: { rawText: { contains: query, mode: "insensitive" } },
@@ -150,6 +150,23 @@ async function runSearch(query: string) {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      prisma.person.findMany({
+        where: {
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { company: { contains: query, mode: "insensitive" } },
+            { notesMd: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { name: "asc" },
+        take: 20,
+      }),
+      prisma.personFact.findMany({
+        where: { factValue: { contains: query, mode: "insensitive" } },
+        include: { person: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
     ]);
 
     const results = [
@@ -206,6 +223,18 @@ async function runSearch(query: string) {
         id: entry.id,
         title: entry.bodyMd,
         detail: formatShortDate(entry.entryDate),
+      })),
+      ...people.map((person) => ({
+        type: "Person",
+        id: person.id,
+        title: person.name,
+        detail: person.relationshipType ?? person.company ?? undefined,
+      })),
+      ...personFacts.map((fact) => ({
+        type: "Person fact",
+        id: fact.id,
+        title: fact.factValue,
+        detail: fact.person.name,
       })),
     ].slice(0, 40);
 

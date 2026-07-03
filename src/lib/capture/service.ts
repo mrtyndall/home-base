@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
 import { createCheckInRecord } from "@/lib/checkins";
 import { boostResurfaceByMatch } from "@/lib/resurfacing";
+import { createPersonRecord, findPersonByMatch } from "@/lib/people";
 import { completeRoutineByMatch } from "@/lib/routines";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
@@ -312,6 +313,15 @@ async function executeActions(
         break;
       case "create_routine":
         createdItems.push(await executeCreateRoutine(action, context));
+        break;
+      case "create_person":
+        createdItems.push(await executeCreatePerson(action, context));
+        break;
+      case "create_person_fact":
+        createdItems.push(...(await executeCreatePersonFact(action, context)));
+        break;
+      case "log_interaction":
+        createdItems.push(...(await executeLogInteraction(action, context)));
         break;
       case "complete_routine": {
         const result = await completeRoutineByMatch(
@@ -951,6 +961,115 @@ async function matchProject(projectMatch: string) {
   });
 
   return project;
+}
+
+async function executeCreatePerson(
+  action: Extract<ExecutableAction, { type: "create_person" }>,
+  context: ExecutionContext,
+) {
+  const person = await createPersonRecord(
+    {
+      name: action.name,
+      relationshipType: action.relationship_type,
+      email: action.email,
+      phone: action.phone,
+      company: action.company,
+      areaId: matchAreaId(action.area_match, context.areas),
+    },
+    context.actor,
+  );
+
+  return {
+    type: "person" as const,
+    id: person.id,
+    label: `Person added: ${person.name}`,
+  };
+}
+
+async function resolveOrCreatePerson(
+  personMatch: string,
+  context: ExecutionContext,
+): Promise<{ person: { id: string; name: string }; created: boolean }> {
+  const existing = await findPersonByMatch(personMatch);
+  if (existing) {
+    return { person: existing, created: false };
+  }
+  const person = await createPersonRecord({ name: personMatch }, context.actor);
+  return { person, created: true };
+}
+
+async function executeCreatePersonFact(
+  action: Extract<ExecutableAction, { type: "create_person_fact" }>,
+  context: ExecutionContext,
+) {
+  const { person, created } = await resolveOrCreatePerson(
+    action.person_match,
+    context,
+  );
+
+  const fact = await prisma.personFact.create({
+    data: {
+      personId: person.id,
+      factType: action.fact_type ?? "note",
+      factValue: action.fact_value,
+      dateRelevant: parseDateOnly(action.date_relevant),
+      recurring: action.recurring ?? false,
+      captureId: context.captureId,
+    },
+  });
+
+  const items: CreatedItemRef[] = [];
+  if (created) {
+    items.push({
+      type: "person",
+      id: person.id,
+      label: `Person added: ${person.name}`,
+    });
+  }
+  items.push({
+    type: "person_fact",
+    id: fact.id,
+    label: `Fact saved for ${person.name}`,
+  });
+  return items;
+}
+
+async function executeLogInteraction(
+  action: Extract<ExecutableAction, { type: "log_interaction" }>,
+  context: ExecutionContext,
+) {
+  const { person, created } = await resolveOrCreatePerson(
+    action.person_match,
+    context,
+  );
+
+  const interaction = await prisma.personInteraction.create({
+    data: {
+      personId: person.id,
+      interactionType: action.interaction_type ?? "touchpoint",
+      notesMd: action.notes,
+      occurredAt: action.occurred_at
+        ? parseDateTime(action.occurred_at)
+        : new Date(),
+      source: "capture",
+      captureId: context.captureId,
+    },
+  });
+
+  const items: CreatedItemRef[] = [];
+  if (created) {
+    items.push({
+      type: "person",
+      id: person.id,
+      label: `Person added: ${person.name}`,
+    });
+  }
+  items.push({
+    type: "person_interaction",
+    id: interaction.id,
+    label: `Interaction logged for ${person.name}`,
+  });
+  return items;
 }
 
 async function executeCreateRoutine(

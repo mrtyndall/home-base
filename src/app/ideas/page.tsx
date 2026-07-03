@@ -1,4 +1,5 @@
-import type { JournalEntry } from "@prisma/client";
+import type { JournalEntry, Person } from "@prisma/client";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { SetupNotice } from "@/components/setup-notice";
@@ -15,7 +16,7 @@ export default async function LibraryPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { ideas, journalEntries } = result;
+  const { ideas, journalEntries, people } = result;
 
   return (
     <div className="space-y-5">
@@ -23,6 +24,7 @@ export default async function LibraryPage() {
         <h1 className="text-3xl font-semibold tracking-normal">Library</h1>
       </header>
       <JournalSection entries={journalEntries} />
+      <PeopleSection people={people} />
       <h2 className="text-base font-semibold text-stone-800">Ideas</h2>
       <section className="space-y-3">
         {ideas.length === 0 ? (
@@ -105,6 +107,47 @@ export default async function LibraryPage() {
   );
 }
 
+function PeopleSection({
+  people,
+}: {
+  people: Array<Person & { _count: { facts: number; interactions: number } }>;
+}) {
+  if (people.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">People</h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {people.map((person) => (
+          <Link
+            key={person.id}
+            href={`/people/${person.id}`}
+            className="rounded-lg border border-stone-200 bg-white p-4 transition hover:border-teal-400"
+          >
+            <p className="text-sm font-medium text-stone-900">{person.name}</p>
+            <p className="mt-0.5 text-xs text-stone-500">
+              {[
+                person.relationshipType,
+                person.company,
+                person._count.facts > 0
+                  ? `${person._count.facts} fact${person._count.facts === 1 ? "" : "s"}`
+                  : null,
+                person._count.interactions > 0
+                  ? `${person._count.interactions} interaction${person._count.interactions === 1 ? "" : "s"}`
+                  : null,
+              ]
+                .filter((item): item is string => Boolean(item))
+                .join(" · ")}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function JournalSection({ entries }: { entries: JournalEntry[] }) {
   const groups = new Map<string, JournalEntry[]>();
   for (const entry of entries) {
@@ -152,7 +195,7 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
 
 async function loadIdeas() {
   try {
-    const [ideas, journalEntries] = await Promise.all([
+    const [ideas, journalEntries, people] = await Promise.all([
       prisma.idea.findMany({
         where: { status: { in: ["seed", "developing"] } },
         include: {
@@ -168,9 +211,15 @@ async function loadIdeas() {
         orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
         take: 60,
       }),
+      prisma.person.findMany({
+        where: { status: "active" },
+        include: { _count: { select: { facts: true, interactions: true } } },
+        orderBy: { name: "asc" },
+        take: 100,
+      }),
     ]);
 
-    return { ok: true as const, ideas, journalEntries };
+    return { ok: true as const, ideas, journalEntries, people };
   } catch {
     return { ok: false as const };
   }

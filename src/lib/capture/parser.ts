@@ -41,6 +41,9 @@ Use these action types:
 - schedule_review
 - create_routine
 - complete_routine
+- create_person
+- create_person_fact
+- log_interaction
 - create_idea
 - append_to_idea
 - convert_idea
@@ -67,6 +70,9 @@ Rules:
 - Future-facing intent that is not a datable task ("circle back after the shoot", "revisit this once the trailer sells", "revisit the insurance quote in two weeks") emits schedule_review with review_at (ISO date) when the time resolves, else review_condition_text with the condition. Emit it alongside whatever action stores the content itself; if nothing else fits, schedule_review alone is fine — the raw capture is kept.
 - Recurring habits ("start a morning stretch routine on weekdays", "new routine: ...") use create_routine with name, frequency (daily/weekly/custom), days (mon..sun) for custom, time_window (morning/afternoon/evening/anytime), optional grace_days, temporary + start_date/end_date for time-boxed routines. Routines are separate from tasks: no due dates.
 - Reporting a habit done ("did my morning stretch", "finished the stretch routine") uses complete_routine with routine_match.
+- Facts people mention ("note for Chris: his daughter starts college in August") use create_person_fact with person_match, fact_value, date_relevant (ISO date, resolve month names to a concrete date) and recurring true for anniversaries/birthdays. The server creates the person if unknown.
+- Meeting or talking with someone ("had lunch with Sarah", "called Dad about the trip") uses log_interaction with person_match, interaction_type, notes, occurred_at.
+- Introducing a person ("add Chris Miller to people, he's my neighbor, chris@example.com") uses create_person.
 - Work narration on a known project or area that is not a status update creates project activity/update or an entity note.
 - If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
 - If unparseable, return { "error": "..." } and create no entity.
@@ -185,6 +191,19 @@ function fallbackParse(rawText: string): ParserAction[] {
   const projectMatch = trimmed.match(/^project\s*[:,-]\s*(.+)$/i);
   if (projectMatch?.[1]) {
     return [{ type: "create_project", name: projectMatch[1].trim() }];
+  }
+
+  const personFactMatch = trimmed.match(
+    /^note for (.+?)\s*[:,-]\s*(.+)$/i,
+  );
+  if (personFactMatch?.[1] && personFactMatch[2]) {
+    return [
+      {
+        type: "create_person_fact",
+        person_match: personFactMatch[1].trim(),
+        fact_value: personFactMatch[2].trim(),
+      },
+    ];
   }
 
   const routineMatch = trimmed.match(/^routine\s*[:,-]\s*(.+)$/i);

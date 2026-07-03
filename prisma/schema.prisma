@@ -128,6 +128,17 @@ enum RoutineStatus {
   retired
 }
 
+enum PersonStatus {
+  active
+  retired
+}
+
+enum InteractionSource {
+  manual
+  calendar
+  capture
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -152,6 +163,8 @@ model Capture {
   checkIns        CheckIn[]
   journalEntries  JournalEntry[]
   scheduledReviews ScheduledReview[]
+  personFacts        PersonFact[]
+  personInteractions PersonInteraction[]
   entityDocs      EntityDoc[]
   entityNotes     EntityNote[]
   ideaNotes       IdeaNote[]
@@ -194,6 +207,7 @@ model Area {
 
   domain     Domain      @relation(fields: [domainId], references: [id])
   ideas      Idea[]
+  people     Person[]
   projects   Project[]
   references Reference[]
   routines   Routine[]
@@ -367,6 +381,66 @@ model EntityNote {
   @@map("entity_notes")
 }
 
+model Person {
+  id               String       @id @default(uuid())
+  name             String
+  relationshipType String?      @map("relationship_type")
+  email            String?
+  phone            String?
+  company          String?
+  notesMd          String?      @map("notes_md")
+  areaId           String?      @map("area_id")
+  status           PersonStatus @default(active)
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  area         Area?               @relation(fields: [areaId], references: [id])
+  facts        PersonFact[]
+  interactions PersonInteraction[]
+
+  @@index([status, name])
+  @@index([email])
+  @@map("people")
+}
+
+model PersonFact {
+  id           String    @id @default(uuid())
+  personId     String    @map("person_id")
+  factType     String    @default("note") @map("fact_type")
+  factValue    String    @map("fact_value")
+  dateRelevant DateTime? @map("date_relevant") @db.Date
+  recurring    Boolean   @default(false)
+  captureId    String?   @map("capture_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  person  Person   @relation(fields: [personId], references: [id])
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([personId, createdAt])
+  @@index([dateRelevant])
+  @@index([captureId])
+  @@map("person_facts")
+}
+
+model PersonInteraction {
+  id              String            @id @default(uuid())
+  personId        String            @map("person_id")
+  interactionType String            @default("touchpoint") @map("interaction_type")
+  notesMd         String?           @map("notes_md")
+  occurredAt      DateTime          @map("occurred_at")
+  source          InteractionSource @default(manual)
+  calendarEventId String?           @map("calendar_event_id")
+  captureId       String?           @map("capture_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  person  Person   @relation(fields: [personId], references: [id])
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([personId, occurredAt])
+  @@index([calendarEventId])
+  @@index([captureId])
+  @@map("person_interactions")
+}
+
 model Routine {
   id          String        @id @default(uuid())
   name        String
@@ -521,6 +595,7 @@ model CalendarEvent {
   title            String
   start            DateTime
   end              DateTime
+  attendees        Json?
   location         String?
   status           String              @default("confirmed")
   syncedAt         DateTime?           @map("synced_at")

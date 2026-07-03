@@ -110,6 +110,33 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+const createPersonAction = z.object({
+  type: z.literal("create_person"),
+  name: z.string().min(1),
+  relationship_type: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  area_match: z.string().optional(),
+});
+
+const createPersonFactAction = z.object({
+  type: z.literal("create_person_fact"),
+  person_match: z.string().min(1),
+  fact_type: z.string().optional(),
+  fact_value: z.string().min(1),
+  date_relevant: z.string().optional(),
+  recurring: z.boolean().optional(),
+});
+
+const logInteractionAction = z.object({
+  type: z.literal("log_interaction"),
+  person_match: z.string().min(1),
+  interaction_type: z.string().optional(),
+  notes: z.string().optional(),
+  occurred_at: z.string().optional(),
+});
+
 const createRoutineAction = z.object({
   type: z.literal("create_routine"),
   name: z.string().min(1),
@@ -194,6 +221,9 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   scheduleReviewAction,
   createRoutineAction,
   completeRoutineAction,
+  createPersonAction,
+  createPersonFactAction,
+  logInteractionAction,
   checkInAction,
   createEntityNoteAction,
   createEntityDocAction,
@@ -238,6 +268,9 @@ export type CreatedItemRef = {
     | "scheduled_review"
     | "routine"
     | "routine_completion"
+    | "person"
+    | "person_fact"
+    | "person_interaction"
     | "notification";
   id: string;
   label: string;

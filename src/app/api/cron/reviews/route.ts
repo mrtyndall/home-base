@@ -1,10 +1,16 @@
 import { prisma } from "@/lib/db";
 import { dateOnlyFromString, localDateString } from "@/lib/dates";
+import {
+  logCalendarInteractions,
+  nudgeUpcomingPersonFacts,
+} from "@/lib/people";
 import { isPushoverConfigured, sendPushoverMessage } from "@/lib/pushover";
 
-// Daily job: surface scheduled reviews whose date has arrived. Date-anchored
+// Daily job: surface scheduled reviews whose date has arrived (date-anchored
 // reviews reaching their window are the existing time-sensitive push trigger,
-// so each newly surfaced one sends a single Pushover nudge (when configured).
+// so each newly surfaced one sends a single Pushover nudge when configured),
+// sweep upcoming person facts into the same trigger, and catch up calendar
+// interactions for synced events.
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -53,6 +59,7 @@ export async function POST(request: Request) {
             trigger: "time_sensitive",
             title: "Needs review",
             body: review.capture.rawText,
+            sentAt: new Date(),
             supportingData: {
               scheduledReviewId: review.id,
               reviewAt: review.reviewAt?.toISOString() ?? null,
@@ -63,5 +70,13 @@ export async function POST(request: Request) {
     }
   }
 
-  return Response.json({ surfaced: due.length, nudged });
+  const factNudges = await nudgeUpcomingPersonFacts().catch(() => 0);
+  const interactionsLogged = await logCalendarInteractions().catch(() => 0);
+
+  return Response.json({
+    surfaced: due.length,
+    nudged,
+    factNudges,
+    interactionsLogged,
+  });
 }
