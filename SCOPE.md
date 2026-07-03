@@ -134,7 +134,7 @@ One door, every source, nothing lost.
 
 **Parsing disposition:** classify, never coerce. Clear action intent creates tasks; thoughts and possibilities create ideas; facts, links, and recommendations create references or notes; project/area narration logs activity or notes. Ambiguous input remains a pending Inbox capture with its raw text intact and no derived entity. Matt can convert it later with one tap after choosing a destination. Never let Inbox become a triage obligation.
 
-**Both input modes ship together.** Text field and mic sit side by side on every screen via a persistent capture affordance. Typing for when people are around, voice for the truck and home. No mode selection, both always present.
+**Both input modes ship together.** Text field and mic sit side by side on every screen via a persistent capture affordance, with equal visual weight. Typing for when people are around, voice for the truck and home. Voice uses live transcript into the same field and submits through `/api/capture`; unsupported/error states preserve transcript text instead of dropping it.
 
 **Mobile shortcuts (iOS Shortcuts, Android HTTP Shortcuts):** per the original guide's Section 8 pattern, with capture tokens scoped to POST `/api/capture` only, rate-limited, revocable. Stable domain name required so shortcuts never silently break.
 

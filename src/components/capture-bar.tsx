@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Mic, Send, Square, TriangleAlert } from "lucide-react";
 
 type CaptureResponse = {
@@ -17,10 +17,16 @@ type SpeechRecognitionLike = {
   stop: () => void;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
 };
 
 type SpeechRecognitionEventLike = {
+  resultIndex?: number;
   results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+type SpeechRecognitionErrorEventLike = {
+  error?: string;
 };
 
 type BrowserWithSpeech = Window & {
@@ -36,6 +42,9 @@ export function CaptureBar() {
     "idle",
   );
   const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceDraftRef = useRef("");
+  const voiceErrorRef = useRef(false);
 
   const speechSupported = useMemo(() => {
     if (typeof window === "undefined") {
@@ -96,7 +105,7 @@ export function CaptureBar() {
   function toggleMic() {
     if (!speechSupported || typeof window === "undefined") {
       setStatus("error");
-      setMessage("Voice capture is not available in this browser.");
+      setMessage("Voice is not available here. Any text already captured is still in the field.");
       return;
     }
 
@@ -108,13 +117,17 @@ export function CaptureBar() {
     }
 
     if (listening) {
+      recognitionRef.current?.stop();
       setListening(false);
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognitionRef.current = recognition;
+    voiceDraftRef.current = rawText;
+    voiceErrorRef.current = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = "en-US";
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
@@ -123,11 +136,29 @@ export function CaptureBar() {
         .trim();
 
       if (transcript) {
+        voiceDraftRef.current = transcript;
         setRawText(transcript);
+      }
+    };
+    recognition.onerror = (event) => {
+      voiceErrorRef.current = true;
+      setListening(false);
+      setStatus("error");
+      setRawText(voiceDraftRef.current);
+      setMessage(
+        event.error
+          ? `Voice stopped: ${event.error}. Transcript stayed in the field.`
+          : "Voice stopped. Transcript stayed in the field.",
+      );
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setListening(false);
+      const transcript = voiceDraftRef.current.trim();
+      if (!voiceErrorRef.current && transcript) {
         void submitCapture("in_app_voice", transcript);
       }
     };
-    recognition.onend = () => setListening(false);
     setListening(true);
     recognition.start();
   }
@@ -142,15 +173,19 @@ export function CaptureBar() {
           type="button"
           onClick={toggleMic}
           title={listening ? "Stop voice capture" : "Start voice capture"}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
         >
           {listening ? <Square size={18} /> : <Mic size={19} />}
+          {listening ? "Stop" : "Voice"}
         </button>
+        <label className="sr-only" htmlFor="capture-text">
+          Capture text
+        </label>
         <input
+          id="capture-text"
           value={rawText}
           onChange={(event) => setRawText(event.target.value)}
-          placeholder="Capture anything"
-          className="h-11 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-base text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          className="h-11 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
         />
         <button
           type="submit"
