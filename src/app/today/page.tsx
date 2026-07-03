@@ -126,6 +126,25 @@ export default async function TodayPage() {
                 </TaskDropZone>
               </div>
             </div>
+
+            <div className="space-y-3">
+              <SectionHeader icon={Inbox} title="Task inbox" />
+              <TaskDropZone
+                targetDate={null}
+                label="Task inbox"
+                isEmpty={data.taskInbox.length === 0}
+                emptyText="No unscheduled tasks."
+              >
+                {data.taskInbox.map((task) => (
+                  <TodayTaskRow
+                    key={task.id}
+                    task={task}
+                    today={data.today}
+                    tomorrow={data.tomorrow}
+                  />
+                ))}
+              </TaskDropZone>
+            </div>
           </section>
         </>
       )}

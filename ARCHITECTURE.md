@@ -156,6 +156,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Added an actual floating task drag preview so dragged cards visibly travel through Today and Tasks while drop targets remain highlighted.
 - Reworked Home from a passive status dashboard into action cards for Today, Inbox, Tasks, Projects, Ideas, and Settings, and removed the duplicate recent-capture billboard.
 - Improved task quick-add with a visible title label/placeholder and project chips instead of a project dropdown, while preserving instant title-first add.
+- Added a bounded Today task inbox for open unscheduled tasks, ordered by recent update so clearing a date keeps the task visible and easy to move back into Today/Tomorrow.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

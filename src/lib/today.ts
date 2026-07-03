@@ -4,6 +4,7 @@ import {
   dateOnlyFromString,
   localDateString,
 } from "@/lib/dates";
+import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
 
 export async function getTodayDashboard() {
   const today = localDateString();
@@ -28,6 +29,7 @@ export async function getTodayDashboard() {
       dueTomorrow,
       todayEvents,
       tomorrowEvents,
+      taskInbox,
       recentCaptures,
       nextTask,
       nextEvent,
@@ -68,6 +70,17 @@ export async function getTodayDashboard() {
         orderBy: { start: "asc" },
         take: 6,
       }),
+      prisma.task.findMany({
+        where: {
+          status: "open",
+          someday: false,
+          dueDate: null,
+          parentTaskId: null,
+        },
+        include: { area: true, project: true },
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        take: getTodayTaskInboxLimit(),
+      }),
       prisma.capture.findMany({
         orderBy: { createdAt: "desc" },
         take: 6,
@@ -106,6 +119,7 @@ export async function getTodayDashboard() {
       tomorrow,
       dueToday,
       dueTomorrow,
+      taskInbox,
       todayEvents,
       tomorrowEvents,
       recentCaptures,
