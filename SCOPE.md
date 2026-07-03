@@ -130,9 +130,9 @@ One door, every source, nothing lost.
 3. Backend calls the Claude API with the parser system prompt (Section 10) and current context
 4. Parser returns structured actions; server executes them and links created items back to the capture record
 5. UI shows confirmation: what was created and where it landed ("Task created in Ham Radio, due Friday"). Mobile shortcuts receive a spoken/text confirmation.
-6. Ambiguous parses land in the Inbox: a visible, first-class holding area, never a hidden queue. Inbox items are complete captures awaiting routing, not degraded data.
+6. Ambiguous or unclassifiable parses remain pending captures in the Inbox: visible raw text with conversion affordances, never manufactured tasks.
 
-**Parsing disposition:** auto-file with best guess and visible confirmation. Matt corrects misfiles when he sees them; search guarantees misfiles are always recoverable. Inbox is reserved for genuine ambiguity only. Never let Inbox become a triage obligation.
+**Parsing disposition:** classify, never coerce. Clear action intent creates tasks; thoughts and possibilities create ideas; facts, links, and recommendations create references or notes; project/area narration logs activity or notes. Ambiguous input remains a pending Inbox capture with its raw text intact and no derived entity. Matt can convert it later with one tap after choosing a destination. Never let Inbox become a triage obligation.
 
 **Both input modes ship together.** Text field and mic sit side by side on every screen via a persistent capture affordance. Typing for when people are around, voice for the truck and home. No mode selection, both always present.
 

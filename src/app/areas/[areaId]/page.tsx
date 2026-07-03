@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import type { Area, Capture, Domain } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Ellipsis, Pencil } from "lucide-react";
 import {
+  convertPendingCapture,
   parkAreaById,
   retireAreaById,
   unparkAreaById,
@@ -33,7 +35,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
     notFound();
   }
 
-  const { area } = result;
+  const { area, pendingCaptures, domains } = result;
 
   return (
     <div className="space-y-5">
@@ -103,6 +105,10 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </form>
       </details>
 
+      {area.id === "area_inbox" ? (
+        <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
+      ) : null}
+
       <section className="grid gap-4 lg:grid-cols-2">
         <Panel title="Standing tasks" empty="No open standing tasks.">
           {area.tasks.map((task) => (
@@ -152,6 +158,66 @@ export default async function AreaPage({ params }: AreaPageProps) {
         attachments={area.attachments}
       />
     </div>
+  );
+}
+
+function PendingCapturesPanel({
+  captures,
+  domains,
+}: {
+  captures: Capture[];
+  domains: Array<Domain & { areas: Area[] }>;
+}) {
+  if (captures.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+      <h2 className="text-base font-semibold text-stone-800">Pending captures</h2>
+      <div className="divide-y divide-stone-100">
+        {captures.map((capture) => (
+          <form key={capture.id} action={convertPendingCapture} className="py-3">
+            <input type="hidden" name="captureId" value={capture.id} />
+            <p className="text-sm text-stone-800">{capture.rawText}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                name="areaId"
+                defaultValue="area_inbox"
+                className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              >
+                {domains.map((domain) => (
+                  <optgroup key={domain.id} label={domain.name}>
+                    {domain.areas.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <ConvertButton value="task" label="Task" />
+              <ConvertButton value="idea" label="Idea" />
+              <ConvertButton value="note" label="Note" />
+              <ConvertButton value="reference" label="Reference" />
+            </div>
+          </form>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ConvertButton({ value, label }: { value: string; label: string }) {
+  return (
+    <button
+      type="submit"
+      name="targetType"
+      value={value}
+      className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -237,7 +303,8 @@ function Panel({
 
 async function loadArea(areaId: string) {
   try {
-    const area = await prisma.area.findUnique({
+    const [area, domains] = await Promise.all([
+      prisma.area.findUnique({
       where: { id: areaId },
       include: {
         domain: true,
@@ -257,9 +324,20 @@ async function loadArea(areaId: string) {
           take: 12,
         },
       },
-    });
+      }),
+      prisma.domain.findMany({
+        where: { active: true },
+        orderBy: [{ isSystem: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
+        include: {
+          areas: {
+            where: { status: "active" },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
+        },
+      }),
+    ]);
 
-    const [notes, docs, attachments] = area
+    const [notes, docs, attachments, pendingCaptures] = area
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
@@ -276,12 +354,23 @@ async function loadArea(areaId: string) {
             orderBy: { createdAt: "desc" },
             take: 12,
           }),
+          area.id === "area_inbox"
+            ? prisma.capture.findMany({
+                where: {
+                  OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
+                },
+                orderBy: { createdAt: "desc" },
+                take: 20,
+              })
+            : Promise.resolve([]),
         ])
-      : [[], [], []];
+      : [[], [], [], []];
 
     return {
       ok: true as const,
       area: area ? { ...area, notes, docs, attachments } : null,
+      pendingCaptures,
+      domains,
     };
   } catch {
     return { ok: false as const };

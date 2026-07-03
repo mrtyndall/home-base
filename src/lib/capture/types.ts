@@ -160,6 +160,7 @@ export type ParserAction = z.infer<typeof parserActionSchema>;
 export type CreatedItemRef = {
   type:
     | "task"
+    | "pending_capture"
     | "area"
     | "project"
     | "project_activity"

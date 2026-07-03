@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
 import {
   completeTaskById,
@@ -235,6 +236,23 @@ function parseReminderOffsetsInput(value: string) {
     .map((item) => Math.trunc(item));
 }
 
+function normalizeCreatedItems(value: Prisma.JsonValue | null): CreatedItemRef[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is CreatedItemRef => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      return false;
+    }
+    return (
+      "type" in item &&
+      typeof item.type === "string" &&
+      "id" in item &&
+      typeof item.id === "string" &&
+      "label" in item &&
+      typeof item.label === "string"
+    );
+  });
+}
+
 export async function unparkProject(formData: FormData) {
   const projectId = formData.get("projectId");
   if (typeof projectId !== "string" || projectId.length === 0) return;
@@ -456,6 +474,113 @@ export async function addEntityNote(formData: FormData) {
   });
 
   revalidateEntityParent(parentType, parentId);
+}
+
+export async function convertPendingCapture(formData: FormData) {
+  const captureId = getTrimmedString(formData, "captureId");
+  const areaId = getTrimmedString(formData, "areaId");
+  const targetType = getTrimmedString(formData, "targetType");
+  if (
+    !captureId ||
+    !areaId ||
+    (targetType !== "task" &&
+      targetType !== "idea" &&
+      targetType !== "note" &&
+      targetType !== "reference")
+  ) {
+    return;
+  }
+
+  const [capture, area] = await Promise.all([
+    prisma.capture.findUnique({ where: { id: captureId } }),
+    prisma.area.findFirst({
+      where: { id: areaId, status: "active" },
+      include: { domain: true },
+    }),
+  ]);
+  if (!capture || !area) return;
+
+  let item: CreatedItemRef;
+  if (targetType === "task") {
+    const task = await createTaskWithAudit(
+      {
+        title: capture.rawText,
+        areaId: area.id,
+        captureId: capture.id,
+        source: "manual",
+      },
+      { source: "manual" },
+    );
+    item = { type: "task", id: task.id, label: `Task added to ${area.name}` };
+  } else if (targetType === "idea") {
+    const idea = await prisma.idea.create({
+      data: {
+        title: capture.rawText,
+        body: capture.rawText,
+        areaId: area.id,
+        source: "manual",
+        captureId: capture.id,
+      },
+    });
+    item = { type: "idea", id: idea.id, label: `Idea saved to ${area.name}` };
+  } else if (targetType === "note") {
+    const note = await prisma.entityNote.create({
+      data: {
+        parentType: "area",
+        parentId: area.id,
+        bodyMd: capture.rawText,
+        source: "manual",
+        captureId: capture.id,
+      },
+    });
+    item = { type: "entity_note", id: note.id, label: `Note added to ${area.name}` };
+  } else {
+    const reference = await prisma.reference.create({
+      data: {
+        body: capture.rawText,
+        areaId: area.id,
+        source: "manual",
+        captureId: capture.id,
+      },
+    });
+    item = {
+      type: "reference",
+      id: reference.id,
+      label: `Reference saved to ${area.name}`,
+    };
+  }
+
+  const existingItems = normalizeCreatedItems(capture.createdItems);
+  await prisma.capture.update({
+    where: { id: capture.id },
+    data: {
+      parseStatus: "parsed",
+      createdItems: [
+        ...existingItems.filter((existing) => existing.type !== "pending_capture"),
+        item,
+      ] as Prisma.InputJsonValue,
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "capture_converted",
+      title: "Capture converted",
+      body: item.label,
+      sourceRef: {
+        type: "capture",
+        id: capture.id,
+        source: "manual",
+        createdType: item.type,
+        createdId: item.id,
+      },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/search");
+  revalidatePath(`/areas/${area.id}`);
+  revalidatePath("/areas/area_inbox");
 }
 
 export async function createEntityDoc(formData: FormData) {

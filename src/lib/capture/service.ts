@@ -74,7 +74,7 @@ export async function submitCapture(
     if (status === "parsed" && executableActions.length > 0) {
       createdItems = await executeActions(executableActions, context);
     } else {
-      createdItems = await createInboxFallbackTask(context);
+      createdItems = await markCapturePending(context);
     }
   } catch (error) {
     status = "failed";
@@ -84,7 +84,7 @@ export async function submitCapture(
       },
     ];
 
-    createdItems = await createInboxFallbackTask({
+    createdItems = await markCapturePending({
       captureId: capture.id,
       rawText: parsedInput.rawText,
       inboxAreaId: await getInboxAreaId(),
@@ -312,22 +312,12 @@ async function executeActions(
   return createdItems;
 }
 
-async function createInboxFallbackTask(context: ExecutionContext) {
-  const task = await prisma.task.create({
-    data: {
-      title: context.rawText,
-      areaId: context.inboxAreaId,
-      source:
-        context.actor.source === "api" ? context.writeSource : "capture_fallback",
-      captureId: context.captureId,
-    },
-  });
-
+async function markCapturePending(context: ExecutionContext) {
   const notification = await prisma.notification.create({
     data: {
       type: "capture_needs_review",
       title: "Capture saved to Inbox",
-      body: "Parser could not confidently route this capture.",
+      body: context.rawText,
       sourceRef: {
         type: "capture",
         id: context.captureId,
@@ -339,9 +329,9 @@ async function createInboxFallbackTask(context: ExecutionContext) {
 
   return [
     {
-      type: "task" as const,
-      id: task.id,
-      label: `Inbox task: ${task.title}`,
+      type: "pending_capture" as const,
+      id: context.captureId,
+      label: "Saved to Inbox to sort later",
     },
     {
       type: "notification" as const,
@@ -383,7 +373,7 @@ async function createTask(
   return {
     type: "task" as const,
     id: task.id,
-    label: `Task in ${task.area.name}: ${task.title}`,
+    label: `Task added to ${task.project?.name ?? task.area.name}`,
   };
 }
 
@@ -507,7 +497,7 @@ async function createProject(
   return {
     type: "project" as const,
     id: project.id,
-    label: `Project in ${project.area.name}: ${project.name}`,
+    label: `Project saved to ${project.area.name}`,
   };
 }
 
@@ -603,17 +593,18 @@ async function createIdea(
       areaId:
         project?.areaId ??
         matchAreaId(action.area_match, context.areas) ??
-        undefined,
+        context.inboxAreaId,
       projectId: project?.id,
       source: context.writeSource,
       captureId: context.captureId,
     },
+    include: { area: true, project: true },
   });
 
   return {
     type: "idea" as const,
     id: idea.id,
-    label: `Idea captured: ${idea.title}`,
+    label: `Idea saved to ${idea.project?.name ?? idea.area?.name ?? "Inbox"}`,
   };
 }
 
@@ -730,19 +721,20 @@ async function createReference(
       areaId:
         project?.areaId ??
         matchAreaId(action.area_match, context.areas) ??
-        undefined,
+        context.inboxAreaId,
       projectId: project?.id,
       relatedType: action.related_match ? "unknown" : undefined,
       relatedId: action.related_match,
       source: context.writeSource,
       captureId: context.captureId,
     },
+    include: { area: true, project: true },
   });
 
   return {
     type: "reference" as const,
     id: reference.id,
-    label: "Reference captured",
+    label: `Reference saved to ${reference.project?.name ?? reference.area?.name ?? "Inbox"}`,
   };
 }
 
@@ -907,11 +899,11 @@ function buildConfirmationMessage(
 ) {
   const visibleItems = createdItems.filter((item) => item.type !== "notification");
   if (status === "ambiguous") {
-    return `Saved to Inbox for review. ${formatCreatedItems(visibleItems)}`;
+    return "Saved to Inbox to sort later";
   }
 
   if (status === "failed") {
-    return `Capture saved. Parser failed, so it landed in Inbox. ${formatCreatedItems(visibleItems)}`;
+    return "Saved to Inbox to sort later";
   }
 
   return formatCreatedItems(visibleItems);

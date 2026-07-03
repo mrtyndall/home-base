@@ -44,8 +44,13 @@ Rules:
 - If it can be finished, route it as a project. If Matt would still be responsible for it a year from now, route it as an area.
 - Use area_match, project_match, task_match, and idea_match as fuzzy names from context.
 - If the user gives no area or project, omit area_match and project_match so the server can place it in the Inbox area.
-- If genuinely ambiguous, return { "needs_disambiguation": true, "candidates": [...] }.
-- If unparseable, return { "error": "..." }.
+- Capture classifies, never coerces. Do not manufacture a task from non-task input.
+- Clear action intent ("do", "buy", "call", "fix", "schedule", "renew") creates a task.
+- A thought, opinion, or possibility ("what if", "I wonder", "idea:") creates an idea.
+- A fact, link, or recommendation someone mentioned creates a reference, or an entity note when a known area/project is named.
+- Work narration on a known project or area creates project activity/update or an entity note.
+- If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
+- If unparseable, return { "error": "..." } and create no entity.
 - Interpret park/unpark project requests as update_project_state with status parked/active.
 - Someday means wanted, not committed. "Someday project" uses create_project with status "someday"; "someday task" uses create_task with someday true.
 - Parked means started and set down. Do not use parked for someday items.
@@ -226,5 +231,23 @@ function fallbackParse(rawText: string): ParserAction[] {
     return [{ type: "complete_task", task_match: completeMatch[1].trim() }];
   }
 
-  return [{ type: "create_task", title: trimmed }];
+  if (/^(buy|call|fix|schedule|renew|do|send|email|order|pick up)\b/i.test(trimmed)) {
+    return [{ type: "create_task", title: trimmed }];
+  }
+
+  if (/^(what if|i wonder|maybe|could|should)\b/i.test(trimmed)) {
+    return [{ type: "create_idea", title: trimmed, body: trimmed }];
+  }
+
+  if (/^(the|a|an)\b.+\b(is|are|was|were)\b/i.test(trimmed) || /^https?:\/\//i.test(trimmed)) {
+    return [{ type: "create_reference", body: trimmed }];
+  }
+
+  return [
+    {
+      needs_disambiguation: true,
+      candidates: [],
+      reason: "Fallback parser could not classify this capture.",
+    },
+  ];
 }
