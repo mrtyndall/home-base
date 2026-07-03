@@ -98,6 +98,8 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 
 ## Current Components
 
+- `src/app/page.tsx`: Home landing page with derived entry cards for Today, Tasks, Projects, Ideas, and Inbox.
+- `src/app/today/page.tsx`: Today screen with the all-clear state, calendar freshness, due-today/tomorrow horizon, and recently captured strip.
 - `prisma/schema.prisma`: core Section 12 data model.
 - `prisma/seed.ts`: initial domains and app settings.
 - `scripts/backup-database.ts`: `pg_dump` backup with optional S3-compatible upload.
@@ -137,6 +139,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Added Milestone 2 foundations: reminder deliveries, API keys, calendar sync state, REST API, MCP server, parked project UI, subtask UI, recurrence-on-completion behavior, and Apple Reminders CSV import.
 - Added Pushover reminder scheduler logic with append-only delivery audit rows and in-app notification mirroring.
 - Added Today calendar sync freshness display and recently captured outcome labels.
+- Split Home and Today into separate routes: `/` is the launch surface and `/today` keeps the focused today-plus-tomorrow workflow. Search remains a top utility instead of a bottom tab.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

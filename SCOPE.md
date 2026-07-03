@@ -68,7 +68,7 @@ This is where the mental load lives and where the system succeeds or dies. It is
 - Last-synced timestamp visible on the Today screen
 - Events creatable via capture ("dinner with Lauren Friday 7pm")
 
-**The Today screen (the home base):**
+**The Today screen:**
 - Time horizon: today plus tomorrow. Not now/next, not the week.
 - Contents, in order: all-clear or attention status line, today's calendar, tasks due today/overdue, tomorrow preview, recently captured strip
 - The all-clear state renders prominently when nothing is due and nothing is slipping, stating the facts positively including the next upcoming commitment
@@ -247,7 +247,7 @@ Kept from the original guide except where noted.
 | Hosting | Railway | Confirmed |
 | Calendar | Google Calendar API, OAuth via Google Cloud Console, 15-min cron sync | Same |
 
-**Tabs:** Today · Tasks · Projects · Ideas · Search. Persistent capture affordance on every tab.
+**Tabs:** Home · Today · Tasks · Projects · Ideas. Search is a consistent utility action outside the tab bar. Persistent capture affordance remains available on every primary surface.
 
 ## Section 12: Data Model
 

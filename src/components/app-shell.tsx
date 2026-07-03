@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   CalendarCheck2,
   FolderKanban,
+  House,
   Settings,
   Lightbulb,
   ListTodo,
@@ -10,7 +11,8 @@ import {
 import { CaptureBar } from "@/components/capture-bar";
 
 const tabs = [
-  { href: "/", label: "Today", icon: CalendarCheck2 },
+  { href: "/", label: "Home", icon: House },
+  { href: "/today", label: "Today", icon: CalendarCheck2 },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
@@ -48,7 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       <div className="fixed inset-x-0 bottom-0 z-20">
         <nav className="border-t border-stone-200 bg-white/95 px-2 py-2 shadow-[0_-6px_20px_rgba(30,41,59,0.08)] backdrop-blur">
-          <div className="mx-auto grid max-w-4xl grid-cols-4 gap-1">
+          <div className="mx-auto grid max-w-4xl grid-cols-5 gap-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
