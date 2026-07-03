@@ -34,6 +34,7 @@ Rules:
 - If the user gives no domain, omit domain_match so the server can place it in Inbox.
 - If genuinely ambiguous, return { "needs_disambiguation": true, "candidates": [...] }.
 - If unparseable, return { "error": "..." }.
+- Interpret park/unpark project requests as update_project_state with status parked/active.
 - Resolve dates and times to ISO strings in America/New_York using the provided current time.`;
 
 export async function parseCaptureWithContext(
@@ -85,6 +86,30 @@ function fallbackParse(rawText: string): ParserAction[] {
   const projectMatch = trimmed.match(/^project\s*[:,-]\s*(.+)$/i);
   if (projectMatch?.[1]) {
     return [{ type: "create_project", name: projectMatch[1].trim() }];
+  }
+
+  const parkMatch = trimmed.match(/^park(?:\s+the)?\s+(.+?)(?:\s+project)?$/i);
+  if (parkMatch?.[1]) {
+    return [
+      {
+        type: "update_project_state",
+        project_match: parkMatch[1].trim(),
+        status: "parked",
+        log_entry: trimmed,
+      },
+    ];
+  }
+
+  const unparkMatch = trimmed.match(/^unpark(?:\s+the)?\s+(.+?)(?:\s+project)?$/i);
+  if (unparkMatch?.[1]) {
+    return [
+      {
+        type: "update_project_state",
+        project_match: unparkMatch[1].trim(),
+        status: "active",
+        log_entry: trimmed,
+      },
+    ];
   }
 
   const referenceMatch = trimmed.match(/^(reference|remember)\s*[:,-]\s*(.+)$/i);

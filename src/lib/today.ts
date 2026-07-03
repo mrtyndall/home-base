@@ -31,6 +31,8 @@ export async function getTodayDashboard() {
       recentCaptures,
       nextTask,
       nextEvent,
+      calendarSync,
+      calendarStaleMinutesSetting,
     ] = await Promise.all([
       prisma.task.findMany({
         where: {
@@ -79,7 +81,21 @@ export async function getTodayDashboard() {
         where: { start: { gte: dayAfterTomorrowDate } },
         orderBy: { start: "asc" },
       }),
+      prisma.calendarSyncState.findUnique({
+        where: { id: "google-primary" },
+      }),
+      prisma.appSetting.findUnique({
+        where: { key: "google_calendar_stale_minutes" },
+      }),
     ]);
+
+    const staleMinutes =
+      typeof calendarStaleMinutesSetting?.value === "number"
+        ? calendarStaleMinutesSetting.value
+        : 30;
+    const calendarSyncIsStale =
+      !calendarSync?.lastSyncedAt ||
+      Date.now() - calendarSync.lastSyncedAt.getTime() > staleMinutes * 60_000;
 
     return {
       ready: true as const,
@@ -92,6 +108,14 @@ export async function getTodayDashboard() {
       recentCaptures,
       nextTask,
       nextEvent,
+      calendarSync: {
+        status: calendarSync?.status ?? "not_configured",
+        lastSyncedAt: calendarSync?.lastSyncedAt ?? null,
+        lastSuccessfulSyncAt: calendarSync?.lastSuccessfulSyncAt ?? null,
+        stale: calendarSyncIsStale,
+        staleMinutes,
+        error: calendarSync?.error ?? null,
+      },
     };
   } catch {
     return {

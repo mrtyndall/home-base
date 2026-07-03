@@ -49,11 +49,29 @@ enum CalendarEventSource {
   google
   capture
   manual
+  api
 }
 
 enum NudgeTrigger {
   clustering
   time_sensitive
+}
+
+enum ReminderChannel {
+  pushover
+  in_app
+}
+
+enum ReminderDeliveryStatus {
+  sent
+  failed
+}
+
+enum CalendarSyncStatus {
+  ok
+  stale
+  failed
+  not_configured
 }
 
 model Capture {
@@ -152,12 +170,14 @@ model Task {
   captureId       String?    @map("capture_id")
   createdAt       DateTime   @default(now()) @map("created_at")
   completedAt     DateTime?  @map("completed_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  capture  Capture? @relation(fields: [captureId], references: [id])
-  domain   Domain   @relation(fields: [domainId], references: [id])
-  parent   Task?    @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
-  project  Project? @relation(fields: [projectId], references: [id])
-  subtasks Task[]   @relation("TaskSubtasks")
+  capture            Capture?           @relation(fields: [captureId], references: [id])
+  domain             Domain             @relation(fields: [domainId], references: [id])
+  parent             Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  project            Project?           @relation(fields: [projectId], references: [id])
+  reminderDeliveries ReminderDelivery[]
+  subtasks           Task[]             @relation("TaskSubtasks")
 
   @@index([domainId, status])
   @@index([dueDate, dueTime])
@@ -175,6 +195,7 @@ model Idea {
   status          IdeaStatus       @default(seed)
   convertedToType ConvertedToType? @map("converted_to_type")
   convertedToId   String?          @map("converted_to_id")
+  source          String?
   captureId       String?          @map("capture_id")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
@@ -192,6 +213,7 @@ model IdeaNote {
   id        String   @id @default(uuid())
   ideaId    String   @map("idea_id")
   body      String
+  source    String?
   captureId String?  @map("capture_id")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -211,6 +233,7 @@ model Reference {
   domainId    String?  @map("domain_id")
   relatedType String?  @map("related_type")
   relatedId   String?  @map("related_id")
+  source      String?
   captureId   String?  @map("capture_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -223,20 +246,29 @@ model Reference {
 }
 
 model CalendarEvent {
-  id            String              @id @default(uuid())
-  googleEventId String?             @unique @map("google_event_id")
-  title         String
-  start         DateTime
-  end           DateTime
-  location      String?
-  syncedAt      DateTime?           @map("synced_at")
-  source        CalendarEventSource @default(manual)
-  captureId     String?             @map("capture_id")
+  id               String              @id @default(uuid())
+  googleEventId    String?             @unique @map("google_event_id")
+  googleCalendarId String?             @map("google_calendar_id")
+  googleEtag       String?             @map("google_etag")
+  googleUpdatedAt  DateTime?           @map("google_updated_at")
+  title            String
+  start            DateTime
+  end              DateTime
+  location         String?
+  status           String              @default("confirmed")
+  syncedAt         DateTime?           @map("synced_at")
+  lastPushedAt     DateTime?           @map("last_pushed_at")
+  lastPulledAt     DateTime?           @map("last_pulled_at")
+  source           CalendarEventSource @default(manual)
+  captureId        String?             @map("capture_id")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
 
   @@index([start, end])
   @@index([captureId])
+  @@index([googleCalendarId, syncedAt])
   @@map("calendar_events")
 }
 
@@ -278,6 +310,51 @@ model CaptureToken {
 
   @@index([revokedAt])
   @@map("capture_tokens")
+}
+
+model ReminderDelivery {
+  id             String                 @id @default(uuid())
+  taskId         String                 @map("task_id")
+  offsetMinutes  Int                    @map("offset_minutes")
+  channel        ReminderChannel
+  sentAt         DateTime               @default(now()) @map("sent_at")
+  deliveryStatus ReminderDeliveryStatus @map("delivery_status")
+  error          String?
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId, offsetMinutes, channel])
+  @@index([sentAt])
+  @@map("reminder_deliveries")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique @map("token_hash")
+  label      String
+  scopes     Json
+  rateLimit  Int       @default(60) @map("rate_limit")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([revokedAt])
+  @@map("api_keys")
+}
+
+model CalendarSyncState {
+  id                   String             @id @default("google-primary")
+  provider             String             @default("google")
+  calendarId           String?            @map("calendar_id")
+  syncToken            String?            @map("sync_token")
+  lastSyncedAt         DateTime?          @map("last_synced_at")
+  lastSuccessfulSyncAt DateTime?          @map("last_successful_sync_at")
+  status               CalendarSyncStatus @default(not_configured)
+  error                String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  @@map("calendar_sync_states")
 }
 
 model AppSetting {

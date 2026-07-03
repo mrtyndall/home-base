@@ -59,10 +59,28 @@ async function main() {
     });
   }
 
-  await prisma.appSetting.upsert({
-    where: { key: "default_slip_threshold_days" },
-    update: { value: 14 },
-    create: { key: "default_slip_threshold_days", value: 14 },
+  const settings = [
+    ["default_slip_threshold_days", 14],
+    ["default_due_date_reminder_time", "08:00"],
+    ["google_calendar_stale_minutes", 30],
+  ] as const;
+
+  for (const [key, value] of settings) {
+    await prisma.appSetting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
+
+  await prisma.calendarSyncState.upsert({
+    where: { id: "google-primary" },
+    update: {},
+    create: {
+      id: "google-primary",
+      provider: "google",
+      status: "not_configured",
+    },
   });
 }
 

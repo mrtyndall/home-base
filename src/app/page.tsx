@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Clock3,
   Inbox,
+  RefreshCcw,
   type LucideIcon,
 } from "lucide-react";
 import { getTodayDashboard } from "@/lib/today";
@@ -38,6 +39,7 @@ export default async function TodayPage() {
       ) : (
         <>
           <StatusLine data={data} />
+          <CalendarSyncLine data={data.calendarSync} />
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-3">
@@ -140,7 +142,9 @@ export default async function TodayPage() {
                         {capture.rawText}
                       </p>
                       <p className="mt-2 text-xs text-stone-500">
-                        {capture.parseStatus ?? "saved"}
+                        {formatCaptureOutcome(capture.createdItems) ??
+                          capture.parseStatus ??
+                          "saved"}
                       </p>
                     </div>
                   ))
@@ -151,6 +155,43 @@ export default async function TodayPage() {
         </>
       )}
     </div>
+  );
+}
+
+function CalendarSyncLine({
+  data,
+}: {
+  data: {
+    status: string;
+    lastSyncedAt: Date | null;
+    stale: boolean;
+    staleMinutes: number;
+    error: string | null;
+  };
+}) {
+  const configured = data.status !== "not_configured";
+  const tone = !configured || data.stale || data.status === "failed"
+    ? "border-amber-300 bg-amber-50 text-amber-950"
+    : "border-stone-200 bg-white text-stone-700";
+  const message = !configured
+    ? "Google Calendar is not configured yet."
+    : data.lastSyncedAt
+      ? `Google Calendar last synced ${formatTime(data.lastSyncedAt)}.`
+      : "Google Calendar has not synced yet.";
+
+  return (
+    <section className={`rounded-lg border p-3 text-sm ${tone}`}>
+      <div className="flex items-start gap-2">
+        <RefreshCcw className="mt-0.5 shrink-0" size={16} />
+        <p>
+          {message}
+          {data.stale && configured
+            ? ` Sync is stale beyond ${data.staleMinutes} minutes.`
+            : ""}
+          {data.error ? ` ${data.error}` : ""}
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -226,4 +267,28 @@ function EmptyLine({ text }: { text: string }) {
       {text}
     </div>
   );
+}
+
+function formatCaptureOutcome(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const labels = value
+    .map((item) => {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        "label" in item &&
+        typeof item.label === "string" &&
+        (!("type" in item) || item.type !== "notification")
+      ) {
+        return item.label;
+      }
+
+      return null;
+    })
+    .filter((label): label is string => Boolean(label));
+
+  return labels.length > 0 ? labels.slice(0, 2).join("; ") : null;
 }

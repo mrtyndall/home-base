@@ -2,6 +2,7 @@ import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
+import { completeTaskByMatch } from "@/lib/tasks";
 import {
   captureInputSchema,
   type CaptureConfirmation,
@@ -21,6 +22,9 @@ type ExecutionContext = {
   rawText: string;
   inboxDomainId: string;
   domains: DomainContext[];
+  actor: { source: "capture" | "api"; label?: string };
+  writeSource: string;
+  calendarSource: "capture" | "api";
 };
 
 export async function submitCapture(
@@ -54,6 +58,7 @@ export async function submitCapture(
       rawText: parsedInput.rawText,
       inboxDomainId: await getInboxDomainId(),
       domains: parserContext.domains,
+      ...buildActorContext(parsedInput),
     };
 
     if (status === "parsed" && executableActions.length > 0) {
@@ -74,6 +79,7 @@ export async function submitCapture(
       rawText: parsedInput.rawText,
       inboxDomainId: await getInboxDomainId(),
       domains: [],
+      ...buildActorContext(parsedInput),
     });
   }
 
@@ -137,6 +143,31 @@ function isExecutableAction(action: ParserAction): action is ExecutableAction {
   return "type" in action;
 }
 
+function buildActorContext(input: CaptureInput) {
+  if (input.source !== "api") {
+    return {
+      actor: { source: "capture" as const },
+      writeSource: "capture",
+      calendarSource: "capture" as const,
+    };
+  }
+
+  const label =
+    isRecord(input.deviceContext) && typeof input.deviceContext.apiKeyLabel === "string"
+      ? input.deviceContext.apiKeyLabel
+      : undefined;
+
+  return {
+    actor: { source: "api" as const, label },
+    writeSource: label ? `api:${label}` : "api",
+    calendarSource: "api" as const,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 async function getInboxDomainId() {
   const inbox = await prisma.domain.upsert({
     where: { name: "Inbox" },
@@ -165,7 +196,7 @@ async function executeActions(
         createdItems.push(await createTask(action, context));
         break;
       case "complete_task": {
-        const completed = await completeTask(action.task_match);
+        const completed = await completeTask(action.task_match, context);
         createdItems.push(completed);
         break;
       }
@@ -176,13 +207,13 @@ async function executeActions(
         createdItems.push(...(await updateProjectState(action, context)));
         break;
       case "create_calendar_event":
-        createdItems.push(await createCalendarEvent(action, context.captureId));
+        createdItems.push(await createCalendarEvent(action, context));
         break;
       case "create_idea":
         createdItems.push(await createIdea(action, context));
         break;
       case "append_to_idea":
-        createdItems.push(await appendToIdea(action, context.captureId));
+        createdItems.push(await appendToIdea(action, context));
         break;
       case "convert_idea":
         createdItems.push(await convertIdea(action, context));
@@ -202,6 +233,8 @@ async function executeActions(
         sourceRef: {
           type: "capture",
           id: context.captureId,
+          source: context.actor.source,
+          actor: context.actor.label ?? null,
         },
       },
     });
@@ -221,7 +254,8 @@ async function createInboxFallbackTask(context: ExecutionContext) {
     data: {
       title: context.rawText,
       domainId: context.inboxDomainId,
-      source: "capture_fallback",
+      source:
+        context.actor.source === "api" ? context.writeSource : "capture_fallback",
       captureId: context.captureId,
     },
   });
@@ -231,7 +265,12 @@ async function createInboxFallbackTask(context: ExecutionContext) {
       type: "capture_needs_review",
       title: "Capture saved to Inbox",
       body: "Parser could not confidently route this capture.",
-      sourceRef: { type: "capture", id: context.captureId },
+      sourceRef: {
+        type: "capture",
+        id: context.captureId,
+        source: context.actor.source,
+        actor: context.actor.label ?? null,
+      },
     },
   });
 
@@ -269,7 +308,7 @@ async function createTask(
       reminderOffsets: action.reminder_offsets as Prisma.InputJsonValue,
       domainId,
       projectId,
-      source: "capture",
+      source: context.writeSource,
       captureId: context.captureId,
     },
     include: { domain: true },
@@ -282,28 +321,18 @@ async function createTask(
   };
 }
 
-async function completeTask(taskMatch: string) {
-  const task = await prisma.task.findFirst({
-    where: {
-      status: "open",
-      title: { contains: taskMatch, mode: "insensitive" },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!task) {
-    throw new Error(`No open task matched "${taskMatch}".`);
-  }
-
-  const completed = await prisma.task.update({
-    where: { id: task.id },
-    data: { status: "completed", completedAt: new Date() },
-  });
+async function completeTask(taskMatch: string, context: ExecutionContext) {
+  const { completed, nextInstance } = await completeTaskByMatch(
+    taskMatch,
+    context.actor,
+  );
 
   return {
     type: "task" as const,
     id: completed.id,
-    label: `Completed task: ${completed.title}`,
+    label: nextInstance
+      ? `Completed task and created next recurrence: ${completed.title}`
+      : `Completed task: ${completed.title}`,
   };
 }
 
@@ -324,7 +353,7 @@ async function createProject(
       activity: {
         create: {
           entry: `Project created from capture: ${context.rawText}`,
-          source: "capture",
+          source: context.writeSource,
           captureId: context.captureId,
         },
       },
@@ -355,7 +384,12 @@ async function updateProjectState(
       currentState: action.current_state,
       nextStep: action.next_step,
       status: action.status,
-      parkedAt: action.status === "parked" ? now : undefined,
+      parkedAt:
+        action.status === "parked"
+          ? now
+          : action.status === "active"
+            ? null
+            : undefined,
       completedAt: action.status === "completed" ? now : undefined,
       killedAt: action.status === "killed" ? now : undefined,
     },
@@ -365,7 +399,7 @@ async function updateProjectState(
     data: {
       projectId,
       entry: action.log_entry ?? context.rawText,
-      source: "capture",
+      source: context.writeSource,
       captureId: context.captureId,
       stateSnapshot: {
         status: project.status,
@@ -391,7 +425,7 @@ async function updateProjectState(
 
 async function createCalendarEvent(
   action: Extract<ExecutableAction, { type: "create_calendar_event" }>,
-  captureId: string,
+  context: ExecutionContext,
 ) {
   const event = await prisma.calendarEvent.create({
     data: {
@@ -399,8 +433,8 @@ async function createCalendarEvent(
       start: parseDateTime(action.start),
       end: parseDateTime(action.end),
       location: action.location,
-      source: "capture",
-      captureId,
+      source: context.calendarSource,
+      captureId: context.captureId,
     },
   });
 
@@ -421,6 +455,7 @@ async function createIdea(
       body: action.body,
       tags: action.tags ?? [],
       domainId: matchDomainId(action.domain_match, context.domains),
+      source: context.writeSource,
       captureId: context.captureId,
     },
   });
@@ -434,7 +469,7 @@ async function createIdea(
 
 async function appendToIdea(
   action: Extract<ExecutableAction, { type: "append_to_idea" }>,
-  captureId: string,
+  context: ExecutionContext,
 ) {
   const idea = await prisma.idea.findFirst({
     where: {
@@ -452,7 +487,8 @@ async function appendToIdea(
     data: {
       ideaId: idea.id,
       body: action.body,
-      captureId,
+      source: context.writeSource,
+      captureId: context.captureId,
     },
   });
 
@@ -540,6 +576,7 @@ async function createReference(
       domainId: matchDomainId(action.domain_match, context.domains),
       relatedType: action.related_match ? "unknown" : undefined,
       relatedId: action.related_match,
+      source: context.writeSource,
       captureId: context.captureId,
     },
   });
