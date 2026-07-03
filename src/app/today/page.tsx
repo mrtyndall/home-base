@@ -39,11 +39,11 @@ export default async function TodayPage() {
       ) : (
         <>
           <StatusLine data={data} />
-          <CalendarSyncLine data={data.calendarSync} />
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-3">
               <SectionHeader icon={CalendarDays} title="Today's Calendar" />
+              <CalendarSyncMeta data={data.calendarSync} />
               <div className="space-y-2">
                 {data.todayEvents.length === 0 ? (
                   <EmptyLine text="No calendar events today." />
@@ -245,7 +245,7 @@ function getCaptureHref(capture: Capture) {
   return `/search?q=${encodeURIComponent(capture.rawText)}`;
 }
 
-function CalendarSyncLine({
+function CalendarSyncMeta({
   data,
 }: {
   data: {
@@ -257,38 +257,33 @@ function CalendarSyncLine({
   };
 }) {
   const configured = data.status !== "not_configured";
-  const tone = !configured || data.stale || data.status === "failed"
-    ? "border-amber-300 bg-amber-50 text-amber-950"
-    : "border-stone-200 bg-white text-stone-700";
+  const needsAttention = !configured || data.stale || data.status === "failed";
+  const tone = needsAttention ? "text-amber-800" : "text-stone-500";
   const message = !configured
     ? "Google Calendar is not configured yet."
     : data.lastSyncedAt
-      ? `Google Calendar last synced ${formatTime(data.lastSyncedAt)}.`
-      : "Google Calendar has not synced yet.";
+      ? `Calendar synced ${formatTime(data.lastSyncedAt)}`
+      : "Calendar has not synced yet";
 
   return (
-    <section className={`rounded-lg border p-3 text-sm ${tone}`}>
-      <div className="flex items-start gap-2">
-        <RefreshCcw className="mt-0.5 shrink-0" size={16} />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
-          <p>
-            {message}
-            {data.stale && configured
-              ? ` Sync is stale beyond ${data.staleMinutes} minutes.`
-              : ""}
-            {data.error ? ` ${data.error}` : ""}
-          </p>
-          {!configured ? (
-            <Link
-              href="/settings"
-              className="font-medium text-amber-950 underline-offset-4 hover:underline"
-            >
-              Open settings
-            </Link>
-          ) : null}
-        </div>
-      </div>
-    </section>
+    <div className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
+      <RefreshCcw className="shrink-0" size={13} />
+      <p>
+        {message}
+        {data.stale && configured
+          ? ` · stale beyond ${data.staleMinutes} minutes`
+          : ""}
+        {data.error ? ` · ${data.error}` : ""}
+      </p>
+      {!configured ? (
+        <Link
+          href="/settings"
+          className="font-medium underline-offset-4 hover:underline"
+        >
+          Open settings
+        </Link>
+      ) : null}
+    </div>
   );
 }
 
