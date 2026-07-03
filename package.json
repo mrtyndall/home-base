@@ -15,6 +15,7 @@
     "db:seed": "prisma db seed",
     "backup:db": "tsx scripts/backup-database.ts",
     "import:reminders": "tsx scripts/import-apple-reminders.ts",
+    "calendar:sync": "tsx scripts/sync-google-calendar.ts",
     "reminders:send": "tsx scripts/send-reminders.ts",
     "api:key:register": "tsx scripts/register-api-key.ts",
     "mcp:http": "tsx mcp/http-server.ts",

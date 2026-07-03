@@ -357,6 +357,22 @@ model CalendarSyncState {
   @@map("calendar_sync_states")
 }
 
+model CalendarOAuthToken {
+  id                     String    @id @default("google-primary")
+  provider               String    @default("google")
+  calendarId             String    @default("primary") @map("calendar_id")
+  refreshTokenCiphertext String    @map("refresh_token_ciphertext")
+  refreshTokenIv         String    @map("refresh_token_iv")
+  refreshTokenTag        String    @map("refresh_token_tag")
+  scope                  String?
+  tokenType              String?   @map("token_type")
+  expiryDate             DateTime? @map("expiry_date")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("calendar_oauth_tokens")
+}
+
 model AppSetting {
   id        String   @id @default(uuid())
   key       String   @unique

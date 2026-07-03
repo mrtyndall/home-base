@@ -10,7 +10,7 @@ Home Base is a single-user personal operations system for tasks, calendar, proje
 - Prisma 7 with `@prisma/adapter-pg`
 - Anthropic API for capture parsing
 - Pushover for reminder delivery
-- Google Calendar sync state and local calendar event storage; OAuth implementation is pending Matt's redirect URI decision
+- Google Calendar OAuth, encrypted refresh-token storage, 15-minute scheduled sync, and local calendar event storage
 - REST API plus streamable HTTP MCP server for agent access
 - Local LaunchAgents for the production app server and reminder scheduler, with Tailscale Serve for remote access
 - Railway deployment later, after the local core loop is trusted
@@ -27,16 +27,19 @@ The current active runtime is local:
 - Local env: `.env.local` with `DATABASE_URL`
 - App server: LaunchAgent `com.mrtyndall.home-base`
 - Reminder scheduler: LaunchAgent `com.mrtyndall.home-base-reminders`
+- Calendar sync scheduler: LaunchAgent `com.mrtyndall.home-base-calendar-sync`
 - App port: `127.0.0.1:3002`
 - MCP port: `127.0.0.1:8081`
 - Tailnet URL: `https://mac-studio.tail3baa7a.ts.net/`
 - Tailnet MCP URL: `https://mac-studio.tail3baa7a.ts.net:8443/api/mcp`
+- Railway URL: `https://home-base-production-e3b7.up.railway.app/`
 
 Useful commands:
 
 ```bash
 npm run db:deploy
 npm run db:seed
+npm run calendar:sync
 launchctl kickstart -k gui/501/com.mrtyndall.home-base
 tailscale serve status
 ```
@@ -66,14 +69,24 @@ The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streama
 
 ## Calendar Sync
 
-`calendar_sync_states` stores sync freshness and powers the Today screen stale-warning line. Sync is intentionally never triggered on page load.
+`calendar_sync_states` stores sync freshness and powers the Today screen stale-warning line. Sync is intentionally never triggered on page load. The local scheduler runs `scripts/sync-google-calendar.ts` every 15 minutes.
 
-Google OAuth and the 15-minute scheduled two-way sync remain blocked on the open redirect URI decision:
+Matt chose the hosted Railway/domain OAuth path on 2026-07-03. The Google Cloud Console authorized redirect URI must be:
 
-- Localhost redirect during setup: fastest local-first path.
-- Railway/domain redirect: cleaner hosted OAuth path, but accelerates deployment work.
+```text
+https://home-base-production-e3b7.up.railway.app/api/google/oauth/callback
+```
 
-Home Base calendar events can be created locally through capture/API/MCP now. Pushing those events to Google is part of the blocked OAuth/sync implementation.
+OAuth routes:
+
+- `/api/google/oauth/start`: starts Google authorization with offline access.
+- `/api/google/oauth/callback`: exchanges the code, encrypts the refresh token, stores it in `calendar_oauth_tokens`, and runs an initial full sync.
+
+The refresh token is encrypted with `GOOGLE_TOKEN_ENCRYPTION_KEY`; that key must come from 1Password/Railway environment variables. The database never stores the plaintext refresh token.
+
+The sync worker pushes unsynced Home Base calendar events to Google, then pulls Google changes using Calendar API sync tokens. Google remains the source of truth on conflicts. If Google invalidates the sync token, the worker marks existing Google-origin events cancelled and performs a full resync without hard deletes.
+
+The Railway app service is deployed. Railway cron still needs to be configured in the service settings after Google secrets are added: `*/15 * * * *` running `npm run calendar:sync`.
 
 ## Parked Projects
 
@@ -87,8 +100,12 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 - `scripts/import-apple-reminders.ts`: one-time CSV importer that writes captures then tasks.
 - `scripts/register-api-key.ts`: hashes an externally supplied API token into `api_keys`.
 - `scripts/send-reminders.ts`: minute scheduler target for Pushover reminder delivery.
+- `scripts/sync-google-calendar.ts`: 15-minute scheduler target for Google Calendar two-way sync.
 - `src/app/api/v1/[...path]/route.ts`: REST API for agent access.
+- `src/app/api/google/oauth/start/route.ts`: Google OAuth authorization start.
+- `src/app/api/google/oauth/callback/route.ts`: Google OAuth callback and initial sync.
 - `mcp/http-server.ts`: streamable HTTP MCP wrapper around the REST API.
+- `src/lib/calendar/google.ts`: Google OAuth, encrypted token storage, push/pull sync, and conflict handling.
 - `src/lib/db.ts`: Prisma client configured for PostgreSQL.
 - `src/lib/reminders.ts`: due reminder selection, Pushover delivery, and audit writes.
 - `src/lib/tasks.ts`: shared task creation/completion and recurrence behavior.
@@ -97,6 +114,8 @@ Project statuses are `active`, `parked`, `completed`, and `killed`. Parked proje
 
 ### 2026-07-03
 
+- Implemented the hosted Google OAuth path chosen by Matt: OAuth start/callback routes, encrypted refresh-token storage, sync-token based pull, local-event push to Google, and a 15-minute scheduler command.
+- Created the Railway `home-base` project with Postgres and deployed the app at `https://home-base-production-e3b7.up.railway.app/`.
 - Added Milestone 2 foundations: reminder deliveries, API keys, calendar sync state, REST API, MCP server, parked project UI, subtask UI, recurrence-on-completion behavior, and Apple Reminders CSV import.
 - Added Pushover reminder scheduler logic with append-only delivery audit rows and in-app notification mirroring.
 - Added Today calendar sync freshness display and recently captured outcome labels.

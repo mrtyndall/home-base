@@ -3,10 +3,11 @@ import { parse } from "csv-parse/sync";
 import { config } from "dotenv";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { prisma } from "../src/lib/db";
 
 config({ path: ".env.local" });
 config();
+
+let prisma: Awaited<typeof import("../src/lib/db")>["prisma"] | undefined;
 
 type ReminderRow = Record<string, string | undefined>;
 
@@ -23,6 +24,8 @@ type NormalizedReminder = {
 };
 
 async function main() {
+  ({ prisma } = await import("../src/lib/db"));
+
   const inputPath = process.argv[2];
   const dryRun = process.argv.includes("--dry-run");
   if (!inputPath) {
@@ -56,7 +59,7 @@ async function main() {
     imported.push(await importReminder(reminder, inputPath));
   }
 
-  await prisma.notification.create({
+  await getPrisma().notification.create({
     data: {
       type: "apple_reminders_imported",
       title: "Apple Reminders imported",
@@ -84,7 +87,7 @@ async function importReminder(reminder: NormalizedReminder, inputPath: string) {
     ? await resolveProjectId(reminder.projectName)
     : undefined;
 
-  return prisma.$transaction(async (tx) => {
+  return getPrisma().$transaction(async (tx) => {
     const capture = await tx.capture.create({
       data: {
         rawText: buildRawText(reminder),
@@ -213,16 +216,24 @@ function parseBoolean(value?: string) {
   );
 }
 
+function getPrisma() {
+  if (!prisma) {
+    throw new Error("Database client was not initialized.");
+  }
+
+  return prisma;
+}
+
 async function resolveDomainId(name?: string) {
   if (name) {
-    const domain = await prisma.domain.findFirst({
+    const domain = await getPrisma().domain.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
       select: { id: true },
     });
     if (domain) return domain.id;
   }
 
-  const inbox = await prisma.domain.upsert({
+  const inbox = await getPrisma().domain.upsert({
     where: { name: "Inbox" },
     update: { active: true, isSystem: true },
     create: {
@@ -238,7 +249,7 @@ async function resolveDomainId(name?: string) {
 }
 
 async function resolveProjectId(name: string) {
-  const project = await prisma.project.findFirst({
+  const project = await getPrisma().project.findFirst({
     where: {
       name: { contains: name, mode: "insensitive" },
       status: { in: ["active", "parked"] },
@@ -270,5 +281,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await prisma?.$disconnect();
   });
