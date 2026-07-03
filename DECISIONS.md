@@ -10,7 +10,7 @@ These are the initial build defaults from SCOPE.md Section 16. They are written 
 | Clustering nudge threshold | Conservative and disabled until the core capture/search flow is trusted; start with 5 related captures in 7 days when enabled | Confirm later |
 | Visual direction | Designed and calm | Confirm with Matt; design pass remains paused |
 | Google OAuth redirect URI | Option B: Railway/domain hosted redirect. Use `https://home-base-production-e3b7.up.railway.app/api/google/oauth/callback`. | Chosen by Matt on 2026-07-03 |
-| Parked-project weighting | Lost context is the main problem; parked projects stay browsable but excluded from Today attention and slipping detection | Confirmed |
+| Parked-project weighting | Open: clarify whether the pain of dormant projects is lost context, lost visibility, or too many open threads | Open |
 | References tab | No dedicated tab for now; references live under Search/Browse | Confirm with Matt |
 | File attachment storage | Cloudflare R2 for object storage; Railway volume remains the fallback if Matt wants fewer external services | Confirm with Matt |
 | Initial area map | Suggested domains: Home, Family, Health, Hobbies, Creative. Current seeded areas include Inbox, Ham Radio, Homelab, and Magic/Pokemon. | Confirm with Matt |
