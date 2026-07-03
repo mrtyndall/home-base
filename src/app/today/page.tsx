@@ -209,15 +209,11 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
 
 function getCaptureHref(capture: Capture) {
   const items = Array.isArray(capture.createdItems) ? capture.createdItems : [];
-  const firstItem = items.find(
-    (item) =>
-      typeof item === "object" &&
-      item !== null &&
-      "type" in item &&
-      "id" in item &&
-      typeof item.type === "string" &&
-      typeof item.id === "string",
-  ) as { type: string; id: string } | undefined;
+  const actionableItems = items
+    .filter(isCreatedItem)
+    .filter((item) => item.type !== "pending_capture");
+  const firstItem =
+    actionableItems[actionableItems.length - 1] ?? items.find(isCreatedItem);
 
   if (!firstItem) {
     return `/areas/area_inbox`;
@@ -356,21 +352,37 @@ function formatCaptureOutcome(value: unknown) {
     return null;
   }
 
-  const labels = value
-    .map((item) => {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        "label" in item &&
-        typeof item.label === "string" &&
-        (!("type" in item) || item.type !== "notification")
-      ) {
-        return item.label;
-      }
-
-      return null;
-    })
-    .filter((label): label is string => Boolean(label));
+  const filedItems = value
+    .filter(isCreatedItem)
+    .filter((item) => item.type !== "pending_capture");
+  const pendingItems = value.filter(isCreatedItem);
+  const labels =
+    filedItems.length > 0
+      ? filedItems
+          .slice()
+          .reverse()
+          .map((item) => item.label)
+          .filter((label) => !label.startsWith("Saved to Inbox to sort later"))
+      : pendingItems
+          .slice()
+          .reverse()
+          .map((item) => item.label);
 
   return labels.length > 0 ? labels.slice(0, 2).join("; ") : null;
+}
+
+function isCreatedItem(
+  item: unknown,
+): item is { type: string; id: string; label: string } {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    "type" in item &&
+    typeof item.type === "string" &&
+    item.type !== "notification" &&
+    "id" in item &&
+    typeof item.id === "string" &&
+    "label" in item &&
+    typeof item.label === "string"
+  );
 }

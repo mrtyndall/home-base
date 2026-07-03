@@ -578,6 +578,7 @@ export async function convertPendingCapture(formData: FormData) {
   });
 
   revalidatePath("/");
+  revalidatePath("/today");
   revalidatePath("/search");
   revalidatePath(`/areas/${area.id}`);
   revalidatePath("/areas/area_inbox");
