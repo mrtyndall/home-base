@@ -5,6 +5,7 @@ import {
   House,
   Library,
   ListTodo,
+  MessageCircle,
   Search,
   Settings,
 } from "lucide-react";
@@ -35,6 +36,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Search size={16} />
             Search
+          </Link>
+          <Link
+            href="/chat"
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+          >
+            <MessageCircle size={16} />
+            Chat
           </Link>
           <Link
             href="/settings"
