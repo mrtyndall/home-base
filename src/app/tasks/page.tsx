@@ -7,6 +7,7 @@ import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
+import { getTaskSlipDays, taskOpenSinceFact } from "@/lib/slippage";
 import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
 import {
   buildTasksFilterHref,
@@ -45,6 +46,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   }
 
   const { tasks, doneTasks, projects, domains } = result;
+  const slipDays = await getTaskSlipDays();
   const selectedDomainIds = normalizeFilterValues(
     domain,
     domains.map((item) => item.id),
@@ -157,6 +159,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
       {(selectedView === "done" || selectedView === "all") ? (
@@ -174,6 +177,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
       {selectedView === "schedule" &&
@@ -188,6 +192,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
       {selectedView === "schedule" &&
@@ -198,6 +203,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
       {selectedView === "schedule" &&
@@ -212,6 +218,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
       {selectedView === "schedule" &&
@@ -226,6 +233,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           tomorrow={tomorrow}
           areaGroups={areaGroups}
           projects={projectOptions}
+          slipDays={slipDays}
         />
       ) : null}
     </div>
@@ -583,6 +591,7 @@ function TaskSection({
   tomorrow,
   areaGroups,
   projects,
+  slipDays,
 }: {
   title: string;
   empty: string;
@@ -593,6 +602,7 @@ function TaskSection({
   tomorrow: string;
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
+  slipDays: number;
 }) {
   return (
     <section id={anchor} className="scroll-mt-4 space-y-3">
@@ -614,6 +624,7 @@ function TaskSection({
               tomorrow={tomorrow}
               areaGroups={areaGroups}
               projects={projects}
+              slipDays={slipDays}
             />
           ))}
         </div>
@@ -628,12 +639,14 @@ function UpcomingSection({
   tomorrow,
   areaGroups,
   projects,
+  slipDays,
 }: {
   groups: Array<{ date: string; tasks: TaskListItem[] }>;
   today: string;
   tomorrow: string;
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
+  slipDays: number;
 }) {
   const count = groups.reduce((total, group) => total + group.tasks.length, 0);
   return (
@@ -667,6 +680,7 @@ function UpcomingSection({
                       tomorrow={tomorrow}
                       areaGroups={areaGroups}
                       projects={projects}
+                      slipDays={slipDays}
                     />
                   ))}
                 </div>
@@ -685,12 +699,14 @@ function AllOpenSection({
   tomorrow,
   areaGroups,
   projects,
+  slipDays,
 }: {
   tasks: TaskListItem[];
   today: string;
   tomorrow: string;
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
+  slipDays: number;
 }) {
   return (
     <section className="space-y-3">
@@ -712,6 +728,7 @@ function AllOpenSection({
               tomorrow={tomorrow}
               areaGroups={areaGroups}
               projects={projects}
+              slipDays={slipDays}
             />
           ))}
         </div>
@@ -771,12 +788,14 @@ function TaskCard({
   tomorrow,
   areaGroups,
   projects,
+  slipDays,
 }: {
   task: TaskListItem;
   today: string;
   tomorrow: string;
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
+  slipDays: number;
 }) {
   return (
     <article className="rounded-lg border border-stone-200 bg-white p-4">
@@ -785,7 +804,7 @@ function TaskCard({
           taskId={task.id}
           href={`/tasks/${task.id}`}
           title={task.title}
-          detail={formatTaskDetail(task)}
+          detail={formatTaskDetail(task, slipDays)}
           currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
           currentAreaId={task.areaId}
           currentProjectId={task.projectId}
@@ -874,13 +893,14 @@ type TaskProjectOption = {
   areaName: string;
 };
 
-function formatTaskDetail(task: TaskListItem) {
+function formatTaskDetail(task: TaskListItem, slipDays: number) {
   return [
     task.area.domain.name,
     task.area.name,
     task.project?.name,
     task.dueDate ? formatDateOnly(task.dueDate) : null,
     task.recurrenceRule ? "repeats" : null,
+    taskOpenSinceFact(task, slipDays),
   ]
     .filter((item): item is string => Boolean(item))
     .join(" / ");

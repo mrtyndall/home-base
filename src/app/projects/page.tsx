@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
+import { projectLastActivityFact } from "@/lib/slippage";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
   const nextDatedTask = getNextDatedTask(project);
   const lastTouched = getLastTouched(project);
   const freshNote = getFreshNote(project);
+  const slipFact = projectLastActivityFact(project, lastTouched);
 
   return (
     <article className="rounded-lg border border-stone-200 bg-white p-4">
@@ -147,11 +149,15 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
         )}
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
-          {lastTouched ? <span>Touched {formatShortDate(lastTouched)}</span> : null}
+          {lastTouched && !slipFact ? (
+            <span>Touched {formatShortDate(lastTouched)}</span>
+          ) : null}
           {project.targetDate ? (
             <span>Target {formatDateOnly(project.targetDate)}</span>
           ) : null}
         </div>
+
+        {slipFact ? <p className="text-sm text-stone-600">{slipFact}</p> : null}
 
         {project.currentState?.trim() ? (
           <p className="text-sm text-stone-700">{project.currentState}</p>
@@ -185,6 +191,7 @@ function getLastTouched(project: ProjectListItem) {
     ...project.tasks
       .map((task) => task.completedAt)
       .filter((date): date is Date => Boolean(date)),
+    ...project.tasks.map((task) => task.createdAt),
     ...project.activity.map((entry) => entry.createdAt),
     ...project.notes.map((note) => note.createdAt),
   ];

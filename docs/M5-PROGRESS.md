@@ -28,4 +28,11 @@ Format per step: what was built, test result, commit hash, deviations.
 - Built: Tasks tab view control with **Schedule** (existing sections + jumps), **All Open** (every open task, due date asc, undated last, cap 200), **Done** (completed, newest first, cap 100), **All** (open + done stacked). `view` searchParam (`normalizeTaskView`, carried through every filter href). Domain/project/starred filters apply in all views; star/complete inline actions available wherever tasks are open; Done rows link to detail with a plain "completed <date>" fact.
 - Test (work-order): switched all four views via URL — each renders; created `M5T step2 task`, saw it in All Open, completed it, it left All Open and appeared in Done (newest first) with completion date. Existing `task-filter-links` unit tests still pass. PASS.
 - Gates: tsc clean, eslint clean, build succeeds.
+- Commit: cf8c5a3
+
+### Step 3 — Slippage as Fact
+- Built: `src/lib/slippage.ts` — `getTaskSlipDays()` (app_settings key `task_slip_days`, default 14), `taskOpenSinceFact()` ("open since Jun 12" for open, non-someday tasks with no create/update activity inside the threshold), `projectLastActivityFact()` ("Last activity Jun 20" for active projects past their per-project `slipThresholdDays`). Task fact renders in the row detail line across all Tasks-tab views; project fact renders as a plain sentence on active project cards (replacing the tiny "Touched" span only on slipping cards to avoid stating the same date twice). `getLastTouched` now also counts task creation as activity. No color, no badge, no sort change, nothing hidden.
+- Test (work-order): created `M5T step3 aging task` + `M5T step3 project` in dev, backdated 20/30 days via SQL — "open since Jun 13" renders on the task row (still fully visible), "Last activity Jun 3" renders on the project card (still on the Active shelf). No red styling anywhere. PASS.
+- Gates: tsc clean, eslint clean, build succeeds.
 - Commit: (this commit)
+- DEVIATION: someday tasks excluded from the task slip fact (someday = wanted-not-committed; an "open since" fact there reads as guilt). DEVIATION: task fact shown on Tasks-tab rows (all views), not Today rows — Today already surfaces overdue items in place; smallest interpretation that passes the test.
