@@ -300,6 +300,319 @@ function registerTools(server: McpServer, bearerToken: string) {
     },
     async () => toToolResult(await apiFetch(bearerToken, "/calendar-events")),
   );
+
+  server.registerTool(
+    "star_task",
+    {
+      description: "Star or unstar a task. Starred tasks surface in the Today Top Tasks strip.",
+      inputSchema: z.object({
+        taskId: z.string().min(1),
+        starred: z.boolean().default(true),
+      }),
+    },
+    async ({ taskId, starred }) =>
+      toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}/star`, "POST", { starred })),
+  );
+
+  server.registerTool(
+    "list_tasks",
+    {
+      description:
+        "List tasks with optional filters: q (title search), starred (true), view (open|done).",
+      inputSchema: z.object({
+        q: z.string().optional(),
+        starred: z.boolean().optional(),
+        view: z.enum(["open", "done"]).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    },
+    async ({ q, starred, view, limit }) => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (starred) params.set("starred", "1");
+      if (view) params.set("view", view);
+      if (limit) params.set("limit", String(limit));
+      const query = params.toString();
+      return toToolResult(
+        await apiFetch(bearerToken, `/tasks${query ? `?${query}` : ""}`),
+      );
+    },
+  );
+
+  server.registerTool(
+    "list_check_ins",
+    {
+      description: "List check-ins, optionally scoped to an area or project.",
+      inputSchema: z.object({
+        parentType: z.enum(["area", "project"]).optional(),
+        parentId: z.string().optional(),
+      }),
+    },
+    async ({ parentType, parentId }) => {
+      const params = new URLSearchParams();
+      if (parentType) params.set("parentType", parentType);
+      if (parentId) params.set("parentId", parentId);
+      const query = params.toString();
+      return toToolResult(
+        await apiFetch(bearerToken, `/check-ins${query ? `?${query}` : ""}`),
+      );
+    },
+  );
+
+  server.registerTool(
+    "create_check_in",
+    {
+      description:
+        "Post a check-in (timestamped markdown status update) to a project or area. Append-only.",
+      inputSchema: z.object({
+        parentType: z.enum(["area", "project"]),
+        parentId: z.string().min(1),
+        bodyMd: z.string().min(1),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/check-ins", "POST", input)),
+  );
+
+  server.registerTool(
+    "draft_check_in_summary",
+    {
+      description:
+        "Draft (never post) an AI check-in summarizing activity since the last check-in on a project or area.",
+      inputSchema: z.object({
+        parentType: z.enum(["area", "project"]),
+        parentId: z.string().min(1),
+      }),
+    },
+    async (input) =>
+      toToolResult(await apiFetch(bearerToken, "/check-ins/draft", "POST", input)),
+  );
+
+  server.registerTool(
+    "list_journal_entries",
+    {
+      description: "List journal entries, newest first, optionally filtered by q.",
+      inputSchema: z.object({
+        q: z.string().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    },
+    async ({ q, limit }) => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (limit) params.set("limit", String(limit));
+      const query = params.toString();
+      return toToolResult(
+        await apiFetch(bearerToken, `/journal-entries${query ? `?${query}` : ""}`),
+      );
+    },
+  );
+
+  server.registerTool(
+    "create_journal_entry",
+    {
+      description: "Save a journal entry (markdown; entryDate defaults to today).",
+      inputSchema: z.object({
+        bodyMd: z.string().min(1),
+        entryDate: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+      }),
+    },
+    async (input) =>
+      toToolResult(await apiFetch(bearerToken, "/journal-entries", "POST", input)),
+  );
+
+  server.registerTool(
+    "read_resurfaced_item",
+    {
+      description: "Read today's resurfaced memory (journal entry or idea), if any.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/resurfacing")),
+  );
+
+  server.registerTool(
+    "respond_to_resurfaced_item",
+    {
+      description: "Boost or dismiss today's resurfaced memory by its seen id.",
+      inputSchema: z.object({
+        seenId: z.string().min(1),
+        response: z.enum(["boost", "dismiss"]),
+      }),
+    },
+    async ({ seenId, response }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/resurfacing/${seenId}/${response}`, "POST", {}),
+      ),
+  );
+
+  server.registerTool(
+    "list_scheduled_reviews",
+    {
+      description:
+        "List scheduled reviews (needs-review follow-ups), optionally filtered by status.",
+      inputSchema: z.object({
+        status: z.enum(["pending", "surfaced", "done", "dismissed"]).optional(),
+      }),
+    },
+    async ({ status }) =>
+      toToolResult(
+        await apiFetch(
+          bearerToken,
+          `/scheduled-reviews${status ? `?status=${status}` : ""}`,
+        ),
+      ),
+  );
+
+  server.registerTool(
+    "settle_scheduled_review",
+    {
+      description:
+        "Settle a scheduled review: done, dismiss, or snooze (snooze needs reviewAt YYYY-MM-DD).",
+      inputSchema: z.object({
+        reviewId: z.string().min(1),
+        outcome: z.enum(["done", "dismiss", "snooze"]),
+        reviewAt: z.string().optional(),
+      }),
+    },
+    async ({ reviewId, outcome, reviewAt }) =>
+      toToolResult(
+        await apiFetch(
+          bearerToken,
+          `/scheduled-reviews/${reviewId}/${outcome}`,
+          "POST",
+          outcome === "snooze" ? { reviewAt } : {},
+        ),
+      ),
+  );
+
+  server.registerTool(
+    "list_routines",
+    {
+      description:
+        "List routines with today's state, run length (plain fact), and recent completions.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/routines")),
+  );
+
+  server.registerTool(
+    "create_routine",
+    {
+      description:
+        "Create a routine (recurring habit, separate from tasks — no due dates).",
+      inputSchema: z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        areaId: z.string().optional(),
+        frequency: z.enum(["daily", "weekly", "custom"]).optional(),
+        days: z.array(z.string()).optional(),
+        timeWindow: z.enum(["morning", "afternoon", "evening", "anytime"]).optional(),
+        graceDays: z.number().optional(),
+        temporary: z.boolean().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/routines", "POST", input)),
+  );
+
+  server.registerTool(
+    "complete_routine",
+    {
+      description:
+        "Complete a routine for today by ID. A second completion the same day is a no-op.",
+      inputSchema: z.object({ routineId: z.string().min(1) }),
+    },
+    async ({ routineId }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/routines/${routineId}/complete`, "POST", {}),
+      ),
+  );
+
+  server.registerTool(
+    "list_people",
+    {
+      description: "List people, optionally filtered by q (name).",
+      inputSchema: z.object({ q: z.string().optional() }),
+    },
+    async ({ q }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/people${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+      ),
+  );
+
+  server.registerTool(
+    "read_person",
+    {
+      description: "Read a person with their facts and interaction timeline.",
+      inputSchema: z.object({ personId: z.string().min(1) }),
+    },
+    async ({ personId }) =>
+      toToolResult(await apiFetch(bearerToken, `/people/${personId}`)),
+  );
+
+  server.registerTool(
+    "create_person",
+    {
+      description: "Add a person to the personal CRM.",
+      inputSchema: z.object({
+        name: z.string().min(1),
+        relationshipType: z.string().optional(),
+        email: z.string().optional(),
+        phone: z.string().optional(),
+        company: z.string().optional(),
+        areaId: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/people", "POST", input)),
+  );
+
+  server.registerTool(
+    "create_person_fact",
+    {
+      description:
+        "Save a fact about a person (dateRelevant YYYY-MM-DD + recurring for dates worth surfacing ahead).",
+      inputSchema: z.object({
+        personId: z.string().min(1),
+        factType: z.string().optional(),
+        factValue: z.string().min(1),
+        dateRelevant: z.string().optional(),
+        recurring: z.boolean().optional(),
+      }),
+    },
+    async ({ personId, ...body }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/people/${personId}/facts`, "POST", body),
+      ),
+  );
+
+  server.registerTool(
+    "log_interaction",
+    {
+      description: "Log an interaction with a person.",
+      inputSchema: z.object({
+        personId: z.string().min(1),
+        interactionType: z.string().optional(),
+        notes: z.string().optional(),
+        occurredAt: z.string().optional(),
+      }),
+    },
+    async ({ personId, ...body }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/people/${personId}/interactions`, "POST", body),
+      ),
+  );
+
+  server.registerTool(
+    "read_domain_page",
+    {
+      description:
+        "Read a domain's derived aggregate: areas with latest check-ins, project facts, task pulse.",
+      inputSchema: z.object({ domainId: z.string().min(1) }),
+    },
+    async ({ domainId }) =>
+      toToolResult(await apiFetch(bearerToken, `/domains/${domainId}/aggregate`)),
+  );
 }
 
 async function apiFetch(

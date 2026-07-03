@@ -6,7 +6,13 @@ import {
   type AuthenticatedApiKey,
 } from "@/lib/api/auth";
 import { submitCapture } from "@/lib/capture/service";
+import { createCheckInRecord, draftCheckInFromActivity } from "@/lib/checkins";
+import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { getDomainAggregate } from "@/lib/domains";
+import { createPersonRecord } from "@/lib/people";
+import { boostResurfaceWeight, getDailyResurfacedItem } from "@/lib/resurfacing";
+import { completeRoutineById, getRoutinesWithState } from "@/lib/routines";
 import { getTodayDashboard } from "@/lib/today";
 import { completeTaskById, createTaskWithAudit } from "@/lib/tasks";
 
@@ -34,6 +40,10 @@ export async function GET(request: Request, context: RouteCtx) {
     }
 
     if (resource === "domains") {
+      if (id && action === "aggregate") {
+        return { aggregate: await getDomainAggregate(id) };
+      }
+
       if (id) {
         return {
           domain: await prisma.domain.findUnique({
@@ -110,11 +120,23 @@ export async function GET(request: Request, context: RouteCtx) {
       }
 
       const query = listQuerySchema.parse(Object.fromEntries(url.searchParams));
+      const starredParam = url.searchParams.get("starred");
+      const viewParam = url.searchParams.get("view");
       return {
         tasks: await prisma.task.findMany({
-          where: query.q
-            ? { title: { contains: query.q, mode: "insensitive" } }
-            : undefined,
+          where: {
+            ...(query.q
+              ? { title: { contains: query.q, mode: "insensitive" } }
+              : {}),
+            ...(starredParam === "1" || starredParam === "true"
+              ? { starred: true }
+              : {}),
+            ...(viewParam === "open"
+              ? { status: "open" as const }
+              : viewParam === "done"
+                ? { status: "completed" as const }
+                : {}),
+          },
           include: { area: true, project: true, subtasks: true },
           orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
           take: query.limit,
@@ -258,6 +280,96 @@ export async function GET(request: Request, context: RouteCtx) {
       };
     }
 
+    if (resource === "check-ins") {
+      const parentType = url.searchParams.get("parentType");
+      const parentId = url.searchParams.get("parentId");
+      return {
+        checkIns: await prisma.checkIn.findMany({
+          where: {
+            ...(parentType === "area" || parentType === "project"
+              ? { parentType }
+              : {}),
+            ...(parentId ? { parentId } : {}),
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        }),
+      };
+    }
+
+    if (resource === "journal-entries") {
+      const query = listQuerySchema.parse(Object.fromEntries(url.searchParams));
+      return {
+        journalEntries: await prisma.journalEntry.findMany({
+          where: query.q
+            ? { bodyMd: { contains: query.q, mode: "insensitive" } }
+            : undefined,
+          orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+          take: query.limit,
+          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        }),
+      };
+    }
+
+    if (resource === "resurfacing") {
+      return { item: await getDailyResurfacedItem() };
+    }
+
+    if (resource === "scheduled-reviews") {
+      const status = url.searchParams.get("status");
+      return {
+        reviews: await prisma.scheduledReview.findMany({
+          where:
+            status === "pending" ||
+            status === "surfaced" ||
+            status === "done" ||
+            status === "dismissed"
+              ? { status }
+              : undefined,
+          include: { capture: { select: { rawText: true } } },
+          orderBy: [{ reviewAt: "asc" }, { createdAt: "asc" }],
+          take: 100,
+        }),
+      };
+    }
+
+    if (resource === "routines") {
+      if (id && action === "completions") {
+        return {
+          completions: await prisma.routineCompletion.findMany({
+            where: { routineId: id },
+            orderBy: { completedAt: "desc" },
+            take: 100,
+          }),
+        };
+      }
+      return { routines: await getRoutinesWithState() };
+    }
+
+    if (resource === "people") {
+      if (id) {
+        return {
+          person: await prisma.person.findUnique({
+            where: { id },
+            include: {
+              facts: { orderBy: { createdAt: "desc" }, take: 100 },
+              interactions: { orderBy: { occurredAt: "desc" }, take: 100 },
+            },
+          }),
+        };
+      }
+      const query = listQuerySchema.parse(Object.fromEntries(url.searchParams));
+      return {
+        people: await prisma.person.findMany({
+          where: query.q
+            ? { name: { contains: query.q, mode: "insensitive" } }
+            : undefined,
+          orderBy: { name: "asc" },
+          take: query.limit,
+        }),
+      };
+    }
+
     return notFound();
   });
 }
@@ -279,6 +391,23 @@ export async function POST(request: Request, context: RouteCtx) {
           ...(parsed.deviceContext ?? {}),
         },
       });
+    }
+
+    if (resource === "tasks" && id && action === "star") {
+      const parsed = z
+        .object({ starred: z.boolean().default(true) })
+        .parse(body ?? {});
+      const task = await prisma.task.update({
+        where: { id },
+        data: { starred: parsed.starred },
+      });
+      await auditApiWrite(
+        apiKey,
+        parsed.starred ? "task_starred" : "task_unstarred",
+        parsed.starred ? "Task starred" : "Task unstarred",
+        { type: "task", id: task.id },
+      );
+      return { task };
     }
 
     if (resource === "tasks" && id && action === "complete") {
@@ -572,6 +701,252 @@ export async function POST(request: Request, context: RouteCtx) {
         id: event.id,
       });
       return { event };
+    }
+
+    if (resource === "check-ins" && id === "draft") {
+      const parsed = z
+        .object({
+          parentType: z.enum(["area", "project"]),
+          parentId: z.string().min(1),
+        })
+        .parse(body);
+      return draftCheckInFromActivity(parsed.parentType, parsed.parentId);
+    }
+
+    if (resource === "check-ins") {
+      const parsed = z
+        .object({
+          parentType: z.enum(["area", "project"]),
+          parentId: z.string().min(1),
+          bodyMd: z.string().min(1),
+        })
+        .parse(body);
+      const { checkIn } = await createCheckInRecord(
+        {
+          parentType: parsed.parentType,
+          parentId: parsed.parentId,
+          bodyMd: parsed.bodyMd,
+        },
+        { source: "api", label: apiKey.label },
+      );
+      return { checkIn };
+    }
+
+    if (resource === "journal-entries") {
+      const parsed = z
+        .object({
+          bodyMd: z.string().min(1),
+          entryDate: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          source: z.enum(["typed", "import"]).optional(),
+        })
+        .parse(body);
+      const entry = await prisma.journalEntry.create({
+        data: {
+          bodyMd: parsed.bodyMd,
+          entryDate:
+            parseDateOnly(parsed.entryDate) ??
+            new Date(`${localDateString()}T00:00:00.000Z`),
+          tags: parsed.tags ?? [],
+          source: parsed.source ?? "import",
+        },
+      });
+      await auditApiWrite(apiKey, "journal_entry_created", "Journal entry saved", {
+        type: "journal_entry",
+        id: entry.id,
+      });
+      return { journalEntry: entry };
+    }
+
+    if (
+      resource === "resurfacing" &&
+      id &&
+      (action === "boost" || action === "dismiss")
+    ) {
+      const seen = await prisma.resurfacingSeen.findUnique({ where: { id } });
+      if (!seen || seen.response !== null) {
+        return { updated: false };
+      }
+      if (action === "boost") {
+        await boostResurfaceWeight(seen.itemType, seen.itemId);
+      }
+      await prisma.resurfacingSeen.update({
+        where: { id },
+        data: { response: action === "boost" ? "kept" : "dismissed" },
+      });
+      await auditApiWrite(
+        apiKey,
+        action === "boost" ? "resurface_boosted" : "resurface_dismissed",
+        action === "boost"
+          ? "Resurfaced memory boosted"
+          : "Resurfaced memory dismissed",
+        { type: seen.itemType, id: seen.itemId },
+      );
+      return { updated: true };
+    }
+
+    if (resource === "scheduled-reviews" && id && action) {
+      const review = await prisma.scheduledReview.findUnique({
+        where: { id },
+        include: { capture: { select: { rawText: true } } },
+      });
+      if (!review || review.status === "done" || review.status === "dismissed") {
+        return { updated: false };
+      }
+
+      if (action === "done" || action === "dismiss") {
+        const status = action === "done" ? ("done" as const) : ("dismissed" as const);
+        await prisma.scheduledReview.update({ where: { id }, data: { status } });
+        await auditApiWrite(
+          apiKey,
+          status === "done" ? "review_done" : "review_dismissed",
+          status === "done" ? "Review done" : "Review dismissed",
+          { type: "scheduled_review", id: review.id },
+        );
+        return { updated: true };
+      }
+
+      if (action === "snooze") {
+        const parsed = z
+          .object({ reviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
+          .parse(body);
+        await prisma.scheduledReview.update({
+          where: { id },
+          data: { status: "pending", reviewAt: parseDateOnly(parsed.reviewAt) },
+        });
+        await auditApiWrite(apiKey, "review_snoozed", `Review snoozed to ${parsed.reviewAt}`, {
+          type: "scheduled_review",
+          id: review.id,
+        });
+        return { updated: true };
+      }
+    }
+
+    if (resource === "routines" && id && action === "complete") {
+      const result = await completeRoutineById(id, {
+        source: "api",
+        label: apiKey.label,
+      });
+      return { routine: result.routine, repeated: result.repeated };
+    }
+
+    if (resource === "routines") {
+      const parsed = z
+        .object({
+          name: z.string().min(1),
+          description: z.string().optional(),
+          areaId: z.string().optional(),
+          frequency: z.enum(["daily", "weekly", "custom"]).optional(),
+          days: z.array(z.string()).optional(),
+          timeWindow: z
+            .enum(["morning", "afternoon", "evening", "anytime"])
+            .optional(),
+          timesPerWeek: z.number().optional(),
+          graceDays: z.number().optional(),
+          temporary: z.boolean().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+        .parse(body);
+      const routine = await prisma.routine.create({
+        data: {
+          name: parsed.name,
+          description: parsed.description,
+          areaId: parsed.areaId,
+          schedule: {
+            frequency:
+              parsed.frequency ??
+              (parsed.days && parsed.days.length > 0 ? "custom" : "daily"),
+            days: parsed.days ?? [],
+            timeWindow: parsed.timeWindow ?? "anytime",
+          },
+          goal:
+            typeof parsed.timesPerWeek === "number"
+              ? { timesPerWeek: parsed.timesPerWeek }
+              : undefined,
+          graceWindow:
+            typeof parsed.graceDays === "number"
+              ? { days: parsed.graceDays }
+              : undefined,
+          temporary: parsed.temporary ?? false,
+          startDate: parseDateOnly(parsed.startDate),
+          endDate: parseDateOnly(parsed.endDate),
+        },
+      });
+      await auditApiWrite(apiKey, "routine_created", "Routine created", {
+        type: "routine",
+        id: routine.id,
+      });
+      return { routine };
+    }
+
+    if (resource === "people" && id && action === "facts") {
+      const parsed = z
+        .object({
+          factType: z.string().optional(),
+          factValue: z.string().min(1),
+          dateRelevant: z.string().optional(),
+          recurring: z.boolean().optional(),
+        })
+        .parse(body);
+      const fact = await prisma.personFact.create({
+        data: {
+          personId: id,
+          factType: parsed.factType ?? "note",
+          factValue: parsed.factValue,
+          dateRelevant: parseDateOnly(parsed.dateRelevant),
+          recurring: parsed.recurring ?? false,
+        },
+      });
+      await auditApiWrite(apiKey, "person_fact_created", "Fact saved", {
+        type: "person_fact",
+        id: fact.id,
+        personId: id,
+      });
+      return { fact };
+    }
+
+    if (resource === "people" && id && action === "interactions") {
+      const parsed = z
+        .object({
+          interactionType: z.string().optional(),
+          notes: z.string().optional(),
+          occurredAt: z.string().optional(),
+        })
+        .parse(body);
+      const interaction = await prisma.personInteraction.create({
+        data: {
+          personId: id,
+          interactionType: parsed.interactionType ?? "touchpoint",
+          notesMd: parsed.notes,
+          occurredAt: parsed.occurredAt ? new Date(parsed.occurredAt) : new Date(),
+          source: "manual",
+        },
+      });
+      await auditApiWrite(apiKey, "interaction_logged", "Interaction logged", {
+        type: "person_interaction",
+        id: interaction.id,
+        personId: id,
+      });
+      return { interaction };
+    }
+
+    if (resource === "people") {
+      const parsed = z
+        .object({
+          name: z.string().min(1),
+          relationshipType: z.string().optional(),
+          email: z.string().optional(),
+          phone: z.string().optional(),
+          company: z.string().optional(),
+          areaId: z.string().optional(),
+        })
+        .parse(body);
+      const person = await createPersonRecord(parsed, {
+        source: "api",
+        label: apiKey.label,
+      });
+      return { person };
     }
 
     return notFound();

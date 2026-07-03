@@ -3,10 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { updateDomainDescription } from "@/app/actions";
 import { SetupNotice } from "@/components/setup-notice";
-import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
-import { formatShortDate, localDateString } from "@/lib/dates";
-import { prisma } from "@/lib/db";
-import { projectLastActivityFact } from "@/lib/slippage";
+import { checkInSnippet } from "@/lib/checkins";
+import { formatShortDate } from "@/lib/dates";
+import { getDomainAggregate } from "@/lib/domains";
 
 export const dynamic = "force-dynamic";
 
@@ -160,95 +159,11 @@ export default async function DomainPage({ params }: DomainPageProps) {
 
 async function loadDomain(domainId: string) {
   try {
-    const domain = await prisma.domain.findUnique({
-      where: { id: domainId },
-    });
-    if (!domain) {
+    const aggregate = await getDomainAggregate(domainId);
+    if (!aggregate) {
       return { ok: true as const, domain: null };
     }
-
-    const todayStr = localDateString();
-    const todayDate = new Date(`${todayStr}T00:00:00.000Z`);
-
-    const [areas, projects, openTasks, dueToday] = await Promise.all([
-      prisma.area.findMany({
-        where: { domainId, status: { in: ["active", "parked"] } },
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        include: {
-          _count: {
-            select: { tasks: { where: { status: "open" } } },
-          },
-        },
-      }),
-      prisma.project.findMany({
-        where: {
-          status: "active",
-          area: { domainId },
-        },
-        include: {
-          activity: { orderBy: { createdAt: "desc" }, take: 1 },
-        },
-      }),
-      prisma.task.count({
-        where: { status: "open", area: { domainId } },
-      }),
-      prisma.task.count({
-        where: { status: "open", area: { domainId }, dueDate: { lte: todayDate } },
-      }),
-    ]);
-
-    const [areaCheckIns, projectCheckIns, taskActivity] = await Promise.all([
-      getLatestCheckIns("area", areas.map((area) => area.id)),
-      getLatestCheckIns("project", projects.map((project) => project.id)),
-      projects.length
-        ? prisma.task.groupBy({
-            by: ["projectId"],
-            where: { projectId: { in: projects.map((project) => project.id) } },
-            _max: { createdAt: true, completedAt: true, updatedAt: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    const lastTaskActivityByProject = new Map<string, Date>();
-    for (const group of taskActivity) {
-      if (!group.projectId) continue;
-      const latest = [
-        group._max.createdAt,
-        group._max.completedAt,
-        group._max.updatedAt,
-      ]
-        .filter((date): date is Date => Boolean(date))
-        .sort((a, b) => Number(b) - Number(a))[0];
-      if (latest) {
-        lastTaskActivityByProject.set(group.projectId, latest);
-      }
-    }
-
-    const slipping = projects.flatMap((project) => {
-      const dates = [
-        lastTaskActivityByProject.get(project.id),
-        project.activity[0]?.createdAt,
-        projectCheckIns.get(project.id)?.createdAt,
-      ].filter((date): date is Date => Boolean(date));
-      const lastActivity =
-        dates.sort((a, b) => Number(b) - Number(a))[0] ?? null;
-      const fact = projectLastActivityFact(project, lastActivity);
-      return fact ? [{ id: project.id, name: project.name, fact }] : [];
-    });
-
-    return {
-      ok: true as const,
-      domain,
-      areas: areas.map((area) => ({
-        id: area.id,
-        name: area.name,
-        status: area.status,
-        openTaskCount: area._count.tasks,
-        latestCheckIn: areaCheckIns.get(area.id) ?? null,
-      })),
-      projectFacts: { activeCount: projects.length, slipping },
-      taskPulse: { openTasks, dueToday },
-    };
+    return { ok: true as const, ...aggregate };
   } catch {
     return { ok: false as const };
   }
