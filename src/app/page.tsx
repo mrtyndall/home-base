@@ -74,6 +74,7 @@ export default async function TodayPage() {
               <SectionHeader icon={Clock3} title="Due Today" />
               <TaskDropZone
                 targetDate={data.today}
+                label="Today"
                 isEmpty={data.dueToday.length === 0}
                 emptyText="No tasks due today."
               >
@@ -108,6 +109,7 @@ export default async function TodayPage() {
                 ))}
                 <TaskDropZone
                   targetDate={data.tomorrow}
+                  label="Tomorrow"
                   isEmpty={data.dueTomorrow.length === 0}
                   emptyText={
                     data.tomorrowEvents.length === 0

@@ -5,18 +5,31 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  useEffect,
   useRef,
   useState,
   useTransition,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, GripVertical } from "lucide-react";
 
 let activeMouseDragTaskId: string | null = null;
+const dragStartEvent = "home-base-task-drag-start";
+const dragEndEvent = "home-base-task-drag-end";
+
+function announceTaskDragStart() {
+  window.dispatchEvent(new Event(dragStartEvent));
+}
+
+function announceTaskDragEnd() {
+  activeMouseDragTaskId = null;
+  window.dispatchEvent(new Event(dragEndEvent));
+}
 
 type TaskDropZoneProps = {
   targetDate: string | null;
+  label?: string;
   isEmpty: boolean;
   emptyText: string;
   children: ReactNode;
@@ -46,17 +59,34 @@ type DraggableTaskLinkProps = {
 
 export function TaskDropZone({
   targetDate,
+  label = "section",
   isEmpty,
   emptyText,
   children,
 }: TaskDropZoneProps) {
   const router = useRouter();
+  const [draggingTask, setDraggingTask] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
 
+  useEffect(() => {
+    const handleDragStart = () => setDraggingTask(true);
+    const handleDragEnd = () => {
+      setDraggingTask(false);
+      setIsActive(false);
+    };
+    window.addEventListener(dragStartEvent, handleDragStart);
+    window.addEventListener(dragEndEvent, handleDragEnd);
+    return () => {
+      window.removeEventListener(dragStartEvent, handleDragStart);
+      window.removeEventListener(dragEndEvent, handleDragEnd);
+    };
+  }, []);
+
   async function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    announceTaskDragEnd();
     setIsActive(false);
 
     const taskId =
@@ -76,7 +106,7 @@ export function TaskDropZone({
   async function handleMouseUp() {
     const taskId = activeMouseDragTaskId;
     if (!taskId) return;
-    activeMouseDragTaskId = null;
+    announceTaskDragEnd();
 
     setPending(true);
     try {
@@ -92,23 +122,41 @@ export function TaskDropZone({
       data-drop-date={targetDate ?? "none"}
       onMouseUp={handleMouseUp}
       onDragEnter={() => setIsActive(true)}
-      onDragLeave={() => setIsActive(false)}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsActive(false);
+        }
+      }}
       onDragOver={(event) => {
         event.preventDefault();
+        setIsActive(true);
         event.dataTransfer.dropEffect = "move";
       }}
       onDrop={handleDrop}
-      className={`min-h-20 space-y-2 rounded-lg transition ${
-        isActive ? "bg-teal-50 ring-2 ring-teal-300" : ""
-      }`}
+      className={`relative min-h-20 space-y-2 rounded-lg border border-transparent p-1 transition ${
+        draggingTask
+          ? "border-dashed border-teal-300 bg-teal-50/60 ring-1 ring-teal-200"
+          : ""
+      } ${isActive ? "border-teal-500 bg-teal-50 ring-2 ring-teal-300" : ""}`}
     >
-      {isEmpty ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          {pending ? "Updating date." : emptyText}
+      {draggingTask ? (
+        <div
+          className={`mb-2 rounded-md px-3 py-2 text-sm font-medium transition ${
+            isActive ? "bg-teal-700 text-white" : "bg-white/80 text-teal-800"
+          }`}
+        >
+          Move here: {label}
         </div>
-      ) : (
-        children
-      )}
+      ) : null}
+      <div className={`${draggingTask ? "space-y-2" : ""}`}>
+        {isEmpty ? (
+          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+            {pending ? "Updating date." : emptyText}
+          </div>
+        ) : (
+          children
+        )}
+      </div>
     </div>
   );
 }
@@ -131,10 +179,23 @@ export function DraggableTaskLink({
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const mouseStart = useRef<{ x: number; y: number } | null>(null);
   const pointerDragging = useRef(false);
+  const dragAnnounced = useRef(false);
   const suppressNextClick = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragPending, setDragPending] = useState(false);
   const [, startTransition] = useTransition();
+
+  function markDragStarted() {
+    if (dragAnnounced.current) return;
+    dragAnnounced.current = true;
+    announceTaskDragStart();
+  }
+
+  function markDragEnded() {
+    if (!dragAnnounced.current) return;
+    dragAnnounced.current = false;
+    announceTaskDragEnd();
+  }
 
   function clearLongPress() {
     if (longPressTimer.current) {
@@ -165,6 +226,7 @@ export function DraggableTaskLink({
       pointerDragging.current = true;
       suppressNextClick.current = true;
       clearLongPress();
+      markDragStarted();
     }
   }
 
@@ -184,6 +246,7 @@ export function DraggableTaskLink({
       ?.closest<HTMLElement>("[data-drop-date]");
     const targetDateValue = dropTarget?.dataset.dropDate;
     const targetDate = targetDateValue === "none" ? null : targetDateValue;
+    markDragEnded();
     if (targetDate === undefined) return;
 
     event.preventDefault();
@@ -212,6 +275,7 @@ export function DraggableTaskLink({
       activeMouseDragTaskId = taskId;
       suppressNextClick.current = true;
       clearLongPress();
+      markDragStarted();
     }
   }
 
@@ -219,7 +283,7 @@ export function DraggableTaskLink({
     mouseStart.current = null;
     window.setTimeout(() => {
       if (activeMouseDragTaskId === taskId) {
-        activeMouseDragTaskId = null;
+        markDragEnded();
       }
     }, 0);
   }
@@ -229,10 +293,12 @@ export function DraggableTaskLink({
       data-task-id={taskId}
       draggable
       onDragStart={(event) => {
+        markDragStarted();
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("application/x-home-base-task-id", taskId);
         event.dataTransfer.setData("text/plain", taskId);
       }}
+      onDragEnd={markDragEnded}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -240,10 +306,15 @@ export function DraggableTaskLink({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      className={`-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-md p-1 transition hover:bg-stone-50 ${
+      className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-md p-1 transition active:cursor-grabbing hover:bg-stone-50 ${
         dragPending ? "opacity-60" : ""
       }`}
     >
+      <GripVertical
+        aria-hidden="true"
+        className="mt-0.5 hidden shrink-0 text-stone-300 sm:block"
+        size={16}
+      />
       <Link
         href={href}
         onClickCapture={(event) => {
@@ -352,14 +423,15 @@ function ScheduleMenu({
     <div className="relative shrink-0">
       <button
         type="button"
-        title="Schedule task"
+        title="Move, schedule, or assign task"
         onClick={() => setOpen(!open)}
-        className="grid h-8 w-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
       >
         <CalendarDays size={15} />
+        Move
       </button>
       {open ? (
-        <div className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-stone-200 bg-white p-2 text-sm shadow-lg">
+        <div className="absolute right-0 top-10 z-30 w-52 rounded-lg border border-stone-200 bg-white p-2 text-sm shadow-lg">
           <MenuButton disabled={pending} onClick={() => schedule(today)}>
             Today
           </MenuButton>

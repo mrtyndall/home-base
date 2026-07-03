@@ -220,6 +220,7 @@ function TaskSection({
       </h2>
       <TaskDropZone
         targetDate={targetDate}
+        label={title}
         isEmpty={tasks.length === 0}
         emptyText={empty}
       >
@@ -272,6 +273,7 @@ function UpcomingSection({
               </h3>
               <TaskDropZone
                 targetDate={group.date}
+                label={formatDateOnly(group.date)}
                 isEmpty={group.tasks.length === 0}
                 emptyText={`No tasks on ${formatDateOnly(group.date)}.`}
               >
