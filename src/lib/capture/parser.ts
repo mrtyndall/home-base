@@ -229,7 +229,11 @@ function fallbackParse(rawText: string): ParserAction[] {
     return [{ type: "create_reference", body: referenceMatch[2].trim() }];
   }
 
-  const starMatch = trimmed.match(/^(un)?star\s+(?:the\s+)?(.+?)(?:\s+task)?$/i);
+  // Require "the/my" or a "... task" suffix so prose like "star gazing
+  // would be lovely" is not coerced into a star_task action.
+  const starMatch =
+    trimmed.match(/^(un)?star\s+(?:the|my)\s+(.+?)(?:\s+task)?$/i) ??
+    trimmed.match(/^(un)?star\s+(.+?)\s+task$/i);
   if (starMatch?.[2]) {
     return [
       {

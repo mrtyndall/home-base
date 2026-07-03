@@ -177,6 +177,7 @@ type ProjectListItem = Project & {
   tasks: Array<Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">>;
   activity: Array<Pick<ProjectActivity, "createdAt">>;
   notes: Array<Pick<EntityNote, "bodyMd" | "createdAt">>;
+  lastTaskActivity: Date | null;
 };
 
 function getNextDatedTask(project: ProjectListItem) {
@@ -188,10 +189,7 @@ function getNextDatedTask(project: ProjectListItem) {
 
 function getLastTouched(project: ProjectListItem) {
   const dates = [
-    ...project.tasks
-      .map((task) => task.completedAt)
-      .filter((date): date is Date => Boolean(date)),
-    ...project.tasks.map((task) => task.createdAt),
+    ...(project.lastTaskActivity ? [project.lastTaskActivity] : []),
     ...project.activity.map((entry) => entry.createdAt),
     ...project.notes.map((note) => note.createdAt),
   ];
@@ -244,25 +242,47 @@ async function loadProjects() {
       take: 80,
     });
 
-    const notes = projects.length
-      ? await prisma.entityNote.findMany({
-          where: {
-            parentType: "project",
-            parentId: { in: projects.map((project) => project.id) },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 160,
-        })
-      : [];
+    const [notes, taskActivity] = projects.length
+      ? await Promise.all([
+          prisma.entityNote.findMany({
+            where: {
+              parentType: "project",
+              parentId: { in: projects.map((project) => project.id) },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 160,
+          }),
+          prisma.task.groupBy({
+            by: ["projectId"],
+            where: { projectId: { in: projects.map((project) => project.id) } },
+            _max: { createdAt: true, completedAt: true, updatedAt: true },
+          }),
+        ])
+      : [[], []];
     const notesByProject = new Map<string, EntityNote[]>();
     for (const note of notes) {
       const group = notesByProject.get(note.parentId) ?? [];
       group.push(note);
       notesByProject.set(note.parentId, group);
     }
+    const lastTaskActivityByProject = new Map<string, Date>();
+    for (const group of taskActivity) {
+      if (!group.projectId) continue;
+      const latest = [
+        group._max.createdAt,
+        group._max.completedAt,
+        group._max.updatedAt,
+      ]
+        .filter((date): date is Date => Boolean(date))
+        .sort((a, b) => Number(b) - Number(a))[0];
+      if (latest) {
+        lastTaskActivityByProject.set(group.projectId, latest);
+      }
+    }
     const projectsWithNotes = projects.map((project) => ({
       ...project,
       notes: notesByProject.get(project.id) ?? [],
+      lastTaskActivity: lastTaskActivityByProject.get(project.id) ?? null,
     }));
 
     return { ok: true as const, projects: projectsWithNotes };

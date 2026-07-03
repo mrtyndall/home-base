@@ -45,7 +45,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { tasks, doneTasks, projects, domains } = result;
+  const { tasks, doneTasks, openCount, doneCount, projects, domains } = result;
   const slipDays = await getTaskSlipDays();
   const selectedDomainIds = normalizeFilterValues(
     domain,
@@ -61,6 +61,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
   const selectedSection = normalizeTaskSection(section);
   const starredOnly = normalizeStarredFilter(starred);
+  const filtersActive =
+    selectedDomainIds.length > 0 || selectedProjectIds.length > 0 || starredOnly;
   const visibleTasks = tasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
@@ -160,10 +162,14 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           areaGroups={areaGroups}
           projects={projectOptions}
           slipDays={slipDays}
+          totalCount={filtersActive ? null : openCount}
         />
       ) : null}
       {(selectedView === "done" || selectedView === "all") ? (
-        <DoneSection tasks={visibleDoneTasks} />
+        <DoneSection
+          tasks={visibleDoneTasks}
+          totalCount={filtersActive ? null : doneCount}
+        />
       ) : null}
       {selectedView === "schedule" &&
       (selectedSection === "all" || selectedSection === "today") ? (
@@ -700,6 +706,7 @@ function AllOpenSection({
   areaGroups,
   projects,
   slipDays,
+  totalCount,
 }: {
   tasks: TaskListItem[];
   today: string;
@@ -707,12 +714,15 @@ function AllOpenSection({
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
   slipDays: number;
+  totalCount: number | null;
 }) {
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-stone-800">
         All Open{" "}
-        <span className="font-normal text-stone-500">{tasks.length}</span>
+        <span className="font-normal text-stone-500">
+          {totalCount ?? tasks.length}
+        </span>
       </h2>
       {tasks.length === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
@@ -731,17 +741,32 @@ function AllOpenSection({
               slipDays={slipDays}
             />
           ))}
+          {totalCount !== null && totalCount > tasks.length ? (
+            <p className="text-sm text-stone-500">
+              Showing the first {tasks.length} of {totalCount} open tasks.
+              Search finds every task.
+            </p>
+          ) : null}
         </div>
       )}
     </section>
   );
 }
 
-function DoneSection({ tasks }: { tasks: DoneTaskItem[] }) {
+function DoneSection({
+  tasks,
+  totalCount,
+}: {
+  tasks: DoneTaskItem[];
+  totalCount: number | null;
+}) {
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-stone-800">
-        Done <span className="font-normal text-stone-500">{tasks.length}</span>
+        Done{" "}
+        <span className="font-normal text-stone-500">
+          {totalCount ?? tasks.length}
+        </span>
       </h2>
       {tasks.length === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
@@ -776,6 +801,12 @@ function DoneSection({ tasks }: { tasks: DoneTaskItem[] }) {
               </Link>
             </article>
           ))}
+          {totalCount !== null && totalCount > tasks.length ? (
+            <p className="text-sm text-stone-500">
+              Showing the most recent {tasks.length} of {totalCount} completed
+              tasks. Search finds every task.
+            </p>
+          ) : null}
         </div>
       )}
     </section>
@@ -953,11 +984,17 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
 
 async function loadTasks(view: TaskViewFilter) {
   try {
-    const [tasks, doneTasks, projects, domains] = await Promise.all([
+    const [tasks, doneTasks, openCount, doneCount, projects, domains] = await Promise.all([
       view === "done"
         ? Promise.resolve([] as TaskListItem[])
         : prisma.task.findMany({
-            where: { status: "open", parentTaskId: null },
+            where: {
+              status: "open",
+              OR: [
+                { parentTaskId: null },
+                { parent: { status: { not: "open" } } },
+              ],
+            },
             include: {
               area: { include: { domain: true } },
               project: true,
@@ -981,6 +1018,20 @@ async function loadTasks(view: TaskViewFilter) {
             take: 100,
           })
         : Promise.resolve([] as DoneTaskItem[]),
+      view === "open" || view === "all"
+        ? prisma.task.count({
+            where: {
+              status: "open",
+              OR: [
+                { parentTaskId: null },
+                { parent: { status: { not: "open" } } },
+              ],
+            },
+          })
+        : Promise.resolve(0),
+      view === "done" || view === "all"
+        ? prisma.task.count({ where: { status: "completed" } })
+        : Promise.resolve(0),
       prisma.project.findMany({
         where: { status: { in: ["active", "parked", "someday"] } },
         include: { area: { include: { domain: true } } },
@@ -1000,7 +1051,7 @@ async function loadTasks(view: TaskViewFilter) {
       }),
     ]);
 
-    return { ok: true as const, tasks, doneTasks, projects, domains };
+    return { ok: true as const, tasks, doneTasks, openCount, doneCount, projects, domains };
   } catch {
     return { ok: false as const };
   }
