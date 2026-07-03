@@ -38,6 +38,7 @@ Use these action types:
 - check_in
 - journal
 - boost_resurface
+- schedule_review
 - create_idea
 - append_to_idea
 - convert_idea
@@ -61,6 +62,7 @@ Rules:
 - Status narration on a known project or area ("check in on X: ...", "quick update on X: ...", progress reports) uses check_in with body_md and area_match or project_match. Check-ins are the living record of where things stand.
 - "journal: ..." and reflective first-person narration about the day or Matt's state of mind ("today was...", "feeling like...", "grateful that...") use journal with body_md. entry_date defaults to today; set it only when the text names a different day.
 - Requests to see a memory or idea more often ("boost the podcast intro idea", "keep that one coming back") use boost_resurface with item_match.
+- Future-facing intent that is not a datable task ("circle back after the shoot", "revisit this once the trailer sells", "revisit the insurance quote in two weeks") emits schedule_review with review_at (ISO date) when the time resolves, else review_condition_text with the condition. Emit it alongside whatever action stores the content itself; if nothing else fits, schedule_review alone is fine — the raw capture is kept.
 - Work narration on a known project or area that is not a status update creates project activity/update or an entity note.
 - If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
 - If unparseable, return { "error": "..." } and create no entity.
@@ -179,6 +181,13 @@ function fallbackParse(rawText: string): ParserAction[] {
   const projectMatch = trimmed.match(/^project\s*[:,-]\s*(.+)$/i);
   if (projectMatch?.[1]) {
     return [{ type: "create_project", name: projectMatch[1].trim() }];
+  }
+
+  const revisitMatch = trimmed.match(/^(?:revisit|circle back on)\s+.+$/i);
+  if (revisitMatch) {
+    return [
+      { type: "schedule_review", review_condition_text: trimmed },
+    ];
   }
 
   const boostMatch = trimmed.match(/^boost\s+(?:the\s+)?(.+)$/i);

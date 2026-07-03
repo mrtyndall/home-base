@@ -110,6 +110,14 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+// review_at or review_condition_text must be present; enforced at
+// execution (discriminated unions require plain object schemas).
+const scheduleReviewAction = z.object({
+  type: z.literal("schedule_review"),
+  review_at: z.string().optional(),
+  review_condition_text: z.string().optional(),
+});
+
 const boostResurfaceAction = z.object({
   type: z.literal("boost_resurface"),
   item_match: z.string().min(1),
@@ -162,6 +170,7 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   createReferenceAction,
   journalAction,
   boostResurfaceAction,
+  scheduleReviewAction,
   checkInAction,
   createEntityNoteAction,
   createEntityDocAction,
@@ -203,6 +212,7 @@ export type CreatedItemRef = {
     | "entity_doc"
     | "check_in"
     | "journal_entry"
+    | "scheduled_review"
     | "notification";
   id: string;
   label: string;

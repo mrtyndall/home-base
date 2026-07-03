@@ -306,6 +306,9 @@ async function executeActions(
       case "journal":
         createdItems.push(await executeJournal(action, context));
         break;
+      case "schedule_review":
+        createdItems.push(await executeScheduleReview(action, context));
+        break;
       case "boost_resurface": {
         const boosted = await boostResurfaceByMatch(action.item_match);
         if (!boosted) {
@@ -929,6 +932,33 @@ async function matchProject(projectMatch: string) {
   });
 
   return project;
+}
+
+async function executeScheduleReview(
+  action: Extract<ExecutableAction, { type: "schedule_review" }>,
+  context: ExecutionContext,
+) {
+  const reviewAt = parseDateOnly(action.review_at);
+  const conditionText = action.review_condition_text?.trim() || undefined;
+  if (!reviewAt && !conditionText) {
+    throw new Error("schedule_review needs a date or a condition.");
+  }
+
+  const review = await prisma.scheduledReview.create({
+    data: {
+      captureId: context.captureId,
+      reviewAt,
+      conditionText,
+    },
+  });
+
+  return {
+    type: "scheduled_review" as const,
+    id: review.id,
+    label: reviewAt
+      ? `Review scheduled for ${reviewAt.toISOString().slice(0, 10)}`
+      : `Review scheduled (when: ${conditionText})`,
+  };
 }
 
 async function executeJournal(

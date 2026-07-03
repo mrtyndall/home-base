@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Area, Capture, Domain } from "@prisma/client";
+import type { Area, Capture, Domain, ScheduledReview } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Ellipsis } from "lucide-react";
@@ -9,11 +9,17 @@ import {
   retireAreaById,
   unparkAreaById,
 } from "@/app/actions";
+import { dismissReview, markReviewDone, snoozeReview } from "@/app/review-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { CheckInFeed } from "@/components/check-in-feed";
 import { EntityDepth } from "@/components/entity-depth";
 import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
-import { formatShortDate } from "@/lib/dates";
+import {
+  dateOnlyFromString,
+  formatDateOnly,
+  formatShortDate,
+  localDateString,
+} from "@/lib/dates";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +43,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
     notFound();
   }
 
-  const { area, pendingCaptures, domains } = result;
+  const { area, pendingCaptures, reviews, domains } = result;
 
   return (
     <div className="space-y-5">
@@ -71,6 +77,10 @@ export default async function AreaPage({ params }: AreaPageProps) {
         parentId={area.id}
         checkIns={area.checkIns}
       />
+
+      {area.id === "area_inbox" ? (
+        <NeedsReviewPanel reviews={reviews} domains={domains} />
+      ) : null}
 
       {area.id === "area_inbox" ? (
         <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
@@ -128,6 +138,113 @@ export default async function AreaPage({ params }: AreaPageProps) {
         attachments={area.attachments}
       />
     </div>
+  );
+}
+
+type ReviewRow = ScheduledReview & { capture: Pick<Capture, "rawText"> };
+
+function NeedsReviewPanel({
+  reviews,
+  domains,
+}: {
+  reviews: ReviewRow[];
+  domains: Array<Domain & { areas: Area[] }>;
+}) {
+  if (reviews.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">Needs review</h2>
+      <div className="space-y-3">
+        {reviews.map((review) => (
+          <div
+            key={review.id}
+            className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+          >
+            <p className="max-h-48 overflow-y-auto rounded-md border border-stone-100 bg-stone-50 p-3 text-sm leading-6 text-stone-800">
+              {review.capture.rawText}
+            </p>
+            <p className="mt-2 text-xs text-stone-500">
+              {review.reviewAt
+                ? `Review date ${formatDateOnly(review.reviewAt)}`
+                : `Waiting: ${review.conditionText}`}
+            </p>
+            <div className="mt-3 flex flex-col gap-3 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <form
+                action={convertPendingCapture}
+                className="flex min-w-0 flex-wrap items-center gap-2"
+              >
+                <input type="hidden" name="captureId" value={review.captureId} />
+                <input type="hidden" name="reviewId" value={review.id} />
+                <label className="flex min-w-0 items-center gap-2 text-sm text-stone-600">
+                  <span className="shrink-0 font-medium text-stone-700">
+                    Area
+                  </span>
+                  <select
+                    name="areaId"
+                    defaultValue="area_inbox"
+                    className="h-9 min-w-0 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  >
+                    {domains.map((domain) => (
+                      <optgroup key={domain.id} label={domain.name}>
+                        {domain.areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+                <ConvertButton value="task" label="Task" />
+                <ConvertButton value="idea" label="Idea" />
+                <ConvertButton value="note" label="Note" />
+                <ConvertButton value="reference" label="Reference" />
+              </form>
+              <form action={snoozeReview} className="flex items-center gap-2">
+                <input type="hidden" name="reviewId" value={review.id} />
+                <label className="sr-only" htmlFor={`snooze-${review.id}`}>
+                  Snooze until
+                </label>
+                <input
+                  id={`snooze-${review.id}`}
+                  type="date"
+                  name="snoozeUntil"
+                  required
+                  className="h-9 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                />
+                <button
+                  type="submit"
+                  className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+                >
+                  Snooze
+                </button>
+              </form>
+              <form action={markReviewDone}>
+                <input type="hidden" name="reviewId" value={review.id} />
+                <button
+                  type="submit"
+                  className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+                >
+                  Done
+                </button>
+              </form>
+              <form action={dismissReview}>
+                <input type="hidden" name="reviewId" value={review.id} />
+                <button
+                  type="submit"
+                  className="h-9 rounded-md px-3 text-sm font-medium text-stone-600 transition hover:text-stone-950"
+                >
+                  Dismiss
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -322,7 +439,8 @@ async function loadArea(areaId: string) {
       }),
     ]);
 
-    const [notes, docs, attachments, checkIns, latestProjectCheckIns, pendingCaptures] = area
+    const today = dateOnlyFromString(localDateString());
+    const [notes, docs, attachments, checkIns, latestProjectCheckIns, pendingCaptures, reviews] = area
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
@@ -357,8 +475,22 @@ async function loadArea(areaId: string) {
                 take: 20,
               })
             : Promise.resolve([]),
+          area.id === "area_inbox"
+            ? prisma.scheduledReview.findMany({
+                where: {
+                  OR: [
+                    { status: "surfaced" },
+                    { status: "pending", reviewAt: { lte: today } },
+                    { status: "pending", reviewAt: null },
+                  ],
+                },
+                include: { capture: { select: { rawText: true } } },
+                orderBy: [{ reviewAt: "asc" }, { createdAt: "asc" }],
+                take: 30,
+              })
+            : Promise.resolve([]),
         ])
-      : [[], [], [], [], new Map<string, { bodyMd: string; createdAt: Date }>(), []];
+      : [[], [], [], [], new Map<string, { bodyMd: string; createdAt: Date }>(), [], []];
 
     return {
       ok: true as const,
@@ -376,6 +508,7 @@ async function loadArea(areaId: string) {
           }
         : null,
       pendingCaptures,
+      reviews,
       domains,
     };
   } catch {

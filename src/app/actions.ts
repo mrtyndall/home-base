@@ -553,6 +553,7 @@ export async function convertPendingCapture(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
   const areaId = getTrimmedString(formData, "areaId");
   const targetType = getTrimmedString(formData, "targetType");
+  const reviewId = getTrimmedString(formData, "reviewId");
   if (
     !captureId ||
     !areaId ||
@@ -649,6 +650,32 @@ export async function convertPendingCapture(formData: FormData) {
       },
     },
   });
+
+  // Converting from a "Needs review" row settles the review too.
+  if (reviewId) {
+    const review = await prisma.scheduledReview.findUnique({
+      where: { id: reviewId },
+      select: { id: true, status: true },
+    });
+    if (review && review.status !== "done" && review.status !== "dismissed") {
+      await prisma.scheduledReview.update({
+        where: { id: review.id },
+        data: { status: "done" },
+      });
+      await prisma.notification.create({
+        data: {
+          type: "review_done",
+          title: "Review converted",
+          body: item.label,
+          sourceRef: {
+            type: "scheduled_review",
+            id: review.id,
+            source: "manual",
+          },
+        },
+      });
+    }
+  }
 
   revalidatePath("/");
   revalidatePath("/today");

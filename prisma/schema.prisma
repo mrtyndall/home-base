@@ -115,6 +115,13 @@ enum ResurfaceResponse {
   annotated
 }
 
+enum ScheduledReviewStatus {
+  pending
+  surfaced
+  done
+  dismissed
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -138,6 +145,7 @@ model Capture {
   calendarEvents  CalendarEvent[]
   checkIns        CheckIn[]
   journalEntries  JournalEntry[]
+  scheduledReviews ScheduledReview[]
   entityDocs      EntityDoc[]
   entityNotes     EntityNote[]
   ideaNotes       IdeaNote[]
@@ -350,6 +358,21 @@ model EntityNote {
   @@index([parentType, parentId, createdAt])
   @@index([captureId])
   @@map("entity_notes")
+}
+
+model ScheduledReview {
+  id            String                @id @default(uuid())
+  captureId     String                @map("capture_id")
+  reviewAt      DateTime?             @map("review_at") @db.Date
+  conditionText String?               @map("condition_text")
+  status        ScheduledReviewStatus @default(pending)
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  capture Capture @relation(fields: [captureId], references: [id])
+
+  @@index([status, reviewAt])
+  @@index([captureId])
+  @@map("scheduled_reviews")
 }
 
 model ResurfacingSeen {
