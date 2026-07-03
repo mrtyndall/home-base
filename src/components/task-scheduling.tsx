@@ -18,8 +18,13 @@ let activeMouseDragTaskId: string | null = null;
 const dragStartEvent = "home-base-task-drag-start";
 const dragEndEvent = "home-base-task-drag-end";
 
-function announceTaskDragStart() {
-  window.dispatchEvent(new Event(dragStartEvent));
+type TaskDragPreview = {
+  title: string;
+  detail: string;
+};
+
+function announceTaskDragStart(preview: TaskDragPreview) {
+  window.dispatchEvent(new CustomEvent(dragStartEvent, { detail: preview }));
 }
 
 function announceTaskDragEnd() {
@@ -67,14 +72,21 @@ export function TaskDropZone({
   const router = useRouter();
   const [draggingTask, setDraggingTask] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [preview, setPreview] = useState<TaskDragPreview | null>(null);
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
-    const handleDragStart = () => setDraggingTask(true);
+    const handleDragStart = (event: Event) => {
+      setDraggingTask(true);
+      setPreview(
+        event instanceof CustomEvent ? (event.detail as TaskDragPreview) : null,
+      );
+    };
     const handleDragEnd = () => {
       setDraggingTask(false);
       setIsActive(false);
+      setPreview(null);
     };
     window.addEventListener(dragStartEvent, handleDragStart);
     window.addEventListener(dragEndEvent, handleDragEnd);
@@ -148,6 +160,12 @@ export function TaskDropZone({
           Move here: {label}
         </div>
       ) : null}
+      {draggingTask && isActive && preview ? (
+        <div className="mb-2 rounded-lg border border-teal-400 bg-white p-4 shadow-md ring-2 ring-teal-200">
+          <h3 className="font-medium text-stone-950">{preview.title}</h3>
+          <p className="mt-1 text-sm text-stone-500">{preview.detail}</p>
+        </div>
+      ) : null}
       <div className={`${draggingTask ? "space-y-2" : ""}`}>
         {isEmpty ? (
           <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
@@ -188,7 +206,7 @@ export function DraggableTaskLink({
   function markDragStarted() {
     if (dragAnnounced.current) return;
     dragAnnounced.current = true;
-    announceTaskDragStart();
+    announceTaskDragStart({ title, detail });
   }
 
   function markDragEnded() {

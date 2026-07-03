@@ -149,6 +149,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Made the Home recent capture surface actionable: pending captures route to Inbox sorting, filed captures route to the created item or Search.
 - Added a project timeframe control that makes target date/open-ended status more prominent than manual state.
 - Expanded docs creation into an in-page markdown editor/import surface with `.md` upload support.
+- Added task drag hover previews so destination sections show the moving task card before drop.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.
