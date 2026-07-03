@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Home Base
 
-## Getting Started
+Personal operations system for tasks, calendar, projects, ideas, captures, and search.
 
-First, run the development server:
+Home Base is currently running locally while the core trust loop is built and tested. Railway remains the likely later deployment target, but local is the active mode for now.
+
+## Local Runtime
+
+- App: Next.js 16 App Router
+- Database: Homebrew PostgreSQL database `home_base`
+- Local env: `.env.local`
+- Dev server: user LaunchAgent `com.mrtyndall.home-base-dev`
+- Local URL: `http://127.0.0.1:3002`
+- Tailnet URL: `https://mac-studio.tail3baa7a.ts.net/`
+
+## Common Commands
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run build
+npm run db:deploy
+npm run db:seed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Restart the local app server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+launchctl kickstart -k gui/501/com.mrtyndall.home-base-dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Check Tailscale Serve:
 
-## Learn More
+```bash
+tailscale serve status
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Database
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Local database URL:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+postgresql://matt@localhost:5432/home_base
+```
 
-## Deploy on Vercel
+The app expects this in `.env.local` as `DATABASE_URL`. Real deployment credentials should stay out of the repo and live in 1Password/environment variables.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scope
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Read [SCOPE.md](./SCOPE.md) first. The capture ledger and data-integrity rules are product requirements, not implementation preferences.

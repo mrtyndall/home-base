@@ -15,6 +15,8 @@ These are the initial build defaults from SCOPE.md Section 16. They are written 
 ## Architecture Decisions
 
 - Use a single Next.js App Router codebase with route handlers instead of a separate Fastify/Hono backend. This matches Production Hub's deployment shape and keeps Railway operations simple.
-- Use PostgreSQL on Railway with Prisma 7 and the `@prisma/adapter-pg` adapter.
+- Current operating mode is local-first: Homebrew PostgreSQL, local `.env.local`, a user LaunchAgent running `npm run dev -- --port 3002`, and Tailscale Serve for remote access.
+- Railway remains the expected later hosting target, but deployment work is paused until the local core loop earns trust.
+- Use PostgreSQL with Prisma 7 and the `@prisma/adapter-pg` adapter.
 - Keep the capture ledger as the first persistence step for every capture request. Parser failure must not roll back the raw capture row.
 - Use S3-compatible backups through `scripts/backup-database.ts`, with Cloudflare R2 as the expected off-Railway target.
