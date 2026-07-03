@@ -7,6 +7,7 @@ import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
 import { buildProjectFilterGroups } from "@/lib/task-filter-options";
+import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
 
 export const dynamic = "force-dynamic";
 
@@ -141,23 +142,35 @@ function SectionJumps({
   somedayCount: number;
   unscheduledCount: number;
 }) {
-  const links = [
-    ["#today", "Today", todayCount],
-    ["#tomorrow", "Tomorrow", tomorrowCount],
-    ["#upcoming", "Upcoming", upcomingCount],
-    ["#someday", "Someday", somedayCount],
-    ["#unscheduled", "Unscheduled", unscheduledCount],
-  ] as const;
+  const links = buildTaskSectionJumps({
+    todayCount,
+    tomorrowCount,
+    upcomingCount,
+    somedayCount,
+    unscheduledCount,
+  });
 
   return (
-    <nav className="flex flex-wrap gap-2">
-      {links.map(([href, label, count]) => (
+    <nav
+      aria-label="Task sections"
+      className="grid gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-5"
+    >
+      {links.map(({ href, label, count, hasItems }) => (
         <a
           key={href}
           href={href}
-          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:border-stone-400"
+          className={`rounded-lg border px-3 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-teal-100 ${
+            hasItems
+              ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm hover:border-teal-700"
+              : "border-stone-200 bg-stone-50/70 text-stone-500 hover:border-stone-300 hover:bg-white"
+          }`}
         >
-          {label} {count}
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
+            {label}
+          </span>
+          <span className="mt-1 block text-xl font-semibold tabular-nums leading-none">
+            {count}
+          </span>
         </a>
       ))}
     </nav>
