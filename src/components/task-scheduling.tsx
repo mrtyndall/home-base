@@ -28,6 +28,18 @@ type DraggableTaskLinkProps = {
   title: string;
   detail: string;
   currentDueDate: string | null;
+  currentAreaId?: string;
+  currentProjectId?: string | null;
+  areaGroups?: Array<{
+    domainName: string;
+    areas: Array<{ id: string; name: string }>;
+  }>;
+  projects?: Array<{
+    id: string;
+    name: string;
+    areaId: string;
+    areaName: string;
+  }>;
   today: string;
   tomorrow: string;
 };
@@ -107,6 +119,10 @@ export function DraggableTaskLink({
   title,
   detail,
   currentDueDate,
+  currentAreaId = "area_inbox",
+  currentProjectId = null,
+  areaGroups = [],
+  projects = [],
   today,
   tomorrow,
 }: DraggableTaskLinkProps) {
@@ -244,6 +260,10 @@ export function DraggableTaskLink({
       <ScheduleMenu
         taskId={taskId}
         currentDueDate={currentDueDate}
+        currentAreaId={currentAreaId}
+        currentProjectId={currentProjectId}
+        areaGroups={areaGroups}
+        projects={projects}
         today={today}
         tomorrow={tomorrow}
         open={menuOpen}
@@ -256,6 +276,10 @@ export function DraggableTaskLink({
 function ScheduleMenu({
   taskId,
   currentDueDate,
+  currentAreaId,
+  currentProjectId,
+  areaGroups,
+  projects,
   today,
   tomorrow,
   open,
@@ -263,6 +287,10 @@ function ScheduleMenu({
 }: {
   taskId: string;
   currentDueDate: string | null;
+  currentAreaId: string;
+  currentProjectId: string | null;
+  areaGroups: NonNullable<DraggableTaskLinkProps["areaGroups"]>;
+  projects: NonNullable<DraggableTaskLinkProps["projects"]>;
   today: string;
   tomorrow: string;
   open: boolean;
@@ -270,9 +298,15 @@ function ScheduleMenu({
 }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [selectedAreaId, setSelectedAreaId] = useState(currentAreaId);
+  const [selectedProjectId, setSelectedProjectId] = useState(currentProjectId ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [, startTransition] = useTransition();
+  const filteredProjects = selectedAreaId
+    ? projects.filter((project) => project.areaId === selectedAreaId)
+    : projects;
 
   async function schedule(dueDate: string | null) {
     if (dueDate === currentDueDate) {
@@ -286,9 +320,29 @@ function ScheduleMenu({
       await updateTaskSchedule(taskId, { dueDate });
       setOpen(false);
       setPicking(false);
+      setAssigning(false);
       startTransition(() => router.refresh());
     } catch {
       setError("Date was not updated.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function assign() {
+    setPending(true);
+    setError("");
+    try {
+      await updateTaskAssignment(taskId, {
+        areaId: selectedAreaId,
+        projectId: selectedProjectId || null,
+      });
+      setOpen(false);
+      setPicking(false);
+      setAssigning(false);
+      startTransition(() => router.refresh());
+    } catch {
+      setError("Assignment was not updated.");
     } finally {
       setPending(false);
     }
@@ -338,6 +392,7 @@ function ScheduleMenu({
                 await updateTaskSchedule(taskId, { someday: true });
                 setOpen(false);
                 setPicking(false);
+                setAssigning(false);
                 startTransition(() => router.refresh());
               } catch {
                 setError("Task was not updated.");
@@ -348,6 +403,55 @@ function ScheduleMenu({
           >
             Someday
           </MenuButton>
+          {areaGroups.length > 0 ? (
+            <MenuButton disabled={pending} onClick={() => setAssigning(!assigning)}>
+              Assign
+            </MenuButton>
+          ) : null}
+          {assigning ? (
+            <div className="space-y-2 border-t border-stone-100 px-2 pt-2">
+              <select
+                value={selectedAreaId}
+                onChange={(event) => {
+                  setSelectedAreaId(event.target.value);
+                  setSelectedProjectId("");
+                }}
+                className="h-9 w-full rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              >
+                {areaGroups.map((group) => (
+                  <optgroup key={group.domainName} label={group.domainName}>
+                    {group.areas.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              {projects.length > 0 ? (
+                <select
+                  value={selectedProjectId}
+                  onChange={(event) => setSelectedProjectId(event.target.value)}
+                  className="h-9 w-full rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                >
+                  <option value="">No project</option>
+                  {filteredProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name} / {project.areaName}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={assign}
+                className="h-9 w-full rounded-md bg-teal-700 px-2 text-left text-sm font-medium text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+              >
+                Save assignment
+              </button>
+            </div>
+          ) : null}
           {error ? <p className="px-2 py-1 text-xs text-stone-600">{error}</p> : null}
         </div>
       ) : null}
@@ -388,5 +492,20 @@ async function updateTaskSchedule(
 
   if (!response.ok) {
     throw new Error("Task date update failed.");
+  }
+}
+
+async function updateTaskAssignment(
+  taskId: string,
+  body: { areaId: string; projectId?: string | null },
+) {
+  const response = await fetch(`/api/tasks/${taskId}/assignment`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error("Task assignment update failed.");
   }
 }

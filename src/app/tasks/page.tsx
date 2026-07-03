@@ -1,7 +1,5 @@
 import type { Area, Domain, Project, Task } from "@prisma/client";
 import Link from "next/link";
-import { Plus } from "lucide-react";
-import { addSubtask } from "@/app/actions";
 import { prisma } from "@/lib/db";
 import { addDaysToDateString, formatDateOnly, localDateString } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
@@ -35,6 +33,16 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
   const sections = groupTasks(visibleTasks, today, tomorrow);
+  const areaGroups = domains.map((domain) => ({
+    domainName: domain.name,
+    areas: domain.areas.map((area) => ({ id: area.id, name: area.name })),
+  }));
+  const projectOptions = projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    areaId: project.areaId,
+    areaName: project.area.name,
+  }));
 
   return (
     <div className="space-y-5">
@@ -42,56 +50,108 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         <h1 className="text-3xl font-semibold tracking-normal">Tasks</h1>
       </header>
       <TaskQuickAdd
-        areaGroups={domains.map((domain) => ({
-          domainName: domain.name,
-          areas: domain.areas.map((area) => ({ id: area.id, name: area.name })),
-        }))}
-        projects={projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          areaId: project.areaId,
-          areaName: project.area.name,
-        }))}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
       <DomainFilter domains={domains} selectedDomainId={selectedDomainId} />
+      <SectionJumps
+        todayCount={sections.today.length}
+        tomorrowCount={sections.tomorrow.length}
+        upcomingCount={sections.upcoming.reduce(
+          (total, group) => total + group.tasks.length,
+          0,
+        )}
+        somedayCount={sections.someday.length}
+        unscheduledCount={sections.noDate.length}
+      />
       <TaskSection
         title="Today"
         empty="No tasks due today."
+        anchor="today"
         targetDate={today}
         tasks={sections.today}
         today={today}
         tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
       <TaskSection
         title="Tomorrow"
         empty="No tasks due tomorrow."
+        anchor="tomorrow"
         targetDate={tomorrow}
         tasks={sections.tomorrow}
         today={today}
         tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
       <UpcomingSection
         groups={sections.upcoming}
         today={today}
         tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
       <TaskSection
         title="Someday"
         empty="No someday tasks."
+        anchor="someday"
         targetDate={null}
         tasks={sections.someday}
         today={today}
         tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
       <TaskSection
-        title="No date"
-        empty="No undated tasks."
+        title="Unscheduled"
+        empty="No unscheduled tasks."
+        anchor="unscheduled"
         targetDate={null}
         tasks={sections.noDate}
         today={today}
         tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projectOptions}
       />
     </div>
+  );
+}
+
+function SectionJumps({
+  todayCount,
+  tomorrowCount,
+  upcomingCount,
+  somedayCount,
+  unscheduledCount,
+}: {
+  todayCount: number;
+  tomorrowCount: number;
+  upcomingCount: number;
+  somedayCount: number;
+  unscheduledCount: number;
+}) {
+  const links = [
+    ["#today", "Today", todayCount],
+    ["#tomorrow", "Tomorrow", tomorrowCount],
+    ["#upcoming", "Upcoming", upcomingCount],
+    ["#someday", "Someday", somedayCount],
+    ["#unscheduled", "Unscheduled", unscheduledCount],
+  ] as const;
+
+  return (
+    <nav className="flex flex-wrap gap-2">
+      {links.map(([href, label, count]) => (
+        <a
+          key={href}
+          href={href}
+          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:border-stone-400"
+        >
+          {label} {count}
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -135,21 +195,29 @@ function DomainFilter({
 function TaskSection({
   title,
   empty,
+  anchor,
   targetDate,
   tasks,
   today,
   tomorrow,
+  areaGroups,
+  projects,
 }: {
   title: string;
   empty: string;
+  anchor: string;
   targetDate: string | null;
   tasks: TaskListItem[];
   today: string;
   tomorrow: string;
+  areaGroups: TaskAreaGroup[];
+  projects: TaskProjectOption[];
 }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">{title}</h2>
+    <section id={anchor} className="scroll-mt-4 space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">
+        {title} <span className="font-normal text-stone-500">{tasks.length}</span>
+      </h2>
       <TaskDropZone
         targetDate={targetDate}
         isEmpty={tasks.length === 0}
@@ -162,6 +230,8 @@ function TaskSection({
               task={task}
               today={today}
               tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projects}
             />
           ))}
         </div>
@@ -174,14 +244,21 @@ function UpcomingSection({
   groups,
   today,
   tomorrow,
+  areaGroups,
+  projects,
 }: {
   groups: Array<{ date: string; tasks: TaskListItem[] }>;
   today: string;
   tomorrow: string;
+  areaGroups: TaskAreaGroup[];
+  projects: TaskProjectOption[];
 }) {
+  const count = groups.reduce((total, group) => total + group.tasks.length, 0);
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">Upcoming</h2>
+    <section id="upcoming" className="scroll-mt-4 space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">
+        Upcoming <span className="font-normal text-stone-500">{count}</span>
+      </h2>
       {groups.length === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
           No upcoming dated tasks.
@@ -205,6 +282,8 @@ function UpcomingSection({
                       task={task}
                       today={today}
                       tomorrow={tomorrow}
+                      areaGroups={areaGroups}
+                      projects={projects}
                     />
                   ))}
                 </div>
@@ -221,10 +300,14 @@ function TaskCard({
   task,
   today,
   tomorrow,
+  areaGroups,
+  projects,
 }: {
   task: TaskListItem;
   today: string;
   tomorrow: string;
+  areaGroups: TaskAreaGroup[];
+  projects: TaskProjectOption[];
 }) {
   return (
     <article className="rounded-lg border border-stone-200 bg-white p-4">
@@ -235,13 +318,22 @@ function TaskCard({
           title={task.title}
           detail={formatTaskDetail(task)}
           currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+          currentAreaId={task.areaId}
+          currentProjectId={task.projectId}
+          areaGroups={areaGroups}
+          projects={projects}
           today={today}
           tomorrow={tomorrow}
         />
         <TaskCompleteButton taskId={task.id} />
       </div>
-      <SubtaskList subtasks={task.subtasks} today={today} tomorrow={tomorrow} />
-      <AddSubtaskForm parentTaskId={task.id} />
+      <SubtaskList
+        subtasks={task.subtasks}
+        today={today}
+        tomorrow={tomorrow}
+        areaGroups={areaGroups}
+        projects={projects}
+      />
     </article>
   );
 }
@@ -250,10 +342,14 @@ function SubtaskList({
   subtasks,
   today,
   tomorrow,
+  areaGroups,
+  projects,
 }: {
   subtasks: TaskListItem["subtasks"];
   today: string;
   tomorrow: string;
+  areaGroups: TaskAreaGroup[];
+  projects: TaskProjectOption[];
 }) {
   if (subtasks.length === 0) {
     return null;
@@ -269,6 +365,10 @@ function SubtaskList({
             title={subtask.title}
             detail={subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"}
             currentDueDate={subtask.dueDate?.toISOString().slice(0, 10) ?? null}
+            currentAreaId={subtask.areaId}
+            currentProjectId={subtask.projectId}
+            areaGroups={areaGroups}
+            projects={projects}
             today={today}
             tomorrow={tomorrow}
           />
@@ -279,30 +379,22 @@ function SubtaskList({
   );
 }
 
-function AddSubtaskForm({ parentTaskId }: { parentTaskId: string }) {
-  return (
-    <form action={addSubtask} className="mt-3 flex gap-2 border-t border-stone-100 pt-3">
-      <input type="hidden" name="parentTaskId" value={parentTaskId} />
-      <input
-        name="title"
-        placeholder="Add subtask"
-        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      />
-      <button
-        type="submit"
-        title="Add subtask"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
-      >
-        <Plus size={16} />
-      </button>
-    </form>
-  );
-}
-
 type TaskListItem = Task & {
   area: Area & { domain: Domain };
   project: Project | null;
-  subtasks: Task[];
+  subtasks: Array<Task & { area: Area; project: Project | null }>;
+};
+
+type TaskAreaGroup = {
+  domainName: string;
+  areas: Array<{ id: string; name: string }>;
+};
+
+type TaskProjectOption = {
+  id: string;
+  name: string;
+  areaId: string;
+  areaName: string;
 };
 
 function formatTaskDetail(task: TaskListItem) {
@@ -372,6 +464,7 @@ async function loadTasks() {
           project: true,
           subtasks: {
             where: { status: "open" },
+            include: { area: true, project: true },
             orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
           },
         },

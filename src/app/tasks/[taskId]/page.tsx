@@ -131,7 +131,6 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
             <input
               name="reminderOffsets"
               defaultValue={reminderOffsets}
-              placeholder="15, 60, 1440"
               className={inputClassName}
             />
           </Field>
@@ -150,7 +149,6 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
           <input
             name="recurrenceRule"
             defaultValue={task.recurrenceRule ?? ""}
-            placeholder="FREQ=WEEKLY;INTERVAL=1"
             className={inputClassName}
           />
         </Field>
@@ -215,8 +213,8 @@ function AddSubtaskForm({ parentTaskId }: { parentTaskId: string }) {
       <input type="hidden" name="parentTaskId" value={parentTaskId} />
       <input
         name="title"
-        placeholder="Add subtask"
-        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        aria-label="Subtask title"
+        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
       />
       <button
         type="submit"

@@ -89,10 +89,10 @@ export function TaskQuickAdd({
         <input
           name="title"
           required
-          placeholder="Add a task"
+          aria-label="Task title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="h-11 min-w-0 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-stone-400"
+          className="h-11 min-w-0 flex-1 bg-transparent px-2 text-base outline-none"
         />
         <label
           title="Set due date"
