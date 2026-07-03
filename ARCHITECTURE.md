@@ -140,6 +140,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Added Pushover reminder scheduler logic with append-only delivery audit rows and in-app notification mirroring.
 - Added Today calendar sync freshness display and recently captured outcome labels.
 - Split Home and Today into separate routes: `/` is the launch surface and `/today` keeps the focused today-plus-tomorrow workflow. Search remains a top utility instead of a bottom tab.
+- Improved Inbox pending captures so each raw capture renders as a distinct card with its own destination picker and conversion actions.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

@@ -173,33 +173,48 @@ function PendingCapturesPanel({
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+    <section className="space-y-3">
       <h2 className="text-base font-semibold text-stone-800">Pending captures</h2>
-      <div className="divide-y divide-stone-100">
+      <div className="space-y-3">
         {captures.map((capture) => (
-          <form key={capture.id} action={convertPendingCapture} className="py-3">
+          <form
+            key={capture.id}
+            action={convertPendingCapture}
+            className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+          >
             <input type="hidden" name="captureId" value={capture.id} />
-            <p className="text-sm text-stone-800">{capture.rawText}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select
-                name="areaId"
-                defaultValue="area_inbox"
-                className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-              >
-                {domains.map((domain) => (
-                  <optgroup key={domain.id} label={domain.name}>
-                    {domain.areas.map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {area.name}
-                      </option>
+            <div className="space-y-3">
+              <p className="max-h-48 overflow-y-auto rounded-md border border-stone-100 bg-stone-50 p-3 text-sm leading-6 text-stone-800">
+                {capture.rawText}
+              </p>
+              <div className="flex flex-col gap-3 border-t border-stone-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <label className="flex min-w-0 items-center gap-2 text-sm text-stone-600">
+                  <span className="shrink-0 font-medium text-stone-700">
+                    Area
+                  </span>
+                  <select
+                    name="areaId"
+                    defaultValue="area_inbox"
+                    className="h-9 min-w-0 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  >
+                    {domains.map((domain) => (
+                      <optgroup key={domain.id} label={domain.name}>
+                        {domain.areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
-              <ConvertButton value="task" label="Task" />
-              <ConvertButton value="idea" label="Idea" />
-              <ConvertButton value="note" label="Note" />
-              <ConvertButton value="reference" label="Reference" />
+                  </select>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <ConvertButton value="task" label="Task" />
+                  <ConvertButton value="idea" label="Idea" />
+                  <ConvertButton value="note" label="Note" />
+                  <ConvertButton value="reference" label="Reference" />
+                </div>
+              </div>
             </div>
           </form>
         ))}
@@ -214,7 +229,7 @@ function ConvertButton({ value, label }: { value: string; label: string }) {
       type="submit"
       name="targetType"
       value={value}
-      className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+      className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
     >
       {label}
     </button>
