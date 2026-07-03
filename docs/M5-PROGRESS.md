@@ -1,3 +1,13 @@
+# Post-mortem: "production serving a stale build" (2026-07-03, evening)
+
+- **Report:** live app showed a pre-M5 nav despite main being merged and a SUCCESS deploy.
+- **Diagnosis:** Railway's active deployment (7937c92a, via `railway up` from a clean worktree at 978a162) was verified CURRENT by cache-bypassed curl: M5 nav (Home/Today/Tasks/Projects/Library), /chat present, /settings 200, all four M5-only API routes answering 401-not-404, and deploy logs showing all seven M5 migrations applied by `prisma migrate deploy`. Responses are `no-store`; no service worker exists — nothing server-side could serve stale HTML.
+- **Root cause:** this app has a second origin. The local LaunchAgent runtime on the Mac (`127.0.0.1:3002`, proxied at `https://mac-studio.tail3baa7a.ts.net` by Tailscale) had a `next-server` process started at 12:15 — before M5 landed — serving pre-M5 UI from memory. Phone shortcuts from the local-first era point at the tailnet URL, so the app "looked stale" while Railway was fine.
+- **Fix:** no Railway change needed (smallest correct fix = none). Restarted `com.mrtyndall.home-base` and `com.mrtyndall.home-base-mcp` LaunchAgents; local origin now serves the M5 nav, /settings 200, MCP health ok. Any still-stale phone view after this is the device's own long-lived instance — force-close and reopen.
+- **Hardening:** AGENTS.md gained a mandatory post-deploy verification rule (fingerprint the served content + check migrate logs + smoke-test before reporting success; both origins must be updated). ARCHITECTURE.md gained a "Deploy Pipeline" section documenting the two origins and the exact commands. Gap noted: `railway up` records no commit hash — verify by content, or record the commit alongside the deploy.
+
+---
+
 # M5 Progress Log
 
 Session: autonomous build, branch `m5`, started 2026-07-03.

@@ -44,6 +44,13 @@ launchctl kickstart -k gui/501/com.mrtyndall.home-base
 tailscale serve status
 ```
 
+## Deploy Pipeline
+
+Two origins serve this app and both must be updated on release:
+
+1. **Railway** (`https://home-base-production-e3b7.up.railway.app`, Railway Postgres): deploy with `railway up --detach` from a clean `git worktree` at the release commit (the working tree may hold another agent's edits; `railway up` uploads the directory and records no git metadata). The container CMD runs `npx prisma migrate deploy` before the server starts, so additive migrations apply automatically — check deploy logs for the applied list. Verify by content fingerprint against the production URL, never by deployment status alone.
+2. **Local runtime** (`127.0.0.1:3002` behind `https://mac-studio.tail3baa7a.ts.net`, Homebrew Postgres): the LaunchAgent serves the standalone build its process loaded at start. After a release: `npm run db:migrate` (local DB), `npm run build`, then `launchctl kickstart -k gui/501/com.mrtyndall.home-base` and `launchctl kickstart -k gui/501/com.mrtyndall.home-base-mcp`. A long-lived process here is the usual cause of "production looks stale" reports, since phone shortcuts may point at the tailnet URL.
+
 ## Integrity Rules
 
 - `captures` is the sacred append-only ledger. Every capture request writes raw text first.
