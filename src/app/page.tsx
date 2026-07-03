@@ -6,6 +6,7 @@ import {
   RefreshCcw,
   type LucideIcon,
 } from "lucide-react";
+import type { Capture } from "@prisma/client";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
@@ -88,6 +89,8 @@ export default async function TodayPage() {
             </div>
           </section>
 
+          <RecentCapturesStrip captures={data.recentCaptures} />
+
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
               <SectionHeader icon={CalendarDays} title="Tomorrow" />
@@ -121,31 +124,6 @@ export default async function TodayPage() {
                     />
                   ))}
                 </TaskDropZone>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <SectionHeader icon={Inbox} title="Recently Captured" />
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {data.recentCaptures.length === 0 ? (
-                  <EmptyLine text="No captures yet." />
-                ) : (
-                  data.recentCaptures.map((capture) => (
-                    <div
-                      key={capture.id}
-                      className="min-w-56 rounded-lg border border-stone-200 bg-white p-3"
-                    >
-                      <p className="line-clamp-3 text-sm text-stone-800">
-                        {capture.rawText}
-                      </p>
-                      <p className="mt-2 text-xs text-stone-500">
-                        {formatCaptureOutcome(capture.createdItems) ??
-                          capture.parseStatus ??
-                          "saved"}
-                      </p>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           </section>
@@ -187,6 +165,43 @@ function TodayTaskRow({
       />
       <TaskCompleteButton taskId={task.id} />
     </div>
+  );
+}
+
+type RecentCapture = Capture;
+
+function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
+  if (captures.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-stone-200 bg-white px-4 py-3">
+      <div className="mb-2 flex items-center gap-2 text-stone-800">
+        <Inbox size={16} />
+        <h2 className="text-sm font-semibold">Recently captured</h2>
+      </div>
+      <div className="divide-y divide-stone-100">
+        {captures.slice(0, 5).map((capture) => {
+          const outcome =
+            formatCaptureOutcome(capture.createdItems) ??
+            capture.parseStatus ??
+            "saved";
+
+          return (
+            <div
+              key={capture.id}
+              className="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-4"
+            >
+              <p className="min-w-0 truncate text-sm text-stone-900">
+                {capture.rawText}
+              </p>
+              <p className="text-xs text-stone-500 sm:text-right">{outcome}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
