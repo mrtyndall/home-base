@@ -2,6 +2,7 @@ import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
+import { createCheckInRecord } from "@/lib/checkins";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
   captureInputSchema,
@@ -477,8 +478,8 @@ async function updateAreaState(
 
   if (action.current_state?.trim()) {
     const nextStep = action.next_step?.trim();
-    const checkIn = await prisma.checkIn.create({
-      data: {
+    const { checkIn } = await createCheckInRecord(
+      {
         parentType: "area",
         parentId: area.id,
         bodyMd:
@@ -487,7 +488,8 @@ async function updateAreaState(
         source: context.writeSource === "in_app_voice" ? "voice" : "manual",
         captureId: context.captureId,
       },
-    });
+      context.actor,
+    );
     items.push({
       type: "check_in",
       id: checkIn.id,
@@ -601,8 +603,8 @@ async function updateProjectState(
   // the legacy action must still surface on cards and feeds.
   if (action.current_state?.trim()) {
     const nextStep = action.next_step?.trim();
-    const checkIn = await prisma.checkIn.create({
-      data: {
+    const { checkIn } = await createCheckInRecord(
+      {
         parentType: "project",
         parentId: project.id,
         bodyMd:
@@ -611,7 +613,8 @@ async function updateProjectState(
         source: context.writeSource === "in_app_voice" ? "voice" : "manual",
         captureId: context.captureId,
       },
-    });
+      context.actor,
+    );
     items.push({
       type: "check_in",
       id: checkIn.id,
@@ -945,15 +948,16 @@ async function executeCheckIn(
     );
   }
 
-  const checkIn = await prisma.checkIn.create({
-    data: {
+  const { checkIn } = await createCheckInRecord(
+    {
       parentType: parent.type,
       parentId: parent.id,
       bodyMd: action.body_md,
       source: context.writeSource === "in_app_voice" ? "voice" : "manual",
       captureId: context.captureId,
     },
-  });
+    context.actor,
+  );
 
   return {
     type: "check_in" as const,

@@ -204,6 +204,7 @@ function getNextDatedTask(project: ProjectListItem) {
 function getLastTouched(project: ProjectListItem) {
   const dates = [
     ...(project.lastTaskActivity ? [project.lastTaskActivity] : []),
+    ...(project.latestCheckIn ? [project.latestCheckIn.createdAt] : []),
     ...project.activity.map((entry) => entry.createdAt),
     ...project.notes.map((note) => note.createdAt),
   ];

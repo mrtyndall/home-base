@@ -62,4 +62,13 @@ Format per step: what was built, test result, commit hash, deviations.
 - Built: MilestonesPanel now always renders on project pages (visible Add action even with zero milestones — no resting input; the form lives behind the Add disclosure). Progress as plain text: "N of M milestones" in the project page header and on shelf cards (milestone groupBy). `completeMilestone` now writes a `projectActivity` entry ("Milestone completed: <title>."), feeding Step 4 summaries.
 - Test (work-order): added three milestones through the UI, completed one → header showed "0 of 1"→"0 of 2"→"0 of 3"→"1 of 3", card shows "1 of 3 milestones", Activity shows "Milestone completed: Igate on air." PASS.
 - Gates: tsc clean, eslint clean, build succeeds.
-- Commit: (this commit)
+- Commit: 371782f
+
+### Phase 2 VERIFY
+- Fresh-eyes verification subagent: **PASS**. Gates green; migration losslessness confirmed by SQL anti-join (0 missing); UI retirement of current_state/next_step confirmed; append-only holds (no checkIn.update/delete anywhere); live check_in capture + honest sources (manual/ai_draft/ai_draft_edited all present in DB); milestone surfacing verified live; constitution grep clean; sacred capture path intact.
+- Defects reported and fixed in the follow-up commit:
+  1. Capture-path check-ins skipped the `check_in_posted` audit notification → all three service-side check-in writes now route through `createCheckInRecord` (verified: notification count increments on capture check-ins).
+  2. Check-ins didn't count toward project "Touched"/slippage last-activity → `getLastTouched` now includes the latest check-in date.
+  3. ACCEPTED (not fixed): AI-draft provenance is client-asserted — the server compares posted text to a client-supplied draft string; a modified client could post AI text as `manual`. Single-user app, self-deception risk only; server-side draft persistence would be the fix if it ever matters. Logged as a known limitation.
+- Cosmetic: the garbled `ai_draft_edited` test check-in was displaced by a clean follow-up check-in (append-only respected).
+- Phase 2 gate: PASSED. Proceeding to Phase 3.
