@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Capture } from "@prisma/client";
+import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
@@ -20,9 +21,6 @@ export default async function TodayPage() {
   return (
     <div className="space-y-5">
       <header className="space-y-2">
-        <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-          Home Base
-        </p>
         <h1 className="text-3xl font-semibold tracking-normal text-stone-950">
           Today
         </h1>
@@ -189,22 +187,47 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
             formatCaptureOutcome(capture.createdItems) ??
             capture.parseStatus ??
             "saved";
+          const href = getCaptureHref(capture);
 
           return (
-            <div
+            <Link
               key={capture.id}
+              href={href}
               className="grid gap-1 py-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-4"
             >
               <p className="min-w-0 truncate text-sm text-stone-900">
                 {capture.rawText}
               </p>
               <p className="text-xs text-stone-500 sm:text-right">{outcome}</p>
-            </div>
+            </Link>
           );
         })}
       </div>
     </section>
   );
+}
+
+function getCaptureHref(capture: Capture) {
+  const items = Array.isArray(capture.createdItems) ? capture.createdItems : [];
+  const firstItem = items.find(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      "type" in item &&
+      "id" in item &&
+      typeof item.type === "string" &&
+      typeof item.id === "string",
+  ) as { type: string; id: string } | undefined;
+
+  if (!firstItem) {
+    return `/areas/area_inbox`;
+  }
+
+  if (firstItem.type === "task") return `/tasks/${firstItem.id}`;
+  if (firstItem.type === "project") return `/projects/${firstItem.id}`;
+  if (firstItem.type === "idea") return `/ideas`;
+  if (firstItem.type === "pending_capture") return `/areas/area_inbox`;
+  return `/search?q=${encodeURIComponent(capture.rawText)}`;
 }
 
 function CalendarSyncLine({
@@ -232,13 +255,23 @@ function CalendarSyncLine({
     <section className={`rounded-lg border p-3 text-sm ${tone}`}>
       <div className="flex items-start gap-2">
         <RefreshCcw className="mt-0.5 shrink-0" size={16} />
-        <p>
-          {message}
-          {data.stale && configured
-            ? ` Sync is stale beyond ${data.staleMinutes} minutes.`
-            : ""}
-          {data.error ? ` ${data.error}` : ""}
-        </p>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+          <p>
+            {message}
+            {data.stale && configured
+              ? ` Sync is stale beyond ${data.staleMinutes} minutes.`
+              : ""}
+            {data.error ? ` ${data.error}` : ""}
+          </p>
+          {!configured ? (
+            <Link
+              href="/settings"
+              className="font-medium text-amber-950 underline-offset-4 hover:underline"
+            >
+              Open settings
+            </Link>
+          ) : null}
+        </div>
       </div>
     </section>
   );

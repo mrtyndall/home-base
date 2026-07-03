@@ -89,46 +89,7 @@ function ProjectShelf({
               </summary>
               <div className="grid gap-3 md:grid-cols-2">
                 {group.projects.map((project) => (
-            <article
-              key={project.id}
-              className="rounded-lg border border-stone-200 bg-white p-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
-                >
-                  <h2 className="font-semibold">{project.name}</h2>
-                  <p className="mt-1 text-sm text-stone-500">
-                    {project.area.domain.name} / {project.area.name}
-                    {project.targetDate
-                      ? ` / target ${formatDateOnly(project.targetDate)}`
-                      : ""}
-                  </p>
-                </Link>
-                <ProjectOverflowMenu projectId={project.id} status={project.status} />
-              </div>
-              <Link href={`/projects/${project.id}`} className="block">
-                <p className="mt-3 text-sm font-medium text-stone-800">
-                  {getTaskSummary(project)}
-                </p>
-                {getLastTouched(project) ? (
-                  <p className="mt-1 text-xs text-stone-500">
-                    Touched {formatShortDate(getLastTouched(project)!)}
-                  </p>
-                ) : null}
-                {project.currentState?.trim() ? (
-                  <p className="mt-3 text-sm text-stone-700">
-                    {project.currentState}
-                  </p>
-                ) : null}
-                {getFreshNote(project) ? (
-                  <p className="mt-3 border-l-2 border-stone-200 pl-3 text-sm text-stone-600">
-                    {getFreshNote(project)}
-                  </p>
-                ) : null}
-              </Link>
-            </article>
+                  <ProjectCard key={project.id} project={project} />
                 ))}
               </div>
             </details>
@@ -139,6 +100,72 @@ function ProjectShelf({
   );
 }
 
+function ProjectCard({ project }: { project: ProjectListItem }) {
+  const openTasks = project.tasks.filter((task) => task.status === "open");
+  const nextDatedTask = getNextDatedTask(project);
+  const lastTouched = getLastTouched(project);
+  const freshNote = getFreshNote(project);
+
+  return (
+    <article className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <Link
+          href={`/projects/${project.id}`}
+          className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
+            {project.area.domain.name} / {project.area.name}
+          </p>
+          <h2 className="mt-1 text-lg font-semibold leading-snug">
+            {project.name}
+          </h2>
+        </Link>
+        <ProjectOverflowMenu projectId={project.id} status={project.status} />
+      </div>
+      <Link href={`/projects/${project.id}`} className="mt-3 block space-y-3">
+        {nextDatedTask?.dueDate ? (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Next dated task
+            </p>
+            <p className="mt-1 text-sm font-medium text-stone-900">
+              {nextDatedTask.title}
+            </p>
+            <p className="mt-0.5 text-sm text-stone-500">
+              {formatDateOnly(nextDatedTask.dueDate)}
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Open tasks
+            </p>
+            <p className="mt-1 text-sm font-medium text-stone-900">
+              {openTasks.length}
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+          {lastTouched ? <span>Touched {formatShortDate(lastTouched)}</span> : null}
+          {project.targetDate ? (
+            <span>Target {formatDateOnly(project.targetDate)}</span>
+          ) : null}
+        </div>
+
+        {project.currentState?.trim() ? (
+          <p className="text-sm text-stone-700">{project.currentState}</p>
+        ) : null}
+        {freshNote ? (
+          <p className="border-l-2 border-stone-200 pl-3 text-sm text-stone-600">
+            {freshNote}
+          </p>
+        ) : null}
+      </Link>
+    </article>
+  );
+}
+
 type ProjectListItem = Project & {
   area: Area & { domain: Domain };
   tasks: Array<Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">>;
@@ -146,17 +173,11 @@ type ProjectListItem = Project & {
   notes: Array<Pick<EntityNote, "bodyMd" | "createdAt">>;
 };
 
-function getTaskSummary(project: ProjectListItem) {
+function getNextDatedTask(project: ProjectListItem) {
   const openTasks = project.tasks.filter((task) => task.status === "open");
-  const nextDatedTask = openTasks
+  return openTasks
     .filter((task) => task.dueDate)
     .sort((a, b) => Number(a.dueDate) - Number(b.dueDate))[0];
-
-  if (nextDatedTask?.dueDate) {
-    return `${nextDatedTask.title} / ${formatDateOnly(nextDatedTask.dueDate)}`;
-  }
-
-  return `${openTasks.length} open ${openTasks.length === 1 ? "task" : "tasks"}`;
 }
 
 function getLastTouched(project: ProjectListItem) {

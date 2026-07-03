@@ -10,11 +10,11 @@ import { SetupNotice } from "@/components/setup-notice";
 export const dynamic = "force-dynamic";
 
 type TasksPageProps = {
-  searchParams: Promise<{ domain?: string }>;
+  searchParams: Promise<{ domain?: string; project?: string }>;
 };
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
-  const { domain } = await searchParams;
+  const { domain, project } = await searchParams;
 
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
@@ -27,9 +27,12 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   const { tasks, projects, domains } = result;
   const selectedDomainId = domains.some((item) => item.id === domain) ? domain : "";
-  const visibleTasks = selectedDomainId
-    ? tasks.filter((task) => task.area.domainId === selectedDomainId)
-    : tasks;
+  const selectedProjectId = projects.some((item) => item.id === project) ? project : "";
+  const visibleTasks = tasks.filter((task) => {
+    if (selectedDomainId && task.area.domainId !== selectedDomainId) return false;
+    if (selectedProjectId && task.projectId !== selectedProjectId) return false;
+    return true;
+  });
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
   const sections = groupTasks(visibleTasks, today, tomorrow);
@@ -53,7 +56,12 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         areaGroups={areaGroups}
         projects={projectOptions}
       />
-      <DomainFilter domains={domains} selectedDomainId={selectedDomainId} />
+      <TaskFilters
+        domains={domains}
+        projects={projects}
+        selectedDomainId={selectedDomainId}
+        selectedProjectId={selectedProjectId}
+      />
       <SectionJumps
         todayCount={sections.today.length}
         tomorrowCount={sections.tomorrow.length}
@@ -189,6 +197,91 @@ function DomainFilter({
         </Link>
       ))}
     </nav>
+  );
+}
+
+function TaskFilters({
+  domains,
+  projects,
+  selectedDomainId,
+  selectedProjectId,
+}: {
+  domains: Array<Domain & { areas: Area[] }>;
+  projects: Array<Project & { area: Area & { domain: Domain } }>;
+  selectedDomainId: string | undefined;
+  selectedProjectId: string | undefined;
+}) {
+  return (
+    <section className="rounded-lg border border-stone-200 bg-white p-3">
+      <div className="grid gap-3 md:grid-cols-[1fr_0.8fr]">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Domain
+          </p>
+          <DomainFilter
+            domains={domains}
+            selectedDomainId={selectedDomainId}
+          />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Project
+          </p>
+          <ProjectFilter
+            projects={projects}
+            selectedDomainId={selectedDomainId}
+            selectedProjectId={selectedProjectId}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProjectFilter({
+  projects,
+  selectedDomainId,
+  selectedProjectId,
+}: {
+  projects: Array<Project & { area: Area & { domain: Domain } }>;
+  selectedDomainId: string | undefined;
+  selectedProjectId: string | undefined;
+}) {
+  const visibleProjects = selectedDomainId
+    ? projects.filter((project) => project.area.domainId === selectedDomainId)
+    : projects;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        href={selectedDomainId ? `/tasks?domain=${selectedDomainId}` : "/tasks"}
+        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+          !selectedProjectId
+            ? "border-teal-600 bg-teal-50 text-teal-800"
+            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+        }`}
+      >
+        All projects
+      </Link>
+      {visibleProjects.map((project) => {
+        const href = selectedDomainId
+          ? `/tasks?domain=${selectedDomainId}&project=${project.id}`
+          : `/tasks?project=${project.id}`;
+        return (
+          <Link
+            key={project.id}
+            href={href}
+            className={`rounded-md border px-3 py-1.5 text-sm transition ${
+              selectedProjectId === project.id
+                ? "border-teal-600 bg-teal-50 text-teal-800"
+                : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+            }`}
+          >
+            {project.name}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
