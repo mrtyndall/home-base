@@ -130,3 +130,11 @@ Format per step: what was built, test result, commit hash, deviations.
   3. Weekly routines showed "Done today" all week → state now distinguishes `completedToday` from `satisfied` (cadence period), copy reads "Done this week" when satisfied by an earlier day.
 - Noted, accepted: no DB unique on (routineId, day) — concurrent double-tap race is theoretical for single-user; recurring Feb-29 facts emit a nonexistent date string in copy in non-leap years (compare/dedup still correct); `autoRetireRoutines` is a deliberate write-on-read (lazy design).
 - Phase 4 gate: PASSED. Proceeding to Phase 5.
+
+## Phase 5
+
+### Step 11 — Domain Pages
+- Built: `/domains/[domainId]` — description (markdown, renders nothing when empty) with an explicit Edit-description disclosure (server action `updateDomainDescription`, audited); derived aggregation: pulse strip (open tasks, due today, active project count — plain text), area cards with latest check-in snippet + date + open-task count, and a "Project facts" list of slipping active projects (reusing `projectLastActivityFact`). Zero attach actions of any kind. Domain rows now tappable: projects-shelf group headers ("Open" link), area page header domain name, project detail breadcrumb (domain + area both link).
+- Test (work-order): opened the Hobbies domain page — Ham Radio and Homelab render with their latest check-in snippets (posted fresh via capture), pulse and project counts render, and a full-page scan found no add/attach affordance of any kind. PASS.
+- Gates: tsc clean, eslint clean, build succeeds.
+- Commit: (this commit)

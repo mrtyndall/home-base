@@ -868,6 +868,29 @@ function revalidateEntityParent(parentType: "area" | "project", parentId: string
   revalidatePath(parentType === "area" ? `/areas/${parentId}` : `/projects/${parentId}`);
 }
 
+export async function updateDomainDescription(formData: FormData) {
+  const domainId = getTrimmedString(formData, "domainId");
+  if (!domainId) return;
+
+  const description = getTrimmedString(formData, "description");
+  const domain = await prisma.domain.update({
+    where: { id: domainId },
+    data: { description: description || null },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "domain_updated",
+      title: "Domain description updated",
+      body: domain.name,
+      sourceRef: { type: "domain", id: domain.id, source: "manual" },
+    },
+  });
+
+  revalidatePath(`/domains/${domainId}`);
+  redirect(`/domains/${domainId}`);
+}
+
 export async function parkArea(formData: FormData) {
   const areaId = getTrimmedString(formData, "areaId");
   if (!areaId) return;

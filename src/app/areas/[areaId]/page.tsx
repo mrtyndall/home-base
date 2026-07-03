@@ -57,9 +57,12 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </Link>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
+            <Link
+              href={`/domains/${area.domain.id}`}
+              className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700 underline-offset-4 hover:underline"
+            >
               {area.domain.name}
-            </p>
+            </Link>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal">
               {area.name}
             </h1>

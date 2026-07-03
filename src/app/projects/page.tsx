@@ -87,7 +87,13 @@ function ProjectShelf({
           {groups.map((group) => (
             <details key={group.domain.id} open className="space-y-2">
               <summary className="cursor-pointer list-none text-sm font-semibold text-stone-700 [&::-webkit-details-marker]:hidden">
-                {group.domain.name}
+                {group.domain.name}{" "}
+                <Link
+                  href={`/domains/${group.domain.id}`}
+                  className="ml-1 text-xs font-medium text-teal-700 underline-offset-4 hover:underline"
+                >
+                  Open
+                </Link>
               </summary>
               <div className="grid gap-3 md:grid-cols-2">
                 {group.projects.map((project) => (

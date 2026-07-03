@@ -47,7 +47,19 @@ export default async function ProjectDetailPage({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-              {project.area.domain.name} / {project.area.name}
+              <Link
+                href={`/domains/${project.area.domain.id}`}
+                className="underline-offset-4 hover:underline"
+              >
+                {project.area.domain.name}
+              </Link>{" "}
+              /{" "}
+              <Link
+                href={`/areas/${project.area.id}`}
+                className="underline-offset-4 hover:underline"
+              >
+                {project.area.name}
+              </Link>
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal">
               {project.name}
