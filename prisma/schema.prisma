@@ -122,6 +122,12 @@ enum ScheduledReviewStatus {
   dismissed
 }
 
+enum RoutineStatus {
+  active
+  paused
+  retired
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -190,6 +196,7 @@ model Area {
   ideas      Idea[]
   projects   Project[]
   references Reference[]
+  routines   Routine[]
   tasks      Task[]
 
   @@index([domainId, status, sortOrder])
@@ -358,6 +365,40 @@ model EntityNote {
   @@index([parentType, parentId, createdAt])
   @@index([captureId])
   @@map("entity_notes")
+}
+
+model Routine {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  areaId      String?       @map("area_id")
+  schedule    Json
+  goal        Json?
+  graceWindow Json?         @map("grace_window")
+  temporary   Boolean       @default(false)
+  startDate   DateTime?     @map("start_date") @db.Date
+  endDate     DateTime?     @map("end_date") @db.Date
+  status      RoutineStatus @default(active)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  area        Area?               @relation(fields: [areaId], references: [id])
+  completions RoutineCompletion[]
+
+  @@index([status])
+  @@index([areaId])
+  @@map("routines")
+}
+
+model RoutineCompletion {
+  id          String   @id @default(uuid())
+  routineId   String   @map("routine_id")
+  completedAt DateTime @default(now()) @map("completed_at")
+  value       String?
+
+  routine Routine @relation(fields: [routineId], references: [id])
+
+  @@index([routineId, completedAt])
+  @@map("routine_completions")
 }
 
 model ScheduledReview {

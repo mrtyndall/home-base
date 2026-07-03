@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
 import { createCheckInRecord } from "@/lib/checkins";
 import { boostResurfaceByMatch } from "@/lib/resurfacing";
+import { completeRoutineByMatch } from "@/lib/routines";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
   captureInputSchema,
@@ -309,6 +310,24 @@ async function executeActions(
       case "schedule_review":
         createdItems.push(await executeScheduleReview(action, context));
         break;
+      case "create_routine":
+        createdItems.push(await executeCreateRoutine(action, context));
+        break;
+      case "complete_routine": {
+        const result = await completeRoutineByMatch(
+          action.routine_match,
+          context.actor,
+          action.value,
+        );
+        createdItems.push({
+          type: "routine_completion",
+          id: result.completion?.id ?? result.routine.id,
+          label: result.repeated
+            ? `${result.routine.name} was already done today`
+            : `Completed routine: ${result.routine.name}`,
+        });
+        break;
+      }
       case "boost_resurface": {
         const boosted = await boostResurfaceByMatch(action.item_match);
         if (!boosted) {
@@ -932,6 +951,46 @@ async function matchProject(projectMatch: string) {
   });
 
   return project;
+}
+
+async function executeCreateRoutine(
+  action: Extract<ExecutableAction, { type: "create_routine" }>,
+  context: ExecutionContext,
+) {
+  const areaId = matchAreaId(action.area_match, context.areas);
+  const frequency =
+    action.frequency ??
+    (action.days && action.days.length > 0 ? "custom" : "daily");
+
+  const routine = await prisma.routine.create({
+    data: {
+      name: action.name,
+      description: action.description,
+      areaId,
+      schedule: {
+        frequency,
+        days: action.days ?? [],
+        timeWindow: action.time_window ?? "anytime",
+      },
+      goal:
+        typeof action.times_per_week === "number"
+          ? { timesPerWeek: action.times_per_week }
+          : undefined,
+      graceWindow:
+        typeof action.grace_days === "number"
+          ? { days: action.grace_days }
+          : undefined,
+      temporary: action.temporary ?? false,
+      startDate: parseDateOnly(action.start_date),
+      endDate: parseDateOnly(action.end_date),
+    },
+  });
+
+  return {
+    type: "routine" as const,
+    id: routine.id,
+    label: `Routine created: ${routine.name}`,
+  };
 }
 
 async function executeScheduleReview(

@@ -110,6 +110,27 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+const createRoutineAction = z.object({
+  type: z.literal("create_routine"),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  area_match: z.string().optional(),
+  frequency: z.enum(["daily", "weekly", "custom"]).optional(),
+  days: z.array(z.string()).optional(),
+  time_window: z.enum(["morning", "afternoon", "evening", "anytime"]).optional(),
+  times_per_week: z.number().optional(),
+  grace_days: z.number().optional(),
+  temporary: z.boolean().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+});
+
+const completeRoutineAction = z.object({
+  type: z.literal("complete_routine"),
+  routine_match: z.string().min(1),
+  value: z.string().optional(),
+});
+
 // review_at or review_condition_text must be present; enforced at
 // execution (discriminated unions require plain object schemas).
 const scheduleReviewAction = z.object({
@@ -171,6 +192,8 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   journalAction,
   boostResurfaceAction,
   scheduleReviewAction,
+  createRoutineAction,
+  completeRoutineAction,
   checkInAction,
   createEntityNoteAction,
   createEntityDocAction,
@@ -213,6 +236,8 @@ export type CreatedItemRef = {
     | "check_in"
     | "journal_entry"
     | "scheduled_review"
+    | "routine"
+    | "routine_completion"
     | "notification";
   id: string;
   label: string;

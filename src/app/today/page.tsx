@@ -19,6 +19,7 @@ import {
   getRecentCaptureHref,
 } from "@/lib/today-capture-actions";
 import { ResurfacedMemory } from "@/components/resurfaced-memory";
+import { TodayRoutinesLine } from "@/components/today-routines";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,8 @@ export default async function TodayPage() {
               ) : null}
             </section>
           ) : null}
+
+          <TodayRoutinesLine routines={data.routinesDueToday} />
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-3">

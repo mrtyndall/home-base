@@ -6,9 +6,15 @@ export type TaskSectionFilter =
   | "someday"
   | "unscheduled";
 
-export type TaskViewFilter = "schedule" | "open" | "done" | "all";
+export type TaskViewFilter = "schedule" | "open" | "done" | "all" | "routines";
 
-const taskViews = new Set<TaskViewFilter>(["schedule", "open", "done", "all"]);
+const taskViews = new Set<TaskViewFilter>([
+  "schedule",
+  "open",
+  "done",
+  "all",
+  "routines",
+]);
 
 export function normalizeTaskView(
   value: string | string[] | undefined,

@@ -5,6 +5,7 @@ import {
   localDateString,
 } from "@/lib/dates";
 import { getDailyResurfacedItem } from "@/lib/resurfacing";
+import { getRoutinesWithState } from "@/lib/routines";
 import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
 
 export async function getTodayDashboard() {
@@ -124,6 +125,21 @@ export async function getTodayDashboard() {
     // the Today screen.
     const resurfacedItem = await getDailyResurfacedItem().catch(() => null);
 
+    // Today's due routines: plain checkable items. Uncompleted past
+    // windows render nothing tomorrow — due-ness is computed per day.
+    const routinesDueToday = await getRoutinesWithState(today)
+      .then((routines) =>
+        routines
+          .filter((routine) => routine.status === "active" && routine.dueToday)
+          .map((routine) => ({
+            id: routine.id,
+            name: routine.name,
+            timeWindow: routine.scheduleParsed.timeWindow,
+            completedToday: routine.completedToday,
+          })),
+      )
+      .catch(() => []);
+
     const staleMinutes =
       typeof calendarStaleMinutesSetting?.value === "number"
         ? calendarStaleMinutesSetting.value
@@ -147,6 +163,7 @@ export async function getTodayDashboard() {
       nextTask,
       nextEvent,
       resurfacedItem,
+      routinesDueToday,
       calendarSync: {
         status: calendarSync?.status ?? "not_configured",
         lastSyncedAt: calendarSync?.lastSyncedAt ?? null,

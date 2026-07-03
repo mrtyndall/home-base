@@ -6,7 +6,9 @@ import { TaskCompleteButton } from "@/components/task-complete-button";
 import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
+import { RoutinesView } from "@/components/routines-view";
 import { SetupNotice } from "@/components/setup-notice";
+import { getRoutinesWithState } from "@/lib/routines";
 import { getTaskSlipDays, taskOpenSinceFact } from "@/lib/slippage";
 import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
 import {
@@ -47,6 +49,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   const { tasks, doneTasks, openCount, doneCount, projects, domains } = result;
   const slipDays = await getTaskSlipDays();
+  const routines =
+    selectedView === "routines" ? await getRoutinesWithState() : [];
   const selectedDomainIds = normalizeFilterValues(
     domain,
     domains.map((item) => item.id),
@@ -171,6 +175,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           totalCount={filtersActive ? null : doneCount}
         />
       ) : null}
+      {selectedView === "routines" ? <RoutinesView routines={routines} /> : null}
       {selectedView === "schedule" &&
       (selectedSection === "all" || selectedSection === "today") ? (
         <TaskSection
@@ -351,6 +356,7 @@ function ViewControl({
     { value: "open", label: "All Open" },
     { value: "done", label: "Done" },
     { value: "all", label: "All" },
+    { value: "routines", label: "Routines" },
   ];
 
   return (
