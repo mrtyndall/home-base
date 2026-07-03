@@ -2,16 +2,18 @@ import type { ReactNode } from "react";
 import type { Area, Capture, Domain } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Ellipsis, Pencil } from "lucide-react";
+import { ArrowLeft, Ellipsis } from "lucide-react";
 import {
   convertPendingCapture,
   parkAreaById,
   retireAreaById,
   unparkAreaById,
-  updateAreaState,
 } from "@/app/actions";
 import { SetupNotice } from "@/components/setup-notice";
+import { CheckInFeed } from "@/components/check-in-feed";
 import { EntityDepth } from "@/components/entity-depth";
+import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
+import { formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -59,51 +61,16 @@ export default async function AreaPage({ params }: AreaPageProps) {
               {area.status}
               {area.tendingCadence ? ` / ${area.tendingCadence}` : ""}
             </p>
-            {area.currentState?.trim() ? (
-              <p className="mt-3 max-w-2xl text-sm text-stone-700">
-                {area.currentState}
-              </p>
-            ) : null}
           </div>
           <AreaOverflowMenu areaId={area.id} status={area.status} />
         </div>
       </header>
 
-      <details className="rounded-lg border border-stone-200 bg-white p-4">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
-          <Pencil size={15} />
-          Edit state
-        </summary>
-        <form action={updateAreaState} className="mt-4 space-y-4">
-          <input type="hidden" name="areaId" value={area.id} />
-          <label className="block text-sm font-medium text-stone-700">
-            <span>Current state</span>
-            <textarea
-              name="currentState"
-              rows={5}
-              defaultValue={area.currentState ?? ""}
-              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-            />
-          </label>
-          <label className="block text-sm font-medium text-stone-700">
-            <span>Next step</span>
-            <textarea
-              name="nextStep"
-              rows={3}
-              defaultValue={area.nextStep ?? ""}
-              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-            />
-          </label>
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
-            >
-              Save state
-            </button>
-          </div>
-        </form>
-      </details>
+      <CheckInFeed
+        parentType="area"
+        parentId={area.id}
+        checkIns={area.checkIns}
+      />
 
       {area.id === "area_inbox" ? (
         <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
@@ -130,9 +97,12 @@ export default async function AreaPage({ params }: AreaPageProps) {
               className="block py-2 transition hover:text-teal-700"
             >
               <p className="text-sm font-medium text-stone-800">{project.name}</p>
-              <p className="mt-0.5 text-xs text-stone-500">
-                {project.currentState}
-              </p>
+              {project.latestCheckIn ? (
+                <p className="mt-0.5 text-xs text-stone-500">
+                  {checkInSnippet(project.latestCheckIn.bodyMd, 100)} ·{" "}
+                  {formatShortDate(project.latestCheckIn.createdAt)}
+                </p>
+              ) : null}
             </Link>
           ))}
         </Panel>
@@ -352,7 +322,7 @@ async function loadArea(areaId: string) {
       }),
     ]);
 
-    const [notes, docs, attachments, pendingCaptures] = area
+    const [notes, docs, attachments, checkIns, latestProjectCheckIns, pendingCaptures] = area
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
@@ -369,6 +339,15 @@ async function loadArea(areaId: string) {
             orderBy: { createdAt: "desc" },
             take: 12,
           }),
+          prisma.checkIn.findMany({
+            where: { parentType: "area", parentId: area.id },
+            orderBy: { createdAt: "desc" },
+            take: 15,
+          }),
+          getLatestCheckIns(
+            "project",
+            area.projects.map((project) => project.id),
+          ),
           area.id === "area_inbox"
             ? prisma.capture.findMany({
                 where: {
@@ -379,11 +358,23 @@ async function loadArea(areaId: string) {
               })
             : Promise.resolve([]),
         ])
-      : [[], [], [], []];
+      : [[], [], [], [], new Map<string, { bodyMd: string; createdAt: Date }>(), []];
 
     return {
       ok: true as const,
-      area: area ? { ...area, notes, docs, attachments } : null,
+      area: area
+        ? {
+            ...area,
+            notes,
+            docs,
+            attachments,
+            checkIns,
+            projects: area.projects.map((project) => ({
+              ...project,
+              latestCheckIn: latestProjectCheckIns.get(project.id) ?? null,
+            })),
+          }
+        : null,
       pendingCaptures,
       domains,
     };

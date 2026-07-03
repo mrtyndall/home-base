@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
+import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
 import { projectLastActivityFact } from "@/lib/slippage";
 
 export const dynamic = "force-dynamic";
@@ -155,12 +156,23 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           {project.targetDate ? (
             <span>Target {formatDateOnly(project.targetDate)}</span>
           ) : null}
+          {project.milestoneCounts && project.milestoneCounts.total > 0 ? (
+            <span>
+              {project.milestoneCounts.completed} of{" "}
+              {project.milestoneCounts.total} milestones
+            </span>
+          ) : null}
         </div>
 
         {slipFact ? <p className="text-sm text-stone-600">{slipFact}</p> : null}
 
-        {project.currentState?.trim() ? (
-          <p className="text-sm text-stone-700">{project.currentState}</p>
+        {project.latestCheckIn ? (
+          <p className="text-sm text-stone-700">
+            {checkInSnippet(project.latestCheckIn.bodyMd)}{" "}
+            <span className="text-stone-500">
+              · {formatShortDate(project.latestCheckIn.createdAt)}
+            </span>
+          </p>
         ) : null}
         {freshNote ? (
           <p className="border-l-2 border-stone-200 pl-3 text-sm text-stone-600">
@@ -178,6 +190,8 @@ type ProjectListItem = Project & {
   activity: Array<Pick<ProjectActivity, "createdAt">>;
   notes: Array<Pick<EntityNote, "bodyMd" | "createdAt">>;
   lastTaskActivity: Date | null;
+  latestCheckIn: { bodyMd: string; createdAt: Date } | null;
+  milestoneCounts: { completed: number; total: number } | null;
 };
 
 function getNextDatedTask(project: ProjectListItem) {
@@ -242,23 +256,29 @@ async function loadProjects() {
       take: 80,
     });
 
-    const [notes, taskActivity] = projects.length
-      ? await Promise.all([
-          prisma.entityNote.findMany({
-            where: {
-              parentType: "project",
-              parentId: { in: projects.map((project) => project.id) },
-            },
-            orderBy: { createdAt: "desc" },
-            take: 160,
-          }),
-          prisma.task.groupBy({
-            by: ["projectId"],
-            where: { projectId: { in: projects.map((project) => project.id) } },
-            _max: { createdAt: true, completedAt: true, updatedAt: true },
-          }),
-        ])
-      : [[], []];
+    const projectIds = projects.map((project) => project.id);
+    const [notes, taskActivity, latestCheckIns, milestoneGroups] =
+      await Promise.all([
+        prisma.entityNote.findMany({
+          where: {
+            parentType: "project",
+            parentId: { in: projectIds },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 160,
+        }),
+        prisma.task.groupBy({
+          by: ["projectId"],
+          where: { projectId: { in: projectIds } },
+          _max: { createdAt: true, completedAt: true, updatedAt: true },
+        }),
+        getLatestCheckIns("project", projectIds),
+        prisma.milestone.groupBy({
+          by: ["projectId", "status"],
+          where: { projectId: { in: projectIds } },
+          _count: { _all: true },
+        }),
+      ]);
     const notesByProject = new Map<string, EntityNote[]>();
     for (const note of notes) {
       const group = notesByProject.get(note.parentId) ?? [];
@@ -279,10 +299,27 @@ async function loadProjects() {
         lastTaskActivityByProject.set(group.projectId, latest);
       }
     }
+    const milestoneCountsByProject = new Map<
+      string,
+      { completed: number; total: number }
+    >();
+    for (const group of milestoneGroups) {
+      const counts = milestoneCountsByProject.get(group.projectId) ?? {
+        completed: 0,
+        total: 0,
+      };
+      counts.total += group._count._all;
+      if (group.status === "completed") {
+        counts.completed += group._count._all;
+      }
+      milestoneCountsByProject.set(group.projectId, counts);
+    }
     const projectsWithNotes = projects.map((project) => ({
       ...project,
       notes: notesByProject.get(project.id) ?? [],
       lastTaskActivity: lastTaskActivityByProject.get(project.id) ?? null,
+      latestCheckIn: latestCheckIns.get(project.id) ?? null,
+      milestoneCounts: milestoneCountsByProject.get(project.id) ?? null,
     }));
 
     return { ok: true as const, projects: projectsWithNotes };

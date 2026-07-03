@@ -21,6 +21,11 @@ type ParserContext = {
 
 const parserSystemPrompt = `You parse raw personal operations captures into JSON actions.
 Return only a valid JSON array. Do not wrap it in Markdown.
+Each action is an object whose "type" field names the action, plus that action's fields, e.g.
+{ "type": "create_task", "title": "...", "area_match": "...", "due_date": "..." }
+{ "type": "create_entity_note", "parent_type": "project", "project_match": "...", "body_md": "..." }
+{ "type": "check_in", "project_match": "...", "body_md": "..." }
+create_entity_note and create_entity_doc require parent_type set to "area" or "project".
 Use these action types:
 - create_task
 - complete_task
@@ -30,6 +35,7 @@ Use these action types:
 - create_project
 - update_project_state
 - create_calendar_event
+- check_in
 - create_idea
 - append_to_idea
 - convert_idea
@@ -44,12 +50,14 @@ Rules:
 - Areas are ongoing responsibilities with no finish line. Projects are finishable outcomes.
 - If it can be finished, route it as a project. If Matt would still be responsible for it a year from now, route it as an area.
 - Use area_match, project_match, task_match, and idea_match as fuzzy names from context.
+- If the named container matches a known project from context, use project_match, never area_match. Only use area_match for known areas.
 - If the user gives no area or project, omit area_match and project_match so the server can place it in the Inbox area.
 - Capture classifies, never coerces. Do not manufacture a task from non-task input.
 - Clear action intent ("do", "buy", "call", "fix", "schedule", "renew") creates a task.
 - A thought, opinion, or possibility ("what if", "I wonder", "idea:") creates an idea.
 - A fact, link, or recommendation someone mentioned creates a reference, or an entity note when a known area/project is named.
-- Work narration on a known project or area creates project activity/update or an entity note.
+- Status narration on a known project or area ("check in on X: ...", "quick update on X: ...", progress reports) uses check_in with body_md and area_match or project_match. Check-ins are the living record of where things stand.
+- Work narration on a known project or area that is not a status update creates project activity/update or an entity note.
 - If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
 - If unparseable, return { "error": "..." } and create no entity.
 - "Star X" / "make X a top task" uses star_task with task_match. "Unstar X" uses star_task with starred false.
@@ -167,6 +175,19 @@ function fallbackParse(rawText: string): ParserAction[] {
   const projectMatch = trimmed.match(/^project\s*[:,-]\s*(.+)$/i);
   if (projectMatch?.[1]) {
     return [{ type: "create_project", name: projectMatch[1].trim() }];
+  }
+
+  const checkInMatch = trimmed.match(
+    /^check in on (?:the )?(.+?)\s*[:,-]\s*(.+)$/i,
+  );
+  if (checkInMatch?.[1] && checkInMatch[2]) {
+    return [
+      {
+        type: "check_in",
+        project_match: checkInMatch[1].trim(),
+        body_md: checkInMatch[2].trim(),
+      },
+    ];
   }
 
   const projectLogMatch = trimmed.match(

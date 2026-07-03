@@ -294,6 +294,9 @@ async function executeActions(
       case "create_reference":
         createdItems.push(await createReference(action, context));
         break;
+      case "check_in":
+        createdItems.push(await executeCheckIn(action, context));
+        break;
       case "create_entity_note":
         createdItems.push(await createEntityNote(action, context));
         break;
@@ -459,7 +462,7 @@ async function updateAreaState(
     },
   });
 
-  return [
+  const items: CreatedItemRef[] = [
     {
       type: "area" as const,
       id: area.id,
@@ -471,6 +474,28 @@ async function updateAreaState(
       label: "Area note logged",
     },
   ];
+
+  if (action.current_state?.trim()) {
+    const nextStep = action.next_step?.trim();
+    const checkIn = await prisma.checkIn.create({
+      data: {
+        parentType: "area",
+        parentId: area.id,
+        bodyMd:
+          action.current_state.trim() +
+          (nextStep ? `\n\nNext step: ${nextStep}` : ""),
+        source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+        captureId: context.captureId,
+      },
+    });
+    items.push({
+      type: "check_in",
+      id: checkIn.id,
+      label: `Check-in posted to ${area.name}`,
+    });
+  }
+
+  return items;
 }
 
 async function completeTask(taskMatch: string, context: ExecutionContext) {
@@ -559,7 +584,7 @@ async function updateProjectState(
     },
   });
 
-  return [
+  const items: CreatedItemRef[] = [
     {
       type: "project" as const,
       id: project.id,
@@ -571,6 +596,30 @@ async function updateProjectState(
       label: "Project activity logged",
     },
   ];
+
+  // Check-ins are the living record now; state narration written through
+  // the legacy action must still surface on cards and feeds.
+  if (action.current_state?.trim()) {
+    const nextStep = action.next_step?.trim();
+    const checkIn = await prisma.checkIn.create({
+      data: {
+        parentType: "project",
+        parentId: project.id,
+        bodyMd:
+          action.current_state.trim() +
+          (nextStep ? `\n\nNext step: ${nextStep}` : ""),
+        source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+        captureId: context.captureId,
+      },
+    });
+    items.push({
+      type: "check_in",
+      id: checkIn.id,
+      label: `Check-in posted to ${project.name}`,
+    });
+  }
+
+  return items;
 }
 
 async function createCalendarEvent(
@@ -855,6 +904,62 @@ async function matchProject(projectMatch: string) {
   });
 
   return project;
+}
+
+async function executeCheckIn(
+  action: Extract<ExecutableAction, { type: "check_in" }>,
+  context: ExecutionContext,
+) {
+  // Resolve the parent: explicit parent_type wins; otherwise try the
+  // project match first, then the area match.
+  let parent: { type: "area" | "project"; id: string; label: string } | null =
+    null;
+
+  if (action.parent_type) {
+    parent = await resolveEntityParent(
+      action.parent_type,
+      action.area_match,
+      action.project_match,
+      context,
+    );
+  } else {
+    if (action.project_match) {
+      const project = await matchProject(action.project_match);
+      if (project) {
+        parent = { type: "project", id: project.id, label: project.name };
+      }
+    }
+    if (!parent) {
+      const match = action.area_match ?? action.project_match;
+      const areaId = matchAreaId(match, context.areas);
+      if (areaId) {
+        const area = context.areas.find((candidate) => candidate.id === areaId);
+        parent = { type: "area", id: areaId, label: area?.name ?? "area" };
+      }
+    }
+  }
+
+  if (!parent) {
+    throw new Error(
+      `No project or area matched "${action.project_match ?? action.area_match ?? ""}" for check-in.`,
+    );
+  }
+
+  const checkIn = await prisma.checkIn.create({
+    data: {
+      parentType: parent.type,
+      parentId: parent.id,
+      bodyMd: action.body_md,
+      source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+      captureId: context.captureId,
+    },
+  });
+
+  return {
+    type: "check_in" as const,
+    id: checkIn.id,
+    label: `Check-in posted to ${parent.label}`,
+  };
 }
 
 async function resolveEntityParent(

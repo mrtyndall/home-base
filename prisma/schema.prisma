@@ -86,6 +86,13 @@ enum EntityParentType {
   project
 }
 
+enum CheckInSource {
+  manual
+  ai_draft
+  ai_draft_edited
+  voice
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -107,6 +114,7 @@ model Capture {
   createdAt     DateTime            @default(now()) @map("created_at")
 
   calendarEvents  CalendarEvent[]
+  checkIns        CheckIn[]
   entityDocs      EntityDoc[]
   entityNotes     EntityNote[]
   ideaNotes       IdeaNote[]
@@ -317,6 +325,22 @@ model EntityNote {
   @@index([parentType, parentId, createdAt])
   @@index([captureId])
   @@map("entity_notes")
+}
+
+model CheckIn {
+  id         String           @id @default(uuid())
+  parentType EntityParentType @map("parent_type")
+  parentId   String           @map("parent_id")
+  bodyMd     String           @map("body_md")
+  source     CheckInSource    @default(manual)
+  captureId  String?          @map("capture_id")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([parentType, parentId, createdAt])
+  @@index([captureId])
+  @@map("check_ins")
 }
 
 model EntityDoc {

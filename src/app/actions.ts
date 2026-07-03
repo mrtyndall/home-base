@@ -771,6 +771,15 @@ export async function completeMilestone(formData: FormData) {
     data: { status: "completed", completedAt: new Date() },
   });
 
+  await prisma.projectActivity.create({
+    data: {
+      projectId: milestone.projectId,
+      entry: `Milestone completed: ${milestone.title}.`,
+      source: "manual",
+    },
+  });
+
+  revalidatePath("/projects");
   revalidatePath(`/projects/${milestone.projectId}`);
 }
 

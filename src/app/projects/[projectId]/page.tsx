@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarDays, Pencil, Plus } from "lucide-react";
-import {
-  addProjectTask,
-  updateProjectState,
-  updateProjectTimeframe,
-} from "@/app/actions";
+import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
+import { addProjectTask, updateProjectTimeframe } from "@/app/actions";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
+import { CheckInFeed } from "@/components/check-in-feed";
 import { EntityDepth, MilestonesPanel } from "@/components/entity-depth";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
@@ -60,12 +57,14 @@ export default async function ProjectDetailPage({
               {project.targetDate
                 ? ` / target ${formatDateOnly(project.targetDate)}`
                 : ""}
+              {project.milestones.length > 0
+                ? ` / ${
+                    project.milestones.filter(
+                      (milestone) => milestone.status === "completed",
+                    ).length
+                  } of ${project.milestones.length} milestones`
+                : ""}
             </p>
-            {project.currentState?.trim() ? (
-              <p className="mt-3 max-w-2xl text-sm text-stone-700">
-                {project.currentState}
-              </p>
-            ) : null}
           </div>
           <ProjectOverflowMenu projectId={project.id} status={project.status} />
         </div>
@@ -112,39 +111,11 @@ export default async function ProjectDetailPage({
         </form>
       </details>
 
-      <details className="rounded-lg border border-stone-200 bg-white p-4">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
-          <Pencil size={15} />
-          Edit state
-        </summary>
-        <form action={updateProjectState} className="mt-4 space-y-4">
-          <input type="hidden" name="projectId" value={project.id} />
-          <label className="block text-sm font-medium text-stone-700">
-            <span>Current state</span>
-            <textarea
-              name="currentState"
-              rows={5}
-              defaultValue={project.currentState ?? ""}
-              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-            />
-          </label>
-          <label className="block text-sm font-medium text-stone-700">
-            <span>Next step</span>
-            <textarea
-              name="nextStep"
-              rows={3}
-              defaultValue={project.nextStep ?? ""}
-              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-            />
-          </label>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
-          >
-            Save
-          </button>
-        </form>
-      </details>
+      <CheckInFeed
+        parentType="project"
+        parentId={project.id}
+        checkIns={project.checkIns}
+      />
 
       <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
@@ -197,12 +168,7 @@ export default async function ProjectDetailPage({
         )}
       </section>
 
-      {project.milestones.length > 0 ? (
-        <MilestonesPanel
-          projectId={project.id}
-          milestones={project.milestones}
-        />
-      ) : null}
+      <MilestonesPanel projectId={project.id} milestones={project.milestones} />
 
       <EntityDepth
         parentType="project"
@@ -254,7 +220,7 @@ async function loadProject(projectId: string) {
       },
     });
 
-    const [notes, docs, attachments] = project
+    const [notes, docs, attachments, checkIns] = project
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "project", parentId: project.id },
@@ -271,12 +237,17 @@ async function loadProject(projectId: string) {
             orderBy: { createdAt: "desc" },
             take: 12,
           }),
+          prisma.checkIn.findMany({
+            where: { parentType: "project", parentId: project.id },
+            orderBy: { createdAt: "desc" },
+            take: 15,
+          }),
         ])
-      : [[], [], []];
+      : [[], [], [], []];
 
     return {
       ok: true as const,
-      project: project ? { ...project, notes, docs, attachments } : null,
+      project: project ? { ...project, notes, docs, attachments, checkIns } : null,
     };
   } catch {
     return { ok: false as const };
