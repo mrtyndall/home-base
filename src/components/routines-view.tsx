@@ -85,10 +85,10 @@ function RoutineCard({ routine }: { routine: RoutineWithState }) {
             </p>
           </div>
           {routine.status === "active" && routine.dueToday ? (
-            routine.completedToday ? (
+            routine.satisfied ? (
               <span className="inline-flex items-center gap-1.5 text-sm text-teal-800">
                 <Check size={15} />
-                Done today
+                {routine.completedToday ? "Done today" : "Done this week"}
               </span>
             ) : (
               <RoutineCompleteButton routineId={routine.id} />

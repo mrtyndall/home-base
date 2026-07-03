@@ -72,7 +72,7 @@ Rules:
 - Reporting a habit done ("did my morning stretch", "finished the stretch routine") uses complete_routine with routine_match.
 - Facts people mention ("note for Chris: his daughter starts college in August") use create_person_fact with person_match, fact_value, date_relevant (ISO date, resolve month names to a concrete date) and recurring true for anniversaries/birthdays. The server creates the person if unknown.
 - Meeting or talking with someone ("had lunch with Sarah", "called Dad about the trip") uses log_interaction with person_match, interaction_type, notes, occurred_at.
-- Introducing a person ("add Chris Miller to people, he's my neighbor, chris@example.com") uses create_person.
+- Introducing a person ("add Chris Miller to people, he's my neighbor, chris@example.com") uses create_person with name (required), relationship_type, email, phone, company.
 - Work narration on a known project or area that is not a status update creates project activity/update or an entity note.
 - If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
 - If unparseable, return { "error": "..." } and create no entity.

@@ -135,7 +135,7 @@ export async function getTodayDashboard() {
             id: routine.id,
             name: routine.name,
             timeWindow: routine.scheduleParsed.timeWindow,
-            completedToday: routine.completedToday,
+            completedToday: routine.satisfied,
           })),
       )
       .catch(() => []);

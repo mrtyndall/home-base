@@ -158,7 +158,8 @@ export async function nudgeUpcomingPersonFacts() {
     include: { person: { select: { id: true, name: true, status: true } } },
   });
 
-  let nudged = 0;
+  let written = 0;
+  let delivered = 0;
   for (const fact of facts) {
     if (fact.person.status !== "active") continue;
     const dateStr = fact.dateRelevant!.toISOString().slice(0, 10);
@@ -206,10 +207,10 @@ export async function nudgeUpcomingPersonFacts() {
       },
     });
 
-    let delivered = false;
+    let pushDelivered = false;
     if (isPushoverConfigured()) {
       const result = await sendPushoverMessage("Coming up", body);
-      delivered = result.ok;
+      pushDelivered = result.ok;
     }
 
     // The nudge row is both the push audit and the once-per-occurrence
@@ -220,13 +221,18 @@ export async function nudgeUpcomingPersonFacts() {
         title: "Coming up",
         body,
         sentAt: new Date(),
-        supportingData: { personFactId: fact.id, occurrence, delivered },
+        supportingData: {
+          personFactId: fact.id,
+          occurrence,
+          delivered: pushDelivered,
+        },
       },
     });
-    if (delivered) {
-      nudged += 1;
+    written += 1;
+    if (pushDelivered) {
+      delivered += 1;
     }
   }
 
-  return nudged;
+  return { written, delivered };
 }

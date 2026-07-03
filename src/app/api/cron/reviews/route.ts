@@ -70,13 +70,17 @@ export async function POST(request: Request) {
     }
   }
 
-  const factNudges = await nudgeUpcomingPersonFacts().catch(() => 0);
+  const factNudges = await nudgeUpcomingPersonFacts().catch(() => ({
+    written: 0,
+    delivered: 0,
+  }));
   const interactionsLogged = await logCalendarInteractions().catch(() => 0);
 
   return Response.json({
     surfaced: due.length,
     nudged,
-    factNudges,
+    factNudgesWritten: factNudges.written,
+    factNudgesDelivered: factNudges.delivered,
     interactionsLogged,
   });
 }

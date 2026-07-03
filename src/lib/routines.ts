@@ -327,14 +327,19 @@ export async function getRoutinesWithState(todayStr = localDateString()) {
   return routines.map((routine) => {
     const schedule = parseRoutineSchedule(routine.schedule);
     const completedDates = completionDateStrings(routine.completions);
+    const completedToday = isCompletedToday(completedDates, todayStr);
+    // "satisfied" = nothing left to do in the current cadence period:
+    // today for daily/custom, the current ISO week for weekly.
+    const satisfied =
+      schedule.frequency === "weekly"
+        ? isCompletedThisWeek(completedDates, todayStr)
+        : completedToday;
     return {
       ...routine,
       scheduleParsed: schedule,
       dueToday: isDueToday(routine, completedDates, todayStr),
-      completedToday:
-        schedule.frequency === "weekly"
-          ? isCompletedThisWeek(completedDates, todayStr)
-          : isCompletedToday(completedDates, todayStr),
+      completedToday,
+      satisfied,
       runLength: computeRunLength(routine, routine.completions, todayStr),
     };
   });

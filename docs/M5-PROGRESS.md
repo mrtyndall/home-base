@@ -121,3 +121,12 @@ Format per step: what was built, test result, commit hash, deviations.
 - Gates: tsc clean, eslint clean, build succeeds.
 - Commit: (this commit)
 - DEVIATION: attendee matching is by exact email only (displayName matching invites false positives). DEVIATION: `logCalendarInteractions` also runs in the daily cron so environments where sync runs on a separate service still log interactions.
+
+### Phase 4 VERIFY
+- Fresh-eyes verification subagent: **PASS**. Gates green. Streak amendment held under adversarial review (run fact only when >0, gap renders nothing, no red/chain/heatmap anywhere); grace window, idempotent completion, auto-retire-with-history, weekend/paused edge cases, and task-view isolation all verified live. People: person/fact/nudge-window/dedup/Dec→Jan rollover/calendar idempotency/null-email guard/person page/search all verified live.
+- Defects reported and fixed in the follow-up commit:
+  1. create_person parser rule didn't enumerate fields → 50% live flake (LLM omitted `name`); rule now lists name/relationship_type/email/phone/company. (Failed capture preserved in Inbox per the sacred path.)
+  2. Cron `factNudges` counted only Pushover-delivered nudges — indistinguishable from "nothing happened" → response now reports `factNudgesWritten` and `factNudgesDelivered`.
+  3. Weekly routines showed "Done today" all week → state now distinguishes `completedToday` from `satisfied` (cadence period), copy reads "Done this week" when satisfied by an earlier day.
+- Noted, accepted: no DB unique on (routineId, day) — concurrent double-tap race is theoretical for single-user; recurring Feb-29 facts emit a nonexistent date string in copy in non-leap years (compare/dedup still correct); `autoRetireRoutines` is a deliberate write-on-read (lazy design).
+- Phase 4 gate: PASSED. Proceeding to Phase 5.
