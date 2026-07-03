@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CaptureSource {
+  in_app_text
+  in_app_voice
+  ios_shortcut
+  android_shortcut
+  api
+}
+
+enum CaptureParseStatus {
+  parsed
+  ambiguous
+  failed
+}
+
+enum ProjectStatus {
+  active
+  parked
+  completed
+  killed
+}
+
+enum TaskStatus {
+  open
+  completed
+  killed
+}
+
+enum IdeaStatus {
+  seed
+  developing
+  converted
+  killed
+}
+
+enum ConvertedToType {
+  task
+  project
+}
+
+enum CalendarEventSource {
+  google
+  capture
+  manual
+}
+
+enum NudgeTrigger {
+  clustering
+  time_sensitive
+}
+
+model Capture {
+  id            String              @id @default(uuid())
+  rawText       String              @map("raw_text")
+  source        CaptureSource
+  deviceContext Json?               @map("device_context")
+  parseStatus   CaptureParseStatus? @map("parse_status")
+  parsedActions Json?               @map("parsed_actions")
+  createdItems  Json?               @map("created_items")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  calendarEvents  CalendarEvent[]
+  ideaNotes       IdeaNote[]
+  ideas           Idea[]
+  projectActivity ProjectActivity[]
+  references      Reference[]
+  tasks           Task[]
+
+  @@index([createdAt])
+  @@index([parseStatus])
+  @@map("captures")
+}
+
+model Domain {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  sortOrder   Int     @default(0) @map("sort_order")
+  isSystem    Boolean @default(false) @map("is_system")
+  active      Boolean @default(true)
+
+  ideas      Idea[]
+  projects   Project[]
+  references Reference[]
+  tasks      Task[]
+
+  @@index([active, sortOrder])
+  @@map("domains")
+}
+
+model Project {
+  id                String        @id @default(uuid())
+  name              String
+  domainId          String        @map("domain_id")
+  status            ProjectStatus @default(active)
+  currentState      String        @map("current_state")
+  nextStep          String        @map("next_step")
+  targetDate        DateTime?     @map("target_date") @db.Date
+  slipThresholdDays Int           @default(14) @map("slip_threshold_days")
+  parkedAt          DateTime?     @map("parked_at")
+  completedAt       DateTime?     @map("completed_at")
+  killedAt          DateTime?     @map("killed_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  domain   Domain            @relation(fields: [domainId], references: [id])
+  activity ProjectActivity[]
+  tasks    Task[]
+
+  @@index([domainId, status])
+  @@index([targetDate])
+  @@map("projects")
+}
+
+model ProjectActivity {
+  id            String   @id @default(uuid())
+  projectId     String   @map("project_id")
+  entry         String
+  stateSnapshot Json?    @map("state_snapshot")
+  source        String
+  captureId     String?  @map("capture_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+  project Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([captureId])
+  @@map("project_activity")
+}
+
+model Task {
+  id              String     @id @default(uuid())
+  title           String
+  notes           String?
+  status          TaskStatus @default(open)
+  dueDate         DateTime?  @map("due_date") @db.Date
+  dueTime         String?    @map("due_time")
+  priority        String?
+  domainId        String     @map("domain_id")
+  projectId       String?    @map("project_id")
+  parentTaskId    String?    @map("parent_task_id")
+  recurrenceRule  String?    @map("recurrence_rule")
+  reminderOffsets Json?      @map("reminder_offsets")
+  source          String?
+  captureId       String?    @map("capture_id")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  completedAt     DateTime?  @map("completed_at")
+
+  capture  Capture? @relation(fields: [captureId], references: [id])
+  domain   Domain   @relation(fields: [domainId], references: [id])
+  parent   Task?    @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  project  Project? @relation(fields: [projectId], references: [id])
+  subtasks Task[]   @relation("TaskSubtasks")
+
+  @@index([domainId, status])
+  @@index([dueDate, dueTime])
+  @@index([projectId])
+  @@index([captureId])
+  @@map("tasks")
+}
+
+model Idea {
+  id              String           @id @default(uuid())
+  title           String
+  body            String?
+  domainId        String?          @map("domain_id")
+  tags            String[]         @default([])
+  status          IdeaStatus       @default(seed)
+  convertedToType ConvertedToType? @map("converted_to_type")
+  convertedToId   String?          @map("converted_to_id")
+  captureId       String?          @map("capture_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  capture Capture?   @relation(fields: [captureId], references: [id])
+  domain  Domain?    @relation(fields: [domainId], references: [id])
+  notes   IdeaNote[]
+
+  @@index([domainId, status])
+  @@index([captureId])
+  @@map("ideas")
+}
+
+model IdeaNote {
+  id        String   @id @default(uuid())
+  ideaId    String   @map("idea_id")
+  body      String
+  captureId String?  @map("capture_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+  idea    Idea     @relation(fields: [ideaId], references: [id])
+
+  @@index([ideaId, createdAt])
+  @@index([captureId])
+  @@map("idea_notes")
+}
+
+model Reference {
+  id          String   @id @default(uuid())
+  body        String
+  url         String?
+  tags        String[] @default([])
+  domainId    String?  @map("domain_id")
+  relatedType String?  @map("related_type")
+  relatedId   String?  @map("related_id")
+  captureId   String?  @map("capture_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+  domain  Domain?  @relation(fields: [domainId], references: [id])
+
+  @@index([domainId])
+  @@index([captureId])
+  @@map("references")
+}
+
+model CalendarEvent {
+  id            String              @id @default(uuid())
+  googleEventId String?             @unique @map("google_event_id")
+  title         String
+  start         DateTime
+  end           DateTime
+  location      String?
+  syncedAt      DateTime?           @map("synced_at")
+  source        CalendarEventSource @default(manual)
+  captureId     String?             @map("capture_id")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([start, end])
+  @@index([captureId])
+  @@map("calendar_events")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  type        String
+  title       String
+  body        String?
+  sourceRef   Json?    @map("source_ref")
+  status      String   @default("unread")
+  undoPayload Json?    @map("undo_payload")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("notifications")
+}
+
+model Nudge {
+  id             String       @id @default(uuid())
+  trigger        NudgeTrigger
+  title          String
+  body           String
+  supportingData Json?        @map("supporting_data")
+  sentAt         DateTime?    @map("sent_at")
+  actedOn        Boolean?     @map("acted_on")
+
+  @@index([trigger, sentAt])
+  @@map("nudges")
+}
+
+model CaptureToken {
+  id               String    @id @default(uuid())
+  tokenHash        String    @unique @map("token_hash")
+  label            String
+  deviceName       String    @map("device_name")
+  rateLimitPerHour Int       @default(60) @map("rate_limit_per_hour")
+  lastUsedAt       DateTime? @map("last_used_at")
+  revokedAt        DateTime? @map("revoked_at")
+
+  @@index([revokedAt])
+  @@map("capture_tokens")
+}
+
+model AppSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
