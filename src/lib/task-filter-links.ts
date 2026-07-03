@@ -6,6 +6,19 @@ export type TaskSectionFilter =
   | "someday"
   | "unscheduled";
 
+export type TaskViewFilter = "schedule" | "open" | "done" | "all";
+
+const taskViews = new Set<TaskViewFilter>(["schedule", "open", "done", "all"]);
+
+export function normalizeTaskView(
+  value: string | string[] | undefined,
+): TaskViewFilter {
+  const view = Array.isArray(value) ? value[0] : value;
+  return view && taskViews.has(view as TaskViewFilter)
+    ? (view as TaskViewFilter)
+    : "schedule";
+}
+
 const taskSections = new Set<TaskSectionFilter>([
   "all",
   "today",
@@ -56,17 +69,20 @@ export function buildTasksFilterHref({
   projects,
   section,
   starred,
+  view,
 }: {
   domains: string[];
   projects: string[];
   section: TaskSectionFilter;
   starred?: boolean;
+  view?: TaskViewFilter;
 }) {
   const params = new URLSearchParams();
   for (const domain of domains) params.append("domain", domain);
   for (const project of projects) params.append("project", project);
   if (section !== "all") params.set("section", section);
   if (starred) params.set("starred", "1");
+  if (view && view !== "schedule") params.set("view", view);
   const query = params.toString();
   return query ? `/tasks?${query}` : "/tasks";
 }

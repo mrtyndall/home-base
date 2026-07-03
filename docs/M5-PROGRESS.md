@@ -23,3 +23,9 @@ Format per step: what was built, test result, commit hash, deviations.
 - Gates: `tsc --noEmit` clean, `eslint --max-warnings=0` clean, `next build` succeeds.
 - Commit: (this commit)
 - Notes: test tasks B/C left open+starred in dev DB for phase VERIFY; will be completed (never deleted) at session end. Seed script kept at `scripts/m5-step1-seed.ts`.
+
+### Step 2 — Task Views
+- Built: Tasks tab view control with **Schedule** (existing sections + jumps), **All Open** (every open task, due date asc, undated last, cap 200), **Done** (completed, newest first, cap 100), **All** (open + done stacked). `view` searchParam (`normalizeTaskView`, carried through every filter href). Domain/project/starred filters apply in all views; star/complete inline actions available wherever tasks are open; Done rows link to detail with a plain "completed <date>" fact.
+- Test (work-order): switched all four views via URL — each renders; created `M5T step2 task`, saw it in All Open, completed it, it left All Open and appeared in Done (newest first) with completion date. Existing `task-filter-links` unit tests still pass. PASS.
+- Gates: tsc clean, eslint clean, build succeeds.
+- Commit: (this commit)

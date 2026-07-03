@@ -13,8 +13,10 @@ import {
   normalizeFilterValues,
   normalizeStarredFilter,
   normalizeTaskSection,
+  normalizeTaskView,
   toggleFilterValue,
   type TaskSectionFilter,
+  type TaskViewFilter,
 } from "@/lib/task-filter-links";
 
 export const dynamic = "force-dynamic";
@@ -25,22 +27,24 @@ type TasksPageProps = {
     project?: string | string[];
     section?: string | string[];
     starred?: string | string[];
+    view?: string | string[];
   }>;
 };
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
-  const { domain, project, section, starred } = await searchParams;
+  const { domain, project, section, starred, view } = await searchParams;
 
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
   }
 
-  const result = await loadTasks();
+  const selectedView = normalizeTaskView(view);
+  const result = await loadTasks(selectedView);
   if (!result.ok) {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { tasks, projects, domains } = result;
+  const { tasks, doneTasks, projects, domains } = result;
   const selectedDomainIds = normalizeFilterValues(
     domain,
     domains.map((item) => item.id),
@@ -56,6 +60,24 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const selectedSection = normalizeTaskSection(section);
   const starredOnly = normalizeStarredFilter(starred);
   const visibleTasks = tasks.filter((task) => {
+    if (
+      selectedDomainIds.length > 0 &&
+      !selectedDomainIds.includes(task.area.domainId)
+    ) {
+      return false;
+    }
+    if (
+      selectedProjectIds.length > 0 &&
+      (!task.projectId || !selectedProjectIds.includes(task.projectId))
+    ) {
+      return false;
+    }
+    if (starredOnly && !task.starred) {
+      return false;
+    }
+    return true;
+  });
+  const visibleDoneTasks = doneTasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
       !selectedDomainIds.includes(task.area.domainId)
@@ -96,6 +118,13 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         areaGroups={areaGroups}
         projects={projectOptions}
       />
+      <ViewControl
+        selectedView={selectedView}
+        selectedDomainIds={selectedDomainIds}
+        selectedProjectIds={selectedProjectIds}
+        selectedSection={selectedSection}
+        starredOnly={starredOnly}
+      />
       <TaskFilters
         domains={domains}
         projects={projects}
@@ -103,22 +132,38 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         selectedProjectIds={selectedProjectIds}
         selectedSection={selectedSection}
         starredOnly={starredOnly}
+        view={selectedView}
       />
-      <SectionJumps
-        selectedDomainIds={selectedDomainIds}
-        selectedProjectIds={selectedProjectIds}
-        selectedSection={selectedSection}
-        starredOnly={starredOnly}
-        todayCount={sections.today.length}
-        tomorrowCount={sections.tomorrow.length}
-        upcomingCount={sections.upcoming.reduce(
-          (total, group) => total + group.tasks.length,
-          0,
-        )}
-        somedayCount={sections.someday.length}
-        unscheduledCount={sections.noDate.length}
-      />
-      {(selectedSection === "all" || selectedSection === "today") ? (
+      {selectedView === "schedule" ? (
+        <SectionJumps
+          selectedDomainIds={selectedDomainIds}
+          selectedProjectIds={selectedProjectIds}
+          selectedSection={selectedSection}
+          starredOnly={starredOnly}
+          todayCount={sections.today.length}
+          tomorrowCount={sections.tomorrow.length}
+          upcomingCount={sections.upcoming.reduce(
+            (total, group) => total + group.tasks.length,
+            0,
+          )}
+          somedayCount={sections.someday.length}
+          unscheduledCount={sections.noDate.length}
+        />
+      ) : null}
+      {(selectedView === "open" || selectedView === "all") ? (
+        <AllOpenSection
+          tasks={visibleTasks}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
+      {(selectedView === "done" || selectedView === "all") ? (
+        <DoneSection tasks={visibleDoneTasks} />
+      ) : null}
+      {selectedView === "schedule" &&
+      (selectedSection === "all" || selectedSection === "today") ? (
         <TaskSection
           title="Today"
           empty="No tasks due today."
@@ -131,7 +176,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           projects={projectOptions}
         />
       ) : null}
-      {(selectedSection === "all" || selectedSection === "tomorrow") ? (
+      {selectedView === "schedule" &&
+      (selectedSection === "all" || selectedSection === "tomorrow") ? (
         <TaskSection
           title="Tomorrow"
           empty="No tasks due tomorrow."
@@ -144,7 +190,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           projects={projectOptions}
         />
       ) : null}
-      {(selectedSection === "all" || selectedSection === "upcoming") ? (
+      {selectedView === "schedule" &&
+      (selectedSection === "all" || selectedSection === "upcoming") ? (
         <UpcomingSection
           groups={sections.upcoming}
           today={today}
@@ -153,7 +200,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           projects={projectOptions}
         />
       ) : null}
-      {(selectedSection === "all" || selectedSection === "someday") ? (
+      {selectedView === "schedule" &&
+      (selectedSection === "all" || selectedSection === "someday") ? (
         <TaskSection
           title="Someday"
           empty="No someday tasks."
@@ -166,7 +214,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           projects={projectOptions}
         />
       ) : null}
-      {(selectedSection === "all" || selectedSection === "unscheduled") ? (
+      {selectedView === "schedule" &&
+      (selectedSection === "all" || selectedSection === "unscheduled") ? (
         <TaskSection
           title="Unscheduled"
           empty="No unscheduled tasks."
@@ -270,18 +319,65 @@ function SectionJumps({
   );
 }
 
+function ViewControl({
+  selectedView,
+  selectedDomainIds,
+  selectedProjectIds,
+  selectedSection,
+  starredOnly,
+}: {
+  selectedView: TaskViewFilter;
+  selectedDomainIds: string[];
+  selectedProjectIds: string[];
+  selectedSection: TaskSectionFilter;
+  starredOnly: boolean;
+}) {
+  const views: Array<{ value: TaskViewFilter; label: string }> = [
+    { value: "schedule", label: "Schedule" },
+    { value: "open", label: "All Open" },
+    { value: "done", label: "Done" },
+    { value: "all", label: "All" },
+  ];
+
+  return (
+    <nav aria-label="Task views" className="flex flex-wrap gap-2">
+      {views.map((view) => (
+        <Link
+          key={view.value}
+          href={buildTasksFilterHref({
+            domains: selectedDomainIds,
+            projects: selectedProjectIds,
+            section: selectedSection,
+            starred: starredOnly,
+            view: view.value,
+          })}
+          className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+            selectedView === view.value
+              ? "border-teal-600 bg-teal-50 text-teal-800"
+              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+          }`}
+        >
+          {view.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 function DomainFilter({
   domains,
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
   starredOnly,
+  view,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
+  view: TaskViewFilter;
 }) {
   const visibleDomains = domains.filter((domain) => !domain.isSystem);
   return (
@@ -292,6 +388,7 @@ function DomainFilter({
           projects: [],
           section: selectedSection,
           starred: starredOnly,
+          view,
         })}
         className={`rounded-md border px-3 py-1.5 text-sm transition ${
           selectedDomainIds.length === 0
@@ -309,6 +406,7 @@ function DomainFilter({
             projects: selectedProjectIds,
             section: selectedSection,
             starred: starredOnly,
+            view,
           })}
           className={`rounded-md border px-3 py-1.5 text-sm transition ${
             selectedDomainIds.includes(domain.id)
@@ -330,6 +428,7 @@ function TaskFilters({
   selectedProjectIds,
   selectedSection,
   starredOnly,
+  view,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
   projects: Array<Project & { area: Area & { domain: Domain } }>;
@@ -337,6 +436,7 @@ function TaskFilters({
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
+  view: TaskViewFilter;
 }) {
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-3">
@@ -351,6 +451,7 @@ function TaskFilters({
             selectedProjectIds={selectedProjectIds}
             selectedSection={selectedSection}
             starredOnly={starredOnly}
+            view={view}
           />
         </div>
         <div className="space-y-2">
@@ -363,6 +464,7 @@ function TaskFilters({
             selectedProjectIds={selectedProjectIds}
             selectedSection={selectedSection}
             starredOnly={starredOnly}
+            view={view}
           />
         </div>
         <div className="space-y-2">
@@ -376,6 +478,7 @@ function TaskFilters({
                 projects: selectedProjectIds,
                 section: selectedSection,
                 starred: false,
+                view,
               })}
               className={`rounded-md border px-3 py-1.5 text-sm transition ${
                 !starredOnly
@@ -391,6 +494,7 @@ function TaskFilters({
                 projects: selectedProjectIds,
                 section: selectedSection,
                 starred: true,
+                view,
               })}
               className={`rounded-md border px-3 py-1.5 text-sm transition ${
                 starredOnly
@@ -413,12 +517,14 @@ function ProjectFilter({
   selectedProjectIds,
   selectedSection,
   starredOnly,
+  view,
 }: {
   projects: Array<Project & { area: Area & { domain: Domain } }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
+  view: TaskViewFilter;
 }) {
   const visibleProjects = projects.filter(
     (project) =>
@@ -434,6 +540,7 @@ function ProjectFilter({
           projects: [],
           section: selectedSection,
           starred: starredOnly,
+          view,
         })}
         className={`rounded-md border px-3 py-1.5 text-sm transition ${
           selectedProjectIds.length === 0
@@ -451,6 +558,7 @@ function ProjectFilter({
             projects: toggleFilterValue(selectedProjectIds, project.id),
             section: selectedSection,
             starred: starredOnly,
+            view,
           })}
           className={`rounded-md border px-3 py-1.5 text-sm transition ${
             selectedProjectIds.includes(project.id)
@@ -571,6 +679,92 @@ function UpcomingSection({
   );
 }
 
+function AllOpenSection({
+  tasks,
+  today,
+  tomorrow,
+  areaGroups,
+  projects,
+}: {
+  tasks: TaskListItem[];
+  today: string;
+  tomorrow: string;
+  areaGroups: TaskAreaGroup[];
+  projects: TaskProjectOption[];
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">
+        All Open{" "}
+        <span className="font-normal text-stone-500">{tasks.length}</span>
+      </h2>
+      {tasks.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+          No open tasks.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projects}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DoneSection({ tasks }: { tasks: DoneTaskItem[] }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-stone-800">
+        Done <span className="font-normal text-stone-500">{tasks.length}</span>
+      </h2>
+      {tasks.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+          No completed tasks yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <article
+              key={task.id}
+              className="rounded-lg border border-stone-200 bg-white p-4"
+            >
+              <Link
+                href={`/tasks/${task.id}`}
+                className="-m-1 block rounded-md p-1 transition hover:bg-stone-50"
+              >
+                <p className="text-sm font-medium text-stone-800">
+                  {task.title}
+                </p>
+                <p className="mt-0.5 text-xs text-stone-500">
+                  {[
+                    task.area.domain.name,
+                    task.area.name,
+                    task.project?.name,
+                    task.completedAt
+                      ? `completed ${formatDateOnly(task.completedAt)}`
+                      : null,
+                  ]
+                    .filter((item): item is string => Boolean(item))
+                    .join(" / ")}
+                </p>
+              </Link>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TaskCard({
   task,
   today,
@@ -663,6 +857,11 @@ type TaskListItem = Task & {
   subtasks: Array<Task & { area: Area; project: Project | null }>;
 };
 
+type DoneTaskItem = Task & {
+  area: Area & { domain: Domain };
+  project: Project | null;
+};
+
 type TaskAreaGroup = {
   domainName: string;
   areas: Array<{ id: string; name: string }>;
@@ -732,23 +931,36 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
   };
 }
 
-async function loadTasks() {
+async function loadTasks(view: TaskViewFilter) {
   try {
-    const [tasks, projects, domains] = await Promise.all([
-      prisma.task.findMany({
-        where: { status: "open", parentTaskId: null },
-        include: {
-          area: { include: { domain: true } },
-          project: true,
-          subtasks: {
-            where: { status: "open" },
-            include: { area: true, project: true },
+    const [tasks, doneTasks, projects, domains] = await Promise.all([
+      view === "done"
+        ? Promise.resolve([] as TaskListItem[])
+        : prisma.task.findMany({
+            where: { status: "open", parentTaskId: null },
+            include: {
+              area: { include: { domain: true } },
+              project: true,
+              subtasks: {
+                where: { status: "open" },
+                include: { area: true, project: true },
+                orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+              },
+            },
             orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-          },
-        },
-        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-        take: 80,
-      }),
+            take: view === "schedule" ? 80 : 200,
+          }),
+      view === "done" || view === "all"
+        ? prisma.task.findMany({
+            where: { status: "completed" },
+            include: {
+              area: { include: { domain: true } },
+              project: true,
+            },
+            orderBy: [{ completedAt: "desc" }],
+            take: 100,
+          })
+        : Promise.resolve([] as DoneTaskItem[]),
       prisma.project.findMany({
         where: { status: { in: ["active", "parked", "someday"] } },
         include: { area: { include: { domain: true } } },
@@ -768,7 +980,7 @@ async function loadTasks() {
       }),
     ]);
 
-    return { ok: true as const, tasks, projects, domains };
+    return { ok: true as const, tasks, doneTasks, projects, domains };
   } catch {
     return { ok: false as const };
   }
