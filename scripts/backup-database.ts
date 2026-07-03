@@ -1,9 +1,13 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { config } from "dotenv";
 import { createReadStream } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+
+config({ path: ".env.local" });
+config();
 
 type DatabaseConnection = {
   host: string;

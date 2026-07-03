@@ -384,21 +384,21 @@ FOR EACH ROW EXECUTE FUNCTION prevent_capture_source_rewrite();
 
 -- Full-text indexes. Search is an integrity feature, so raw and inactive records are indexed too.
 CREATE INDEX "captures_fts_idx" ON "captures" USING GIN (
-  to_tsvector('english', COALESCE("raw_text", ''))
+  to_tsvector('pg_catalog.english'::regconfig, COALESCE("raw_text", ''))
 );
 
 CREATE INDEX "tasks_fts_idx" ON "tasks" USING GIN (
-  to_tsvector('english', COALESCE("title", '') || ' ' || COALESCE("notes", ''))
+  to_tsvector('pg_catalog.english'::regconfig, COALESCE("title", '') || ' ' || COALESCE("notes", ''))
 );
 
 CREATE INDEX "ideas_fts_idx" ON "ideas" USING GIN (
-  to_tsvector('english', COALESCE("title", '') || ' ' || COALESCE("body", '') || ' ' || COALESCE(array_to_string("tags", ' '), ''))
+  to_tsvector('pg_catalog.english'::regconfig, COALESCE("title", '') || ' ' || COALESCE("body", ''))
 );
 
 CREATE INDEX "references_fts_idx" ON "references" USING GIN (
-  to_tsvector('english', COALESCE("body", '') || ' ' || COALESCE("url", '') || ' ' || COALESCE(array_to_string("tags", ' '), ''))
+  to_tsvector('pg_catalog.english'::regconfig, COALESCE("body", '') || ' ' || COALESCE("url", ''))
 );
 
 CREATE INDEX "project_activity_fts_idx" ON "project_activity" USING GIN (
-  to_tsvector('english', COALESCE("entry", ''))
+  to_tsvector('pg_catalog.english'::regconfig, COALESCE("entry", ''))
 );
