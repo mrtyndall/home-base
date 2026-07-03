@@ -88,7 +88,7 @@ The refresh token is encrypted with `GOOGLE_TOKEN_ENCRYPTION_KEY`; that key must
 
 The sync worker pushes unsynced Home Base calendar events to Google, then pulls Google changes using Calendar API sync tokens. Google remains the source of truth on conflicts. If Google invalidates the sync token, the worker marks existing Google-origin events cancelled and performs a full resync without hard deletes.
 
-The Railway app service is deployed. Railway cron still needs to be configured in the service settings after Google secrets are added: `*/15 * * * *` running `npm run calendar:sync`.
+The Railway app service is deployed with Google OAuth completed (2026-07-03, "Production Hub Auth" client, redirect URI registered in Google Cloud Console). Scheduled sync on Railway runs through a `calendar-sync-cron` service (`cron/Dockerfile`, cron `*/15 * * * *`) that curls `POST /api/cron/calendar-sync` with `CRON_SECRET`, because the standalone runner image has no tsx/scripts. `GOOGLE_TOKEN_ENCRYPTION_KEY` lives only in Railway variables (the 1Password service account is read-only, so no vault copy exists).
 
 ## Hierarchy And Containers
 
@@ -152,6 +152,10 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Added task drag hover previews so destination sections show the moving task card before drop.
 - Tamed the Tasks project filter into one grouped selector so the filter surface stays readable as the project list grows.
 - Reworked the Tasks section jump row into a stronger navigation rail with plain-count emphasis for populated sections.
+- Changed Tasks filters to support multi-select domain/project chips and made section tiles filter the visible list instead of anchor-jumping.
+- Added an actual floating task drag preview so dragged cards visibly travel through Today and Tasks while drop targets remain highlighted.
+- Reworked Home from a passive status dashboard into action cards for Today, Inbox, Tasks, Projects, Ideas, and Settings, and removed the duplicate recent-capture billboard.
+- Improved task quick-add with a visible title label/placeholder and project chips instead of a project dropdown, while preserving instant title-first add.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

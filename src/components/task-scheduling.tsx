@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarDays, GripVertical } from "lucide-react";
+import { getTaskDragPreviewPosition } from "@/lib/task-drag-preview";
 
 let activeMouseDragTaskId: string | null = null;
 const dragStartEvent = "home-base-task-drag-start";
@@ -21,6 +22,11 @@ const dragEndEvent = "home-base-task-drag-end";
 type TaskDragPreview = {
   title: string;
   detail: string;
+};
+
+type TaskDragPreviewPosition = {
+  left: number;
+  top: number;
 };
 
 function announceTaskDragStart(preview: TaskDragPreview) {
@@ -198,20 +204,32 @@ export function DraggableTaskLink({
   const mouseStart = useRef<{ x: number; y: number } | null>(null);
   const pointerDragging = useRef(false);
   const dragAnnounced = useRef(false);
+  const nativeDragImageRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClick = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragPending, setDragPending] = useState(false);
+  const [dragPreviewPosition, setDragPreviewPosition] =
+    useState<TaskDragPreviewPosition | null>(null);
   const [, startTransition] = useTransition();
 
-  function markDragStarted() {
+  function moveDragPreview(clientX: number, clientY: number) {
+    if (clientX === 0 && clientY === 0) return;
+    setDragPreviewPosition(getTaskDragPreviewPosition(clientX, clientY));
+  }
+
+  function markDragStarted(clientX?: number, clientY?: number) {
     if (dragAnnounced.current) return;
     dragAnnounced.current = true;
+    if (clientX !== undefined && clientY !== undefined) {
+      moveDragPreview(clientX, clientY);
+    }
     announceTaskDragStart({ title, detail });
   }
 
   function markDragEnded() {
     if (!dragAnnounced.current) return;
     dragAnnounced.current = false;
+    setDragPreviewPosition(null);
     announceTaskDragEnd();
   }
 
@@ -244,7 +262,8 @@ export function DraggableTaskLink({
       pointerDragging.current = true;
       suppressNextClick.current = true;
       clearLongPress();
-      markDragStarted();
+      moveDragPreview(event.clientX, event.clientY);
+      markDragStarted(event.clientX, event.clientY);
     }
   }
 
@@ -293,7 +312,8 @@ export function DraggableTaskLink({
       activeMouseDragTaskId = taskId;
       suppressNextClick.current = true;
       clearLongPress();
-      markDragStarted();
+      moveDragPreview(event.clientX, event.clientY);
+      markDragStarted(event.clientX, event.clientY);
     }
   }
 
@@ -307,60 +327,111 @@ export function DraggableTaskLink({
   }
 
   return (
-    <div
-      data-task-id={taskId}
-      draggable
-      onDragStart={(event) => {
-        markDragStarted();
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("application/x-home-base-task-id", taskId);
-        event.dataTransfer.setData("text/plain", taskId);
-      }}
-      onDragEnd={markDragEnded}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-md p-1 transition active:cursor-grabbing hover:bg-stone-50 ${
-        dragPending ? "opacity-60" : ""
-      }`}
-    >
-      <GripVertical
-        aria-hidden="true"
-        className="mt-0.5 hidden shrink-0 text-stone-300 sm:block"
-        size={16}
-      />
-      <Link
-        href={href}
-        onClickCapture={(event) => {
-          if (!suppressNextClick.current) return;
-          event.preventDefault();
-          event.stopPropagation();
-          suppressNextClick.current = false;
+    <>
+      <div
+        data-task-id={taskId}
+        draggable
+        onDragStart={(event) => {
+          markDragStarted(event.clientX, event.clientY);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("application/x-home-base-task-id", taskId);
+          event.dataTransfer.setData("text/plain", taskId);
+          if (nativeDragImageRef.current) {
+            event.dataTransfer.setDragImage(nativeDragImageRef.current, 16, 16);
+          }
         }}
-        className="min-w-0 flex-1"
+        onDrag={(event) => moveDragPreview(event.clientX, event.clientY)}
+        onDragEnd={markDragEnded}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-md p-1 transition active:cursor-grabbing hover:bg-stone-50 ${
+          dragPending ? "opacity-60" : ""
+        } ${dragPreviewPosition ? "opacity-50" : ""}`}
       >
-        <h3 className="font-medium">{title}</h3>
-        <p className="mt-1 text-sm text-stone-500">{detail}</p>
-      </Link>
-      <ScheduleMenu
-        taskId={taskId}
-        currentDueDate={currentDueDate}
-        currentAreaId={currentAreaId}
-        currentProjectId={currentProjectId}
-        areaGroups={areaGroups}
-        projects={projects}
-        today={today}
-        tomorrow={tomorrow}
-        open={menuOpen}
-        setOpen={setMenuOpen}
-      />
-    </div>
+        <GripVertical
+          aria-hidden="true"
+          className="mt-0.5 hidden shrink-0 text-stone-300 sm:block"
+          size={16}
+        />
+        <Link
+          href={href}
+          onClickCapture={(event) => {
+            if (!suppressNextClick.current) return;
+            event.preventDefault();
+            event.stopPropagation();
+            suppressNextClick.current = false;
+          }}
+          className="min-w-0 flex-1"
+        >
+          <h3 className="font-medium">{title}</h3>
+          <p className="mt-1 text-sm text-stone-500">{detail}</p>
+        </Link>
+        <ScheduleMenu
+          taskId={taskId}
+          currentDueDate={currentDueDate}
+          currentAreaId={currentAreaId}
+          currentProjectId={currentProjectId}
+          areaGroups={areaGroups}
+          projects={projects}
+          today={today}
+          tomorrow={tomorrow}
+          open={menuOpen}
+          setOpen={setMenuOpen}
+        />
+      </div>
+      <div className="pointer-events-none fixed -left-[9999px] top-0 w-72">
+        <TaskFloatingPreview
+          ref={nativeDragImageRef}
+          title={title}
+          detail={detail}
+        />
+      </div>
+      {dragPreviewPosition ? (
+        <div
+          className="pointer-events-none fixed z-50 w-72 max-w-[calc(100vw-2rem)]"
+          style={{
+            left: dragPreviewPosition.left,
+            top: dragPreviewPosition.top,
+          }}
+        >
+          <TaskFloatingPreview title={title} detail={detail} />
+        </div>
+      ) : null}
+    </>
   );
 }
+
+const TaskFloatingPreview = ({
+  title,
+  detail,
+  ref,
+}: {
+  title: string;
+  detail: string;
+  ref?: React.Ref<HTMLDivElement>;
+}) => (
+  <div
+    ref={ref}
+    className="rounded-xl border border-teal-400 bg-white p-4 text-stone-900 shadow-xl ring-2 ring-teal-100"
+  >
+    <div className="flex items-start gap-2">
+      <GripVertical
+        aria-hidden="true"
+        className="mt-0.5 shrink-0 text-teal-500"
+        size={16}
+      />
+      <div className="min-w-0">
+        <h3 className="truncate font-medium">{title}</h3>
+        <p className="mt-1 line-clamp-2 text-sm text-stone-500">{detail}</p>
+      </div>
+    </div>
+  </div>
+);
 
 function ScheduleMenu({
   taskId,

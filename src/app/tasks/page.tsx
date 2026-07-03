@@ -6,17 +6,27 @@ import { TaskCompleteButton } from "@/components/task-complete-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
-import { buildProjectFilterGroups } from "@/lib/task-filter-options";
 import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
+import {
+  buildTasksFilterHref,
+  normalizeFilterValues,
+  normalizeTaskSection,
+  toggleFilterValue,
+  type TaskSectionFilter,
+} from "@/lib/task-filter-links";
 
 export const dynamic = "force-dynamic";
 
 type TasksPageProps = {
-  searchParams: Promise<{ domain?: string; project?: string }>;
+  searchParams: Promise<{
+    domain?: string | string[];
+    project?: string | string[];
+    section?: string | string[];
+  }>;
 };
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
-  const { domain, project } = await searchParams;
+  const { domain, project, section } = await searchParams;
 
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
@@ -28,11 +38,32 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   }
 
   const { tasks, projects, domains } = result;
-  const selectedDomainId = domains.some((item) => item.id === domain) ? domain : "";
-  const selectedProjectId = projects.some((item) => item.id === project) ? project : "";
+  const selectedDomainIds = normalizeFilterValues(
+    domain,
+    domains.map((item) => item.id),
+  );
+  const allowedProjectIds = projects
+    .filter(
+      (item) =>
+        selectedDomainIds.length === 0 ||
+        selectedDomainIds.includes(item.area.domainId),
+    )
+    .map((item) => item.id);
+  const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
+  const selectedSection = normalizeTaskSection(section);
   const visibleTasks = tasks.filter((task) => {
-    if (selectedDomainId && task.area.domainId !== selectedDomainId) return false;
-    if (selectedProjectId && task.projectId !== selectedProjectId) return false;
+    if (
+      selectedDomainIds.length > 0 &&
+      !selectedDomainIds.includes(task.area.domainId)
+    ) {
+      return false;
+    }
+    if (
+      selectedProjectIds.length > 0 &&
+      (!task.projectId || !selectedProjectIds.includes(task.projectId))
+    ) {
+      return false;
+    }
     return true;
   });
   const today = localDateString();
@@ -61,10 +92,14 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       <TaskFilters
         domains={domains}
         projects={projects}
-        selectedDomainId={selectedDomainId}
-        selectedProjectId={selectedProjectId}
+        selectedDomainIds={selectedDomainIds}
+        selectedProjectIds={selectedProjectIds}
+        selectedSection={selectedSection}
       />
       <SectionJumps
+        selectedDomainIds={selectedDomainIds}
+        selectedProjectIds={selectedProjectIds}
+        selectedSection={selectedSection}
         todayCount={sections.today.length}
         tomorrowCount={sections.tomorrow.length}
         upcomingCount={sections.upcoming.reduce(
@@ -74,68 +109,84 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         somedayCount={sections.someday.length}
         unscheduledCount={sections.noDate.length}
       />
-      <TaskSection
-        title="Today"
-        empty="No tasks due today."
-        anchor="today"
-        targetDate={today}
-        tasks={sections.today}
-        today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
-      <TaskSection
-        title="Tomorrow"
-        empty="No tasks due tomorrow."
-        anchor="tomorrow"
-        targetDate={tomorrow}
-        tasks={sections.tomorrow}
-        today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
-      <UpcomingSection
-        groups={sections.upcoming}
-        today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
-      <TaskSection
-        title="Someday"
-        empty="No someday tasks."
-        anchor="someday"
-        targetDate={null}
-        tasks={sections.someday}
-        today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
-      <TaskSection
-        title="Unscheduled"
-        empty="No unscheduled tasks."
-        anchor="unscheduled"
-        targetDate={null}
-        tasks={sections.noDate}
-        today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
+      {(selectedSection === "all" || selectedSection === "today") ? (
+        <TaskSection
+          title="Today"
+          empty="No tasks due today."
+          anchor="today"
+          targetDate={today}
+          tasks={sections.today}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
+      {(selectedSection === "all" || selectedSection === "tomorrow") ? (
+        <TaskSection
+          title="Tomorrow"
+          empty="No tasks due tomorrow."
+          anchor="tomorrow"
+          targetDate={tomorrow}
+          tasks={sections.tomorrow}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
+      {(selectedSection === "all" || selectedSection === "upcoming") ? (
+        <UpcomingSection
+          groups={sections.upcoming}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
+      {(selectedSection === "all" || selectedSection === "someday") ? (
+        <TaskSection
+          title="Someday"
+          empty="No someday tasks."
+          anchor="someday"
+          targetDate={null}
+          tasks={sections.someday}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
+      {(selectedSection === "all" || selectedSection === "unscheduled") ? (
+        <TaskSection
+          title="Unscheduled"
+          empty="No unscheduled tasks."
+          anchor="unscheduled"
+          targetDate={null}
+          tasks={sections.noDate}
+          today={today}
+          tomorrow={tomorrow}
+          areaGroups={areaGroups}
+          projects={projectOptions}
+        />
+      ) : null}
     </div>
   );
 }
 
 function SectionJumps({
+  selectedDomainIds,
+  selectedProjectIds,
+  selectedSection,
   todayCount,
   tomorrowCount,
   upcomingCount,
   somedayCount,
   unscheduledCount,
 }: {
+  selectedDomainIds: string[];
+  selectedProjectIds: string[];
+  selectedSection: TaskSectionFilter;
   todayCount: number;
   tomorrowCount: number;
   upcomingCount: number;
@@ -149,48 +200,85 @@ function SectionJumps({
     somedayCount,
     unscheduledCount,
   });
+  const totalCount =
+    todayCount + tomorrowCount + upcomingCount + somedayCount + unscheduledCount;
+  const allLink = {
+    href: buildTasksFilterHref({
+      domains: selectedDomainIds,
+      projects: selectedProjectIds,
+      section: "all",
+    }),
+    label: "All",
+    count: totalCount,
+    hasItems: totalCount > 0,
+    active: selectedSection === "all",
+  };
 
   return (
     <nav
       aria-label="Task sections"
-      className="grid gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-5"
+      className="grid gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-6"
     >
-      {links.map(({ href, label, count, hasItems }) => (
-        <a
-          key={href}
-          href={href}
-          className={`rounded-lg border px-3 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-teal-100 ${
-            hasItems
-              ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm hover:border-teal-700"
-              : "border-stone-200 bg-stone-50/70 text-stone-500 hover:border-stone-300 hover:bg-white"
-          }`}
-        >
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
-            {label}
-          </span>
-          <span className="mt-1 block text-xl font-semibold tabular-nums leading-none">
-            {count}
-          </span>
-        </a>
-      ))}
+      {[allLink, ...links].map((item) => {
+        const { href, label, count, hasItems } = item;
+        const sectionValue = href.replace("#", "") as TaskSectionFilter;
+        const filterHref =
+          href.startsWith("#")
+            ? buildTasksFilterHref({
+                domains: selectedDomainIds,
+                projects: selectedProjectIds,
+                section: sectionValue,
+              })
+            : href;
+        const isActive =
+          "active" in item ? item.active : selectedSection === sectionValue;
+        return (
+          <Link
+            key={label}
+            href={filterHref}
+            className={`rounded-lg border px-3 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-teal-100 ${
+              isActive
+                ? "border-teal-700 bg-teal-100 text-teal-950 shadow-sm"
+                : hasItems
+                  ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm hover:border-teal-700"
+                  : "border-stone-200 bg-stone-50/70 text-stone-500 hover:border-stone-300 hover:bg-white"
+            }`}
+          >
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
+              {label}
+            </span>
+            <span className="mt-1 block text-xl font-semibold tabular-nums leading-none">
+              {count}
+            </span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }
 
 function DomainFilter({
   domains,
-  selectedDomainId,
+  selectedDomainIds,
+  selectedProjectIds,
+  selectedSection,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
-  selectedDomainId: string | undefined;
+  selectedDomainIds: string[];
+  selectedProjectIds: string[];
+  selectedSection: TaskSectionFilter;
 }) {
   const visibleDomains = domains.filter((domain) => !domain.isSystem);
   return (
     <nav className="flex flex-wrap gap-2">
       <Link
-        href="/tasks"
+        href={buildTasksFilterHref({
+          domains: [],
+          projects: [],
+          section: selectedSection,
+        })}
         className={`rounded-md border px-3 py-1.5 text-sm transition ${
-          !selectedDomainId
+          selectedDomainIds.length === 0
             ? "border-teal-600 bg-teal-50 text-teal-800"
             : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
         }`}
@@ -200,9 +288,13 @@ function DomainFilter({
       {visibleDomains.map((domain) => (
         <Link
           key={domain.id}
-          href={`/tasks?domain=${domain.id}`}
+          href={buildTasksFilterHref({
+            domains: toggleFilterValue(selectedDomainIds, domain.id),
+            projects: selectedProjectIds,
+            section: selectedSection,
+          })}
           className={`rounded-md border px-3 py-1.5 text-sm transition ${
-            selectedDomainId === domain.id
+            selectedDomainIds.includes(domain.id)
               ? "border-teal-600 bg-teal-50 text-teal-800"
               : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
           }`}
@@ -217,24 +309,28 @@ function DomainFilter({
 function TaskFilters({
   domains,
   projects,
-  selectedDomainId,
-  selectedProjectId,
+  selectedDomainIds,
+  selectedProjectIds,
+  selectedSection,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
   projects: Array<Project & { area: Area & { domain: Domain } }>;
-  selectedDomainId: string | undefined;
-  selectedProjectId: string | undefined;
+  selectedDomainIds: string[];
+  selectedProjectIds: string[];
+  selectedSection: TaskSectionFilter;
 }) {
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-3">
-      <div className="grid gap-3 md:grid-cols-[1fr_0.8fr]">
+      <div className="grid gap-3">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
             Domain
           </p>
           <DomainFilter
             domains={domains}
-            selectedDomainId={selectedDomainId}
+            selectedDomainIds={selectedDomainIds}
+            selectedProjectIds={selectedProjectIds}
+            selectedSection={selectedSection}
           />
         </div>
         <div className="space-y-2">
@@ -243,8 +339,9 @@ function TaskFilters({
           </p>
           <ProjectFilter
             projects={projects}
-            selectedDomainId={selectedDomainId}
-            selectedProjectId={selectedProjectId}
+            selectedDomainIds={selectedDomainIds}
+            selectedProjectIds={selectedProjectIds}
+            selectedSection={selectedSection}
           />
         </div>
       </div>
@@ -254,58 +351,55 @@ function TaskFilters({
 
 function ProjectFilter({
   projects,
-  selectedDomainId,
-  selectedProjectId,
+  selectedDomainIds,
+  selectedProjectIds,
+  selectedSection,
 }: {
   projects: Array<Project & { area: Area & { domain: Domain } }>;
-  selectedDomainId: string | undefined;
-  selectedProjectId: string | undefined;
+  selectedDomainIds: string[];
+  selectedProjectIds: string[];
+  selectedSection: TaskSectionFilter;
 }) {
-  const visibleProjects = selectedDomainId
-    ? projects.filter((project) => project.area.domainId === selectedDomainId)
-    : projects;
-  const projectGroups = buildProjectFilterGroups(projects, selectedDomainId);
-  const selectedProject = visibleProjects.find(
-    (project) => project.id === selectedProjectId,
+  const visibleProjects = projects.filter(
+    (project) =>
+      selectedDomainIds.length === 0 ||
+      selectedDomainIds.includes(project.area.domainId),
   );
 
   return (
-    <form action="/tasks" className="flex flex-wrap items-center gap-2">
-      {selectedDomainId ? (
-        <input type="hidden" name="domain" value={selectedDomainId} />
-      ) : null}
-      <select
-        name="project"
-        defaultValue={selectedProject?.id ?? ""}
-        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-800 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-        aria-label="Project filter"
+    <nav className="flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1">
+      <Link
+        href={buildTasksFilterHref({
+          domains: selectedDomainIds,
+          projects: [],
+          section: selectedSection,
+        })}
+        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+          selectedProjectIds.length === 0
+            ? "border-teal-600 bg-teal-50 text-teal-800"
+            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+        }`}
       >
-        <option value="">All projects ({visibleProjects.length})</option>
-        {projectGroups.map((group) => (
-          <optgroup key={group.domainName} label={group.domainName}>
-            {group.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-      <button
-        type="submit"
-        className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-400"
-      >
-        Apply
-      </button>
-      {selectedProjectId ? (
+        All
+      </Link>
+      {visibleProjects.map((project) => (
         <Link
-          href={selectedDomainId ? `/tasks?domain=${selectedDomainId}` : "/tasks"}
-          className="h-9 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:border-stone-400"
+          key={project.id}
+          href={buildTasksFilterHref({
+            domains: selectedDomainIds,
+            projects: toggleFilterValue(selectedProjectIds, project.id),
+            section: selectedSection,
+          })}
+          className={`rounded-md border px-3 py-1.5 text-sm transition ${
+            selectedProjectIds.includes(project.id)
+              ? "border-teal-600 bg-teal-50 text-teal-800"
+              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+          }`}
         >
-          Clear
+          {project.name}
         </Link>
-      ) : null}
-    </form>
+      ))}
+    </nav>
   );
 }
 

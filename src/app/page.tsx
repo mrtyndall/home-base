@@ -6,11 +6,16 @@ import {
   Inbox,
   Lightbulb,
   ListTodo,
+  Settings,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getTodayDashboard } from "@/lib/today";
-import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { SetupNotice } from "@/components/setup-notice";
+import {
+  getInboxActionLabel,
+  getTasksActionLabel,
+  getTodayActionLabel,
+} from "@/lib/home-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +36,6 @@ export default async function HomePage() {
   const todayTotal = todayData.todayEvents.length + todayData.dueToday.length;
   const tomorrowTotal =
     todayData.tomorrowEvents.length + todayData.dueTomorrow.length;
-  const nextCommitment = getNextCommitment(todayData);
 
   return (
     <div className="space-y-5">
@@ -44,156 +48,103 @@ export default async function HomePage() {
         </h1>
       </header>
 
-      <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-stone-800">
-              <CalendarCheck2 size={18} />
-              <h2 className="text-lg font-semibold">Today&apos;s shape</h2>
-            </div>
-            <p className="max-w-2xl text-sm leading-6 text-stone-600">
-              {todayTotal === 0
-                ? `No calendar events or tasks due today. ${nextCommitment}`
-                : `${todayData.todayEvents.length} calendar ${plural(
-                    todayData.todayEvents.length,
-                    "event",
-                  )} and ${todayData.dueToday.length} ${plural(
-                    todayData.dueToday.length,
-                    "task",
-                  )} due today.`}
-            </p>
-            <p className="text-sm text-stone-500">
-              Tomorrow: {tomorrowTotal} dated{" "}
-              {plural(tomorrowTotal, "commitment")}.
-            </p>
-          </div>
-          <Link
-            href="/today"
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-stone-300 bg-stone-50 px-3 text-sm font-medium text-stone-800 transition hover:border-teal-500 hover:text-teal-700"
-          >
-            Open Today
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2">
-        <HomeCard
-          href="/tasks"
-          icon={ListTodo}
-          title="Tasks"
-          value={`${homeData.openTaskCount} open`}
-          detail={`${todayData.dueToday.length} today, ${todayData.dueTomorrow.length} tomorrow`}
+      <section className="grid gap-3 md:grid-cols-2">
+        <ActionCard
+          href="/today"
+          icon={CalendarCheck2}
+          label="Today"
+          action={getTodayActionLabel(todayTotal)}
+          detail={`${todayData.dueToday.length} due today, ${tomorrowTotal} tomorrow`}
+          primary
         />
-        <HomeCard
-          href="/projects"
-          icon={FolderKanban}
-          title="Projects"
-          value={`${homeData.activeProjectCount} active`}
-          detail={`${homeData.somedayProjectCount} someday, ${homeData.parkedProjectCount} parked`}
-        />
-        <HomeCard
-          href="/ideas"
-          icon={Lightbulb}
-          title="Ideas"
-          value={`${homeData.activeIdeaCount} active`}
-          detail={homeData.latestIdeaTitle ?? "No active ideas."}
-        />
-        <HomeCard
+        <ActionCard
           href="/areas/area_inbox"
           icon={Inbox}
-          title="Inbox"
-          value={`${homeData.pendingCaptureCount} pending`}
-          detail={homeData.latestCaptureText ?? "Nothing waiting in Inbox."}
+          label="Inbox"
+          action={getInboxActionLabel(homeData.pendingCaptureCount)}
+          detail={homeData.latestPendingCaptureText ?? "Open the catch-all area"}
+          primary={homeData.pendingCaptureCount > 0}
+        />
+        <ActionCard
+          href="/tasks"
+          icon={ListTodo}
+          label="Tasks"
+          action={getTasksActionLabel(
+            todayData.dueToday.length,
+            todayData.dueTomorrow.length,
+          )}
+          detail={`${homeData.openTaskCount} open, ${homeData.unscheduledTaskCount} unscheduled`}
+        />
+        <ActionCard
+          href="/projects"
+          icon={FolderKanban}
+          label="Projects"
+          action="Review projects"
+          detail={`${homeData.somedayProjectCount} someday, ${homeData.parkedProjectCount} parked`}
+        />
+        <ActionCard
+          href="/ideas"
+          icon={Lightbulb}
+          label="Ideas"
+          action="Open ideas"
+          detail={homeData.latestIdeaTitle ?? "No active ideas."}
+        />
+        <ActionCard
+          href="/settings"
+          icon={Settings}
+          label="Settings"
+          action="Open settings"
+          detail="Connect calendar, Pushover, API access, and MCP"
         />
       </section>
-
-      {homeData.latestCaptureText ? (
-        <Link
-          href={homeData.latestCaptureHref}
-          className="group block rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:border-teal-400 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-stone-900">
-                Recent capture
-              </h2>
-              <p className="mt-1 line-clamp-4 text-sm leading-6 text-stone-600">
-                {homeData.latestCaptureText}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-stone-500 transition group-hover:text-teal-700">
-              <span>{homeData.latestCaptureAction}</span>
-              <ArrowRight size={16} />
-            </div>
-          </div>
-          {homeData.latestCaptureAt ? (
-            <p className="mt-3 text-xs text-stone-500">
-              {formatShortDate(homeData.latestCaptureAt)}
-            </p>
-          ) : null}
-        </Link>
-      ) : null}
     </div>
   );
 }
 
-type HomeCardProps = {
+type ActionCardProps = {
   href: string;
   icon: typeof CalendarCheck2;
-  title: string;
-  value: string;
+  label: string;
+  action: string;
   detail: string;
+  primary?: boolean;
 };
 
-function HomeCard({ href, icon: Icon, title, value, detail }: HomeCardProps) {
+function ActionCard({
+  href,
+  icon: Icon,
+  label,
+  action,
+  detail,
+  primary = false,
+}: ActionCardProps) {
   return (
     <Link
       href={href}
-      className="group rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:border-teal-400 hover:shadow-md"
+      className={`group rounded-lg border p-4 shadow-sm transition hover:border-teal-500 hover:shadow-md ${
+        primary
+          ? "border-teal-500 bg-teal-50 text-teal-950"
+          : "border-stone-200 bg-white text-stone-950"
+      }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-stone-800">
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
             <Icon size={17} />
-            <h2 className="text-base font-semibold">{title}</h2>
+            <span>{label}</span>
           </div>
-          <p className="text-2xl font-semibold tracking-normal text-stone-950">
-            {value}
-          </p>
+          <h2 className="text-2xl font-semibold tracking-normal">{action}</h2>
         </div>
         <ArrowRight
-          className="mt-1 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-teal-600"
+          className="mt-1 shrink-0 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-teal-600"
           size={17}
         />
       </div>
-      <p className="mt-3 line-clamp-2 text-sm leading-5 text-stone-600">
+      <p className="mt-4 line-clamp-2 text-sm leading-5 text-stone-600">
         {detail}
       </p>
     </Link>
   );
-}
-
-type ReadyTodayData = Awaited<ReturnType<typeof getTodayDashboard>> & {
-  ready: true;
-};
-
-function getNextCommitment(data: ReadyTodayData) {
-  if (data.nextEvent) {
-    return `Next commitment ${formatShortDate(data.nextEvent.start)} at ${formatTime(
-      data.nextEvent.start,
-    )}.`;
-  }
-
-  if (data.nextTask?.dueDate) {
-    return `Next task due ${formatDateOnly(data.nextTask.dueDate)}.`;
-  }
-
-  return "No upcoming dated commitments.";
-}
-
-function plural(count: number, word: string) {
-  return count === 1 ? word : `${word}s`;
 }
 
 async function getHomeData() {
@@ -205,7 +156,8 @@ async function getHomeData() {
       parkedProjectCount,
       activeIdeaCount,
       pendingCaptureCount,
-      latestCapture,
+      unscheduledTaskCount,
+      latestPendingCapture,
       latestIdea,
     ] = await Promise.all([
       prisma.task.count({ where: { status: "open" } }),
@@ -216,7 +168,13 @@ async function getHomeData() {
       prisma.capture.count({
         where: { parseStatus: { in: ["ambiguous", "failed"] } },
       }),
-      prisma.capture.findFirst({ orderBy: { createdAt: "desc" } }),
+      prisma.task.count({
+        where: { status: "open", dueDate: null, someday: false },
+      }),
+      prisma.capture.findFirst({
+        where: { parseStatus: { in: ["ambiguous", "failed"] } },
+        orderBy: { createdAt: "desc" },
+      }),
       prisma.idea.findFirst({
         where: { status: { in: ["seed", "developing"] } },
         orderBy: { updatedAt: "desc" },
@@ -231,62 +189,11 @@ async function getHomeData() {
       parkedProjectCount,
       activeIdeaCount,
       pendingCaptureCount,
-      latestCaptureText: latestCapture?.rawText ?? null,
-      latestCaptureAt: latestCapture?.createdAt ?? null,
-      latestCaptureHref: latestCapture ? getCaptureHref(latestCapture) : "/search",
-      latestCaptureAction: latestCapture
-        ? getCaptureAction(latestCapture)
-        : "Search captures",
+      unscheduledTaskCount,
+      latestPendingCaptureText: latestPendingCapture?.rawText ?? null,
       latestIdeaTitle: latestIdea?.title ?? null,
     };
   } catch {
     return { ok: false as const };
   }
-}
-
-type CaptureForHome = {
-  rawText: string;
-  parseStatus: string | null;
-  createdItems: unknown;
-};
-
-function getCaptureHref(capture: CaptureForHome) {
-  const item = getLatestFiledItem(capture);
-  if (!item) return "/areas/area_inbox";
-  if (item.type === "task") return `/tasks/${item.id}`;
-  if (item.type === "project") return `/projects/${item.id}`;
-  if (item.type === "idea") return "/ideas";
-  return `/search?q=${encodeURIComponent(capture.rawText)}`;
-}
-
-function getCaptureAction(capture: CaptureForHome) {
-  const item = getLatestFiledItem(capture);
-  if (!item || capture.parseStatus !== "parsed") return "Sort in Inbox";
-  if (item.type === "task" || item.type === "project") return "Open item";
-  if (item.type === "idea") return "Open Ideas";
-  return "Find in Search";
-}
-
-function getLatestFiledItem(capture: CaptureForHome) {
-  const items = Array.isArray(capture.createdItems) ? capture.createdItems : [];
-  const filedItems = items
-    .filter(isCreatedItem)
-    .filter((item) => item.type !== "pending_capture");
-  return filedItems[filedItems.length - 1] ?? null;
-}
-
-function isCreatedItem(
-  item: unknown,
-): item is { type: string; id: string; label: string } {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    "type" in item &&
-    typeof item.type === "string" &&
-    item.type !== "notification" &&
-    "id" in item &&
-    typeof item.id === "string" &&
-    "label" in item &&
-    typeof item.label === "string"
-  );
 }

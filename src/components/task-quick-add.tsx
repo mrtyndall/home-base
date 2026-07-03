@@ -84,37 +84,43 @@ export function TaskQuickAdd({
       <form
         action={createQuickTask}
         onSubmit={handleSubmit}
-        className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white p-2 shadow-sm"
+        className="rounded-lg border border-stone-200 bg-white p-2 shadow-sm"
       >
-        <input
-          name="title"
-          required
-          aria-label="Task title"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-11 min-w-0 flex-1 bg-transparent px-2 text-base outline-none"
-        />
-        <label
-          title="Set due date"
-          className={`relative grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-md border bg-white transition hover:border-teal-500 hover:text-teal-700 ${
-            dueDate
-              ? "border-teal-500 text-teal-700"
-              : "border-stone-300 text-stone-600"
-          }`}
-        >
-          <span className="sr-only">Set due date</span>
-          <CalendarDays size={17} />
-          <input
-            name="dueDate"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label="Set due date"
-          />
-        </label>
-        {areaGroups.length > 0 ? (
-          <>
+        <div className="flex items-center gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Quick add task
+            </span>
+            <input
+              name="title"
+              required
+              aria-label="Task title"
+              placeholder="Task title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="h-9 w-full min-w-0 bg-transparent px-1 text-base outline-none placeholder:text-stone-400"
+            />
+          </label>
+          <label
+            title="Set due date"
+            className={`relative grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-md border bg-white transition hover:border-teal-500 hover:text-teal-700 ${
+              dueDate
+                ? "border-teal-500 text-teal-700"
+                : "border-stone-300 text-stone-600"
+            }`}
+          >
+            <span className="sr-only">Set due date</span>
+            <CalendarDays size={17} />
+            <input
+              name="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Set due date"
+            />
+          </label>
+          {areaGroups.length > 0 ? (
             <select
               name="areaId"
               aria-label="Area"
@@ -134,34 +140,53 @@ export function TaskQuickAdd({
                     </option>
                   ))}
                 </optgroup>
-              ))}
-            </select>
-            {projects.length > 0 ? (
-              <select
-                name="projectId"
-                aria-label="Project"
-                value={projectId}
-                onChange={(event) => setProjectId(event.target.value)}
-                className="h-10 max-w-36 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-44"
-              >
-                <option value="">No project</option>
-                {filteredProjects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name} / {project.areaName}
-                  </option>
                 ))}
               </select>
-            ) : null}
-          </>
+          ) : null}
+          <button
+            type="submit"
+            disabled={pending || title.trim().length === 0}
+            title={pending ? "Saving task" : "Add task"}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+        {projects.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-2 border-t border-stone-100 pt-2 sm:flex-row sm:items-start">
+            <input type="hidden" name="projectId" value={projectId} />
+            <span className="shrink-0 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+              Project
+            </span>
+            <div className="flex max-h-20 flex-1 flex-wrap gap-2 overflow-y-auto pr-1">
+              <button
+                type="button"
+                onClick={() => setProjectId("")}
+                className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                  !projectId
+                    ? "border-teal-600 bg-teal-50 text-teal-800"
+                    : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+                }`}
+              >
+                No project
+              </button>
+              {filteredProjects.map((project) => (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() => setProjectId(project.id)}
+                  className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                    projectId === project.id
+                      ? "border-teal-600 bg-teal-50 text-teal-800"
+                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+                  }`}
+                >
+                  {project.name}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
-        <button
-          type="submit"
-          disabled={pending || title.trim().length === 0}
-          title={pending ? "Saving task" : "Add task"}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
-        >
-          <Plus size={18} />
-        </button>
       </form>
       {savedTask ? (
         <Link

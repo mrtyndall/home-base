@@ -14,10 +14,25 @@ export function buildTaskSectionJumps({
   unscheduledCount,
 }: TaskSectionJumpCounts) {
   return [
-    { href: "#today", label: "Today", count: todayCount },
-    { href: "#tomorrow", label: "Tomorrow", count: tomorrowCount },
-    { href: "#upcoming", label: "Upcoming", count: upcomingCount },
-    { href: "#someday", label: "Someday", count: somedayCount },
-    { href: "#unscheduled", label: "Unscheduled", count: unscheduledCount },
+    { href: "#today", label: "Today", count: todayCount, section: "today" },
+    {
+      href: "#tomorrow",
+      label: "Tomorrow",
+      count: tomorrowCount,
+      section: "tomorrow",
+    },
+    {
+      href: "#upcoming",
+      label: "Upcoming",
+      count: upcomingCount,
+      section: "upcoming",
+    },
+    { href: "#someday", label: "Someday", count: somedayCount, section: "someday" },
+    {
+      href: "#unscheduled",
+      label: "Unscheduled",
+      count: unscheduledCount,
+      section: "unscheduled",
+    },
   ].map((jump) => ({ ...jump, hasItems: jump.count > 0 }));
 }
