@@ -1,0 +1,2018 @@
+{
+  "generatedAt": "2026-07-03T22:11:27.771Z",
+  "target": "https://home-base-production-e3b7.up.railway.app",
+  "records": [
+    {
+      "type": "capture",
+      "id": "2ba0514f-c58d-46b7-9e6d-b558ad0c36f6",
+      "label": "ask whether the antenna mount still matters"
+    },
+    {
+      "type": "capture",
+      "id": "381ebf89-3e73-41c2-b3a8-5646c7909283",
+      "label": "check the museum shoot archive next month"
+    },
+    {
+      "type": "capture",
+      "id": "24a3849a-f8bd-498b-b7ea-005d8ea4fdea",
+      "label": "dismissed review for NAS NVR retry"
+    },
+    {
+      "type": "capture",
+      "id": "5564a87e-f577-4502-a2e7-15973a567adb",
+      "label": "done review for CHIRP image backup"
+    },
+    {
+      "type": "capture",
+      "id": "b02a82d9-88ce-48c3-999b-ab941ec5e723",
+      "label": "done review for garage cable labels"
+    },
+    {
+      "type": "capture",
+      "id": "0646b0b1-4b6d-4a96-bde3-e20c0074f8f7",
+      "label": "review the Duke bill when the new cycle lands"
+    },
+    {
+      "type": "capture",
+      "id": "5a3189fe-0755-476c-be60-214682d6286d",
+      "label": "surface the porch camera note today"
+    },
+    {
+      "type": "capture",
+      "id": "91ef400c-efe0-452e-b330-0510e00c983f",
+      "label": "wait on the trailer sale before planning the garage shelf"
+    },
+    {
+      "type": "check_in",
+      "id": "c875cce2-1865-4bcf-9363-3a45cf111ef2",
+      "label": "BIOS is updated and the next thing is testing the mirrored boot drives."
+    },
+    {
+      "type": "check_in",
+      "id": "e0814452-4e45-460e-94e8-a024861327d1",
+      "label": "Calendar and reminders are in place; agent access is the next trust layer."
+    },
+    {
+      "type": "check_in",
+      "id": "dc90fb7a-8591-4890-9e29-6954e0064536",
+      "label": "Captured the rough premise and three possible cold opens."
+    },
+    {
+      "type": "check_in",
+      "id": "8b6540be-2b60-4950-8e55-f9cebae46cde",
+      "label": "Case is built and BIOS sees the RAM correctly."
+    },
+    {
+      "type": "check_in",
+      "id": "bea190d3-3a8d-470e-adc3-ee5dfac18aa9",
+      "label": "Cleaned up the channel names so future me can tell what each memory is for."
+    },
+    {
+      "type": "check_in",
+      "id": "87276576-8a89-46dc-9b8b-c7118f78907f",
+      "label": "Collected the first month of charging sessions from the EV app."
+    },
+    {
+      "type": "check_in",
+      "id": "d8393f9a-df95-49b0-b5bd-1fc273a167f6",
+      "label": "Completed. Garage AP is online and stable."
+    },
+    {
+      "type": "check_in",
+      "id": "d337b61c-ddc6-4b79-8cdd-0124409fba1e",
+      "label": "Completed. Radios are consistent and labeled."
+    },
+    {
+      "type": "check_in",
+      "id": "5e4610ab-e1d0-4845-b701-c9ed039abb0f",
+      "label": "Data import was easy; making the view useful was the hard part."
+    },
+    {
+      "type": "check_in",
+      "id": "6854a130-9851-42dd-8058-a84c319c8f16",
+      "label": "Duke rate sheet is less clear than expected; need the actual bill to compare."
+    },
+    {
+      "type": "check_in",
+      "id": "0bdb827a-d0b4-4d41-9b8a-161d95bbcfa4",
+      "label": "Exported the first radio image and cleaned up the channel names."
+    },
+    {
+      "type": "check_in",
+      "id": "0657e7fc-2ee7-4b03-b172-a46e430f8c7b",
+      "label": "Final pass done. Keeping the image around as the known-good baseline."
+    },
+    {
+      "type": "check_in",
+      "id": "2793a72d-8e13-456f-af23-58e023dce4a5",
+      "label": "First ten minutes need a tighter cut before this feels like a pilot."
+    },
+    {
+      "type": "check_in",
+      "id": "8a7fb31e-4584-4b48-914a-aa748985bef3",
+      "label": "Garage audio makes the cold open feel stranger in the right way."
+    },
+    {
+      "type": "check_in",
+      "id": "006514c3-753d-49c9-a649-15943b9f737e",
+      "label": "Garage camera is moved into Frigate and detection zones are close enough to test"
+    },
+    {
+      "type": "check_in",
+      "id": "d0f78bc4-8783-4110-aa38-02b617eb69ab",
+      "label": "Garage recordings are clean. Porch still needs a hardware swap before I trust it"
+    },
+    {
+      "type": "check_in",
+      "id": "fe505f12-f4da-407c-aa85-318d8396ec9c",
+      "label": "Got a globe prototype rendering route arcs without much trouble."
+    },
+    {
+      "type": "check_in",
+      "id": "4e22b3e4-4bb8-4b2b-b306-fd0f7500e686",
+      "label": "Guest list is narrowed to two realistic people and one stretch ask."
+    },
+    {
+      "type": "check_in",
+      "id": "461d6f4e-1210-46f0-a1b3-2705509b93c9",
+      "label": "Killed this path. Frigate gets the dedicated box instead."
+    },
+    {
+      "type": "check_in",
+      "id": "48d4edf2-9d0e-41fc-84db-a70f1902788d",
+      "label": "Last useful touch: waiting for the next bill before changing the schedule."
+    },
+    {
+      "type": "check_in",
+      "id": "731cba8e-8285-4093-8ec7-d81c0ebf50fb",
+      "label": "Mapped the battery sensors and found the repeaters are uneven upstairs."
+    },
+    {
+      "type": "check_in",
+      "id": "718398fc-1485-4aa1-bac7-0e8478b86418",
+      "label": "Measured the garage path and confirmed the crawlspace route is less awful."
+    },
+    {
+      "type": "check_in",
+      "id": "965b5703-3a6f-45a8-ac88-61cc32ef1a54",
+      "label": "Moved the AP and the garage camera stopped fighting for signal."
+    },
+    {
+      "type": "check_in",
+      "id": "44e6855f-5fd8-49bc-88ae-95188ea6a710",
+      "label": "Moved the app onto Railway and got the capture path reliable enough to use."
+    },
+    {
+      "type": "check_in",
+      "id": "c62cd70a-0c24-42cf-a8d7-1e259996d56d",
+      "label": "NIC seating was the only weird part; everything else posted cleanly."
+    },
+    {
+      "type": "check_in",
+      "id": "b058e36f-7ce1-4504-a7f6-61b5474115eb",
+      "label": "NOAA, local repeaters, and simplex channels are in a stable order."
+    },
+    {
+      "type": "check_in",
+      "id": "0186f12f-c842-45d3-b055-13e9d41f84e5",
+      "label": "Parked. It is neat, but it does not beat the blog work in front of it."
+    },
+    {
+      "type": "check_in",
+      "id": "43041a59-58e6-48a0-a934-d5ad12d6b58d",
+      "label": "Parking this until the camera migration stops moving under it."
+    },
+    {
+      "type": "check_in",
+      "id": "2c94f72a-6730-4b35-8594-c2e8d2be3a34",
+      "label": "Parts ordered: board, ECC RAM, NVMe pair, and the 10 gig card."
+    },
+    {
+      "type": "check_in",
+      "id": "ad57074e-a263-4883-b010-1e0f3e251f61",
+      "label": "Performance is not worth the complexity."
+    },
+    {
+      "type": "check_in",
+      "id": "33e1cf2d-7872-44f2-8be1-5806d1867e49",
+      "label": "Porch camera is dropping overnight; likely power or injector, not Frigate config"
+    },
+    {
+      "type": "check_in",
+      "id": "164e3407-671a-4a00-9466-b494fa2576bf",
+      "label": "Proxmox installer boots cleanly; mirror setup needs one more pass."
+    },
+    {
+      "type": "check_in",
+      "id": "5e1727b1-0093-4225-9265-c8e3fa3b686e",
+      "label": "Pulled cable and left enough slack for the cabinet."
+    },
+    {
+      "type": "check_in",
+      "id": "4e7a54e3-987a-4131-bcfd-c6d7f0212244",
+      "label": "Pulled the existing camera list and found two streams still using old credential"
+    },
+    {
+      "type": "check_in",
+      "id": "6dff3bc2-0dfa-4c93-9952-d433ff880cfe",
+      "label": "Reterminated and got gigabit link."
+    },
+    {
+      "type": "check_in",
+      "id": "582c6a55-42b4-4e52-a853-6174d2cdc00d",
+      "label": "Settings finally behaves like a control surface instead of a status page."
+    },
+    {
+      "type": "check_in",
+      "id": "600699b9-9b85-4598-8344-f851325a4dce",
+      "label": "Storage math looks fine if I keep the high-motion cameras on shorter retention."
+    },
+    {
+      "type": "check_in",
+      "id": "8a52d741-54ef-479e-b5af-f95290ba8d02",
+      "label": "Terminated both ends; first test failed because I crossed a pair."
+    },
+    {
+      "type": "check_in",
+      "id": "de39b1af-10cc-4e10-8859-cce37d386b91",
+      "label": "Tested the NAS as an NVR host and immediately hit storage churn."
+    },
+    {
+      "type": "check_in",
+      "id": "053112c1-b3c5-44e3-b52d-548d47b5de67",
+      "label": "Tested uploads on both BaoFengs without bricking anything."
+    },
+    {
+      "type": "check_in",
+      "id": "1ce4e667-d2d3-4a3a-8fab-549b5a9c22e6",
+      "label": "The app needs real data now so the derived surfaces stop looking empty."
+    },
+    {
+      "type": "check_in",
+      "id": "be44c92f-82a5-4755-8b08-c6092f9305a4",
+      "label": "The door sensor worked, but the battery reporting is nonsense."
+    },
+    {
+      "type": "check_in",
+      "id": "da823d34-bc38-4e12-945e-90a8df17d830",
+      "label": "The NAS path kept turning every camera decision into a storage decision."
+    },
+    {
+      "type": "check_in",
+      "id": "32be6dc7-4bea-4827-a979-ace7aeb41e86",
+      "label": "The title card wants to be quieter than the footage, which surprised me."
+    },
+    {
+      "type": "entity_doc",
+      "id": "b7ac8087-a715-4088-a009-f35f6d0e1b40",
+      "label": "AM5 part list"
+    },
+    {
+      "type": "entity_doc",
+      "id": "c80ac2ef-be18-477d-85a2-3ead29748ef9",
+      "label": "Antenna comparison"
+    },
+    {
+      "type": "entity_doc",
+      "id": "e63685b3-1d42-49f8-a4ca-37c29f34ab41",
+      "label": "Camera placement"
+    },
+    {
+      "type": "entity_doc",
+      "id": "178c9481-4c4c-4fbc-b664-039e7422572b",
+      "label": "Desk layout notes"
+    },
+    {
+      "type": "entity_note",
+      "id": "252f7409-390f-41c2-80da-9fedf3667eb2",
+      "label": "Antenna comparison: the roll-up J-pole wins indoors; the mag mount is easier in the truck."
+    },
+    {
+      "type": "entity_note",
+      "id": "128774c3-25b4-4295-bae7-6d1af93c5be4",
+      "label": "Boot test note: use mirrored NVMe first, then move one non-critical VM before touching Hom"
+    },
+    {
+      "type": "entity_note",
+      "id": "90bfdde3-595c-4934-9f01-1b0094436425",
+      "label": "Camera placement note:\n\n- Garage is stable.\n- Porch needs power checked before software tu"
+    },
+    {
+      "type": "entity_note",
+      "id": "35ef45db-eab5-45bd-9e1a-6b3246436c58",
+      "label": "Charging note: compare cost by kWh, not just the app's session summary."
+    },
+    {
+      "type": "entity_note",
+      "id": "847fdcfb-32bd-44c2-bdb4-5c1523c95098",
+      "label": "The cold open should start with the weird garage audio before any explanation."
+    },
+    {
+      "type": "entity_note",
+      "id": "32cdceb0-77d5-4162-96e6-2da079571fae",
+      "label": "Where I left off: rough width is 42 inches, power on left, coax can drop behind the shelf."
+    },
+    {
+      "type": "idea_note",
+      "id": "f7b4dad5-75f0-4f02-be9c-c27724677fbd",
+      "label": "A shallow shelf under the desk may be better than a wall-mounted raceway."
+    },
+    {
+      "type": "idea_note",
+      "id": "2d5658c1-34f1-4f2b-b74a-31d923ab5df3",
+      "label": "Include the local repeater, a direct path, and one travel path only."
+    },
+    {
+      "type": "idea_note",
+      "id": "bd0923c4-6be8-4956-ad62-56faa7c2162b",
+      "label": "Leave room for power, coax, and the laptop charger without making it a permanent"
+    },
+    {
+      "type": "idea_note",
+      "id": "c30489f0-43a9-4263-81f5-a90f5158b46d",
+      "label": "The garage sound is the hook, not a problem to hide."
+    },
+    {
+      "type": "idea",
+      "id": "6b6f3859-a328-4176-91af-7c8eefa5774f",
+      "label": "AI guest book for older blog posts"
+    },
+    {
+      "type": "idea",
+      "id": "7a28daae-a217-4839-a57e-d14aac9ba6fa",
+      "label": "AM5 Proxmox build"
+    },
+    {
+      "type": "idea",
+      "id": "113ce4ba-a3b1-41ef-b8a4-8a07c3be94df",
+      "label": "Cat camera highlight reel"
+    },
+    {
+      "type": "idea",
+      "id": "67480e9f-eb55-44e6-aeb1-7ba734d444b7",
+      "label": "Charlotte signage photo essay"
+    },
+    {
+      "type": "idea",
+      "id": "eccf9640-a644-43d9-8453-341532e9a3bc",
+      "label": "Crew day packing checklist"
+    },
+    {
+      "type": "idea",
+      "id": "6205b71e-4fcc-464c-9d20-d720f164ef63",
+      "label": "Daily quote collector"
+    },
+    {
+      "type": "idea",
+      "id": "ba6948ed-7892-4547-bb15-5eb200e346c4",
+      "label": "Documentary summit badge wall"
+    },
+    {
+      "type": "idea",
+      "id": "13a95cdd-611a-40b2-afdf-d6bb428de8b6",
+      "label": "EV bill explainer post"
+    },
+    {
+      "type": "idea",
+      "id": "37be32e2-3f07-4f1e-848d-e4c8747d95a9",
+      "label": "Frigate zone sketch overlay"
+    },
+    {
+      "type": "idea",
+      "id": "f42f5b34-104a-441a-9449-f010b6ab69b9",
+      "label": "Ham desk cable raceway"
+    },
+    {
+      "type": "idea",
+      "id": "2f59f934-3bab-4bd7-b50d-4977e0e9beed",
+      "label": "Home network field guide"
+    },
+    {
+      "type": "idea",
+      "id": "4bb6cf9c-8170-4951-ba04-f1819fde0c04",
+      "label": "Magic binder index by color"
+    },
+    {
+      "type": "idea",
+      "id": "b062c2c6-6d88-44e9-813c-e21c26021cf3",
+      "label": "NAS NVR retry"
+    },
+    {
+      "type": "idea",
+      "id": "fb9dca92-3bf0-4cc5-a6ff-36a2eefc3992",
+      "label": "Neighborhood bulk pickup reminder"
+    },
+    {
+      "type": "idea",
+      "id": "d3576c3a-0423-4776-8c1a-25200448f645",
+      "label": "Pocket APRS path card"
+    },
+    {
+      "type": "idea",
+      "id": "9306eda0-0f0c-4c67-9df0-0011c365a0d1",
+      "label": "Reading shelf by mood"
+    },
+    {
+      "type": "idea",
+      "id": "245e0666-512b-4ed7-baf3-6f77551999be",
+      "label": "The Misc pilot"
+    },
+    {
+      "type": "idea",
+      "id": "9a5665b3-16f5-4afc-9b06-2c23d74a5021",
+      "label": "Tiny Home Base changelog"
+    },
+    {
+      "type": "journal_entry",
+      "id": "2a6b50c4-3abc-4783-b0a7-79a4a46b1e3e",
+      "label": "Home Assistant behaved for a whole week, which I am noting here so future me has proof."
+    },
+    {
+      "type": "journal_entry",
+      "id": "72f99d17-d1f4-4aef-86af-89df807bf772",
+      "label": "I drove through Charlotte after a long edit and noticed three signs I should photograph be"
+    },
+    {
+      "type": "journal_entry",
+      "id": "1283e7e4-caf1-4409-a251-f8efa3ac451f",
+      "label": "I got the igate receiving packets on the first try. It felt like a tiny miracle, mostly be"
+    },
+    {
+      "type": "journal_entry",
+      "id": "c326a1dc-5961-46cf-a534-dd65cbef67b8",
+      "label": "I had a clean little radio window tonight. Heard the club net while sorting coax and it ma"
+    },
+    {
+      "type": "journal_entry",
+      "id": "5ac03a6f-ac15-4b80-9d91-86a193ee4066",
+      "label": "I keep wanting Home Base to feel calm, but calm only works if the data is real. Empty soft"
+    },
+    {
+      "type": "journal_entry",
+      "id": "16d9d253-a703-442f-a755-896609a68938",
+      "label": "I made a smaller list today and got more done. Annoying but useful."
+    },
+    {
+      "type": "journal_entry",
+      "id": "3b5a070a-29ca-4297-a44c-6cf92aee0e83",
+      "label": "I spent an hour making Home Base less like a dashboard and more like a tray of things I ca"
+    },
+    {
+      "type": "journal_entry",
+      "id": "e126f00d-d295-46e2-a04b-492e6f7bf599",
+      "label": "I tried to force the blog idea and got nothing. Walked away, fed the cats, and the opener "
+    },
+    {
+      "type": "journal_entry",
+      "id": "83ab907f-564c-4c00-8cbf-39d193a93800",
+      "label": "I want the ham desk to be small, not impressive. Just enough radio to invite me back."
+    },
+    {
+      "type": "journal_entry",
+      "id": "04109968-a978-4444-bc15-7f84b4b4a99c",
+      "label": "Lauren and I talked through the EV charging thing over dinner. The right answer is probabl"
+    },
+    {
+      "type": "journal_entry",
+      "id": "bd4fed4e-d9a9-477f-8f20-53f055206fda",
+      "label": "Lauren found the better framing for the pilot title while I was overthinking it."
+    },
+    {
+      "type": "journal_entry",
+      "id": "158fb98d-30a5-42ec-931b-cc078acbc1bb",
+      "label": "Long shoot day. The room was louder than it looked on the scout, but the crew kept finding"
+    },
+    {
+      "type": "journal_entry",
+      "id": "8a847767-55fa-4ecc-86a9-2c93ee82dd7a",
+      "label": "Louise slept on the camera bag, which is probably her strongest review of the week."
+    },
+    {
+      "type": "journal_entry",
+      "id": "343faa72-b52c-47a1-8d5c-15a867dfea78",
+      "label": "Magic cards are a nicer inventory problem than hard drives because at least the pictures a"
+    },
+    {
+      "type": "journal_entry",
+      "id": "ec21c24c-f4f1-4a40-a637-4f49fcec9ab8",
+      "label": "Paulie yelled at the same cabinet for ten minutes. I checked it and found nothing, which p"
+    },
+    {
+      "type": "journal_entry",
+      "id": "47f9ff96-2be3-4c13-9150-589aff8ebb19",
+      "label": "Shot the museum b-roll and remembered again that quiet prep beats fancy gear almost every "
+    },
+    {
+      "type": "journal_entry",
+      "id": "a07a7b40-6618-49c5-8b71-7b7e1ecc586a",
+      "label": "Some weeks the best system is just remembering where I stopped."
+    },
+    {
+      "type": "journal_entry",
+      "id": "99c966aa-5bf3-459d-9b13-49532c019df3",
+      "label": "The AM5 build is starting to look like a computer instead of a pile of expensive rectangle"
+    },
+    {
+      "type": "journal_entry",
+      "id": "e15561d6-eced-427d-b2b0-f84f7b94946f",
+      "label": "The bank campaign archive is finally off my desk. I underestimate how loud unfinished hand"
+    },
+    {
+      "type": "journal_entry",
+      "id": "cb944e6c-913d-4760-8c67-c1dce85af65a",
+      "label": "The documentary summit idea keeps coming back. Maybe that means it needs a parking place, "
+    },
+    {
+      "type": "journal_entry",
+      "id": "88f75c61-1878-409a-8dee-dffc41ad3e02",
+      "label": "The EV is boring in the best way. I only think about it when the billing math gets weird."
+    },
+    {
+      "type": "journal_entry",
+      "id": "5c20bbba-1adb-415f-a50e-0723cdf35c9c",
+      "label": "The Frigate porch camera still feels flaky. I need to stop tuning software until I rule ou"
+    },
+    {
+      "type": "journal_entry",
+      "id": "922adb4e-288c-4a1a-a2c6-ee91295bae33",
+      "label": "The garage AP has been solid. It is the kind of fix I forget about because it actually wor"
+    },
+    {
+      "type": "journal_entry",
+      "id": "0111d1d4-5740-4c58-9fed-8f2fd2d8d8ea",
+      "label": "The garage network drop made the house feel a little less held together with string."
+    },
+    {
+      "type": "journal_entry",
+      "id": "a9440a9a-e482-4923-bc36-cb6129991a95",
+      "label": "The Homelab is fun until it becomes archaeology. I need more notes for the next version of"
+    },
+    {
+      "type": "journal_entry",
+      "id": "04bafc89-0bb1-486b-9e94-0a476931fb06",
+      "label": "The igate thought is still alive: simple, reliable, boring hardware where possible."
+    },
+    {
+      "type": "journal_entry",
+      "id": "afc80146-24df-49a0-9ac7-24a87e98e088",
+      "label": "The Misc pilot has a shape now. The cold open wants to be stranger than I first let it be."
+    },
+    {
+      "type": "journal_entry",
+      "id": "87ec1628-f5ac-49b8-b344-aa47cdde7b56",
+      "label": "The sports client revision was smaller than feared. Sometimes the second email is kinder t"
+    },
+    {
+      "type": "milestone",
+      "id": "bd132298-0728-424c-a5e3-a0ca308b071d",
+      "label": "BIOS updated"
+    },
+    {
+      "type": "milestone",
+      "id": "a15f2483-2b4c-496c-856f-cace9a28ac1f",
+      "label": "Camera inventory"
+    },
+    {
+      "type": "milestone",
+      "id": "f6d30add-1c87-4ed4-8696-35ef097fe5b2",
+      "label": "Cold open selected"
+    },
+    {
+      "type": "milestone",
+      "id": "e7103f58-36de-4a3f-8867-83865bed78d7",
+      "label": "Detection zones tuned"
+    },
+    {
+      "type": "milestone",
+      "id": "82a6719e-e019-4e20-b689-898b69c699c6",
+      "label": "Document rollback"
+    },
+    {
+      "type": "milestone",
+      "id": "ddde0772-75ea-4e51-8770-6330efb98d45",
+      "label": "Export base image"
+    },
+    {
+      "type": "milestone",
+      "id": "932df2ea-f8aa-4336-b770-58d937fdc9b0",
+      "label": "Export pilot"
+    },
+    {
+      "type": "milestone",
+      "id": "4ec61cf3-5487-499d-9694-f16a6efcff11",
+      "label": "Field test"
+    },
+    {
+      "type": "milestone",
+      "id": "ca0a96b1-81ce-47ba-ba26-797b64af2e41",
+      "label": "Garage recording stable"
+    },
+    {
+      "type": "milestone",
+      "id": "7c90dcff-9a14-415d-97e9-7e8715d082b2",
+      "label": "Guest list confirmed"
+    },
+    {
+      "type": "milestone",
+      "id": "f95fbbdf-f2b7-41d8-beb2-fbb4fe9c88c4",
+      "label": "Mirrored boot test"
+    },
+    {
+      "type": "milestone",
+      "id": "e62e3523-09b9-4063-90a9-27e911e86aa1",
+      "label": "Mount AP"
+    },
+    {
+      "type": "milestone",
+      "id": "070a2812-af0e-4a57-b6db-73648873af6d",
+      "label": "Move VMs"
+    },
+    {
+      "type": "milestone",
+      "id": "8af9abce-0a3d-4521-b205-8ad58af8fffb",
+      "label": "Music pass"
+    },
+    {
+      "type": "milestone",
+      "id": "9aa32150-48fb-40c5-82af-df2837cc7441",
+      "label": "Parts ordered"
+    },
+    {
+      "type": "milestone",
+      "id": "20955494-0e68-4167-a292-7b88cb6121af",
+      "label": "Porch power fixed"
+    },
+    {
+      "type": "milestone",
+      "id": "00960510-d563-4794-ad79-bef2a95e881b",
+      "label": "Premise locked"
+    },
+    {
+      "type": "milestone",
+      "id": "ecb45617-b9c8-4362-9c5f-487f8a3f7509",
+      "label": "Program radios"
+    },
+    {
+      "type": "milestone",
+      "id": "c1698a6d-e373-41d1-ab59-9c653dc93528",
+      "label": "Pull cable"
+    },
+    {
+      "type": "milestone",
+      "id": "047ae7aa-fe83-4ba3-9d8d-070f40a60dec",
+      "label": "Rough cut"
+    },
+    {
+      "type": "milestone",
+      "id": "d725d45e-495b-481b-8bb4-4126498ff7e6",
+      "label": "Terminate ends"
+    },
+    {
+      "type": "person_fact",
+      "id": "0f97e01f-cf36-4db4-97ed-2dbc643c5850",
+      "label": "anniversary dinner is worth planning early"
+    },
+    {
+      "type": "person_fact",
+      "id": "30b8f713-0316-40d0-9f10-2aae13f33990",
+      "label": "annual trip planning usually starts around August"
+    },
+    {
+      "type": "person_fact",
+      "id": "6960b804-28e8-476a-9a03-e4e722a3905b",
+      "label": "asked about borrowing the ladder"
+    },
+    {
+      "type": "person_fact",
+      "id": "68b9aec1-d8db-4720-92f8-cb6212f1988d",
+      "label": "asked about Charlotte venue parking"
+    },
+    {
+      "type": "person_fact",
+      "id": "a0111db9-fbf4-4186-9e58-60ff91223b79",
+      "label": "birthday is a good excuse to send a gear note"
+    },
+    {
+      "type": "person_fact",
+      "id": "ddb81a90-1863-4f52-aec9-3f272c239ab8",
+      "label": "checks in around festival season"
+    },
+    {
+      "type": "person_fact",
+      "id": "46b621d6-56d5-4eea-86a1-b5e64fdd3e4b",
+      "label": "club picnic lands in late summer"
+    },
+    {
+      "type": "person_fact",
+      "id": "0d6e69b8-03ca-4426-81c1-977d38b6cdf9",
+      "label": "does a winter lab cleanup"
+    },
+    {
+      "type": "person_fact",
+      "id": "b766bee3-328e-419a-89af-1ce74fb3a58d",
+      "label": "has a portable lighting kit worth asking about"
+    },
+    {
+      "type": "person_fact",
+      "id": "2832469c-2b5c-4095-903e-b019495a94f4",
+      "label": "holiday lights come up right after Thanksgiving"
+    },
+    {
+      "type": "person_fact",
+      "id": "74da5504-e255-492b-a71f-c4c07098a205",
+      "label": "knows the HOA bulk pickup rhythm"
+    },
+    {
+      "type": "person_fact",
+      "id": "473f9492-0e55-4253-bc1e-d9fc99d7cb00",
+      "label": "likes clean call sheets more than long decks"
+    },
+    {
+      "type": "person_fact",
+      "id": "f3f12968-6131-4993-a84e-93d48f99d9ca",
+      "label": "mentioned wanting to see the total eclipse"
+    },
+    {
+      "type": "person_fact",
+      "id": "ff0bd9d3-9e42-4abd-8a7d-ad8ddfe70069",
+      "label": "offered to look at the APRS path"
+    },
+    {
+      "type": "person_fact",
+      "id": "f37a328a-8e0a-414b-88dd-b4614c10bc1e",
+      "label": "prefers simple antennas that survive storms"
+    },
+    {
+      "type": "person_fact",
+      "id": "5e78c951-2fb4-4357-87f2-365892fee9af",
+      "label": "recommended labeling the UPS cables"
+    },
+    {
+      "type": "person_fact",
+      "id": "5c6908cd-5450-4c79-b87b-d20fbbedc322",
+      "label": "runs a similar Proxmox setup"
+    },
+    {
+      "type": "person_fact",
+      "id": "c1b1747e-8127-49e1-91f9-3165cee1c524",
+      "label": "wants to try the ramen place in NoDa this fall"
+    },
+    {
+      "type": "person_interaction",
+      "id": "f571bd16-5b62-46bd-a0e7-7cc2d3e061cd",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "52fe78a3-b46d-4633-9860-64e7fcdbe525",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "0099c6c0-072f-4184-982b-5135d5694601",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "e0e24e75-8104-4efb-bdd0-6f5b4b653b94",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "dc65c208-d1a4-4da7-92f2-4b31078fc14e",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "62ae4b34-ae50-493c-b09d-5a204c9ff13e",
+      "label": "Calendar-derived touchpoint from a test event."
+    },
+    {
+      "type": "person_interaction",
+      "id": "d593b01b-e7b3-49b0-bce8-d05db67e3e5d",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "41d5e39d-f6e2-4e6c-aa0c-c5a6459dce37",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "1dccecf8-18ea-409c-b29c-bb5d66064009",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "0373b187-88a3-448e-bb15-9165deb777e0",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "2a57a84f-1557-419a-9936-c08f1927a7a0",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "46769edc-ccbd-4431-84e9-1e6561bf147c",
+      "label": "Followed up with one concrete question."
+    },
+    {
+      "type": "person_interaction",
+      "id": "25d864c4-52b4-4a75-af1c-d55e46550e3a",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "4c289fd4-5221-4ff0-afb6-2d064fdda9e1",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "ed8236da-431f-4e8a-bd31-c6f7e21b587c",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "f479e641-9f5d-4818-bc3a-5e50f5462188",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "daa5de1a-2366-414f-8f07-f7e46efb072d",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "57e4c943-efb5-44f8-80a1-3886fae4acf6",
+      "label": "Quick text thread; nothing to do yet."
+    },
+    {
+      "type": "person_interaction",
+      "id": "feda6a58-c834-43f7-9006-1023d5ac4e0a",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "bf5b8bc7-d3d9-4ebf-9505-9af4e9daacd0",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "da43954a-414e-4803-a0e5-65298e7917da",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "2001a400-9eed-4b5b-aa0a-793e865e0a12",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "6615272d-a407-4ef7-9b76-95e4cefcf0e9",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "90634581-a920-48df-8e83-94650d5d9d97",
+      "label": "Shared a small update and left the next move open."
+    },
+    {
+      "type": "person_interaction",
+      "id": "41608082-1ec8-4322-b508-7d1cd0ada6ba",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person_interaction",
+      "id": "4ffab8de-5e8a-47b9-945a-baa361ca6ca9",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person_interaction",
+      "id": "bf548625-c06e-4f06-aaa1-46f2d6bb26c9",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person_interaction",
+      "id": "07b715d7-f8c5-480b-9c56-ba17bfe97b2c",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person_interaction",
+      "id": "72a231cc-9f05-4a8d-8f29-0adf8338fafb",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person_interaction",
+      "id": "9db4cd72-f949-4b7b-83d5-aaa0c370714d",
+      "label": "Talked after a calendar event and captured the useful bit."
+    },
+    {
+      "type": "person",
+      "id": "78a4da69-1f24-47d1-a8a9-85a3ff3c9851",
+      "label": "Ben from Homelab"
+    },
+    {
+      "type": "person",
+      "id": "b9a03d57-ed2b-4acc-a04f-fc358fd600d8",
+      "label": "Chris Miller"
+    },
+    {
+      "type": "person",
+      "id": "f9902797-98b7-4be8-ab0b-a1b37d6a9b57",
+      "label": "Lauren"
+    },
+    {
+      "type": "person",
+      "id": "48f228fe-b7e1-412a-b219-332372a4e059",
+      "label": "Maya Torres"
+    },
+    {
+      "type": "person",
+      "id": "88310c10-0fa2-4a7d-9389-48bc1e3db701",
+      "label": "Neighbor Pat"
+    },
+    {
+      "type": "person",
+      "id": "d659b165-edaf-417f-b60f-2b16f8a17545",
+      "label": "W4ABC Sam"
+    },
+    {
+      "type": "project_activity",
+      "id": "5a4dd216-d08c-4b4b-9885-5e9c8aa2d939",
+      "label": "Milestone completed: BIOS updated."
+    },
+    {
+      "type": "project_activity",
+      "id": "d46f803c-64f9-46d0-910d-a2be4d89d62c",
+      "label": "Milestone completed: Camera inventory."
+    },
+    {
+      "type": "project_activity",
+      "id": "fd03e573-f863-4473-b487-907f9cdb1dca",
+      "label": "Milestone completed: Cold open selected."
+    },
+    {
+      "type": "project_activity",
+      "id": "d84a3827-b640-42eb-9431-bc64f3fe6050",
+      "label": "Milestone completed: Export base image."
+    },
+    {
+      "type": "project_activity",
+      "id": "bf23f8df-1084-4338-b1ba-bfac1abc78c9",
+      "label": "Milestone completed: Field test."
+    },
+    {
+      "type": "project_activity",
+      "id": "cc7ad6fe-7e99-4918-b72c-e696689fe7e1",
+      "label": "Milestone completed: Mirrored boot test."
+    },
+    {
+      "type": "project_activity",
+      "id": "a595080e-0c93-479d-b705-95b352a21d48",
+      "label": "Milestone completed: Mount AP."
+    },
+    {
+      "type": "project_activity",
+      "id": "f67cef33-d1d1-4cb9-a4cd-ec531503f3e9",
+      "label": "Milestone completed: Parts ordered."
+    },
+    {
+      "type": "project_activity",
+      "id": "7cb3c381-919b-418d-a20a-28b457ac3898",
+      "label": "Milestone completed: Premise locked."
+    },
+    {
+      "type": "project_activity",
+      "id": "dd8f344d-d5f6-4efa-8122-64364fc19780",
+      "label": "Milestone completed: Program radios."
+    },
+    {
+      "type": "project_activity",
+      "id": "053d6784-393f-445d-be14-1127b483bece",
+      "label": "Milestone completed: Pull cable."
+    },
+    {
+      "type": "project_activity",
+      "id": "5bac5b71-25f0-4ac0-865d-6df172e42698",
+      "label": "Milestone completed: Terminate ends."
+    },
+    {
+      "type": "project",
+      "id": "936fd6bc-1b61-4ec5-b9a0-c6c9d6bdf337",
+      "label": "AI guest book for the blog"
+    },
+    {
+      "type": "project",
+      "id": "6b3c0d60-61a6-4345-9642-7ba41e44a0c3",
+      "label": "AM5 Proxmox build"
+    },
+    {
+      "type": "project",
+      "id": "8411e089-f858-48bf-8498-f65a4be2c85f",
+      "label": "APRS igate"
+    },
+    {
+      "type": "project",
+      "id": "aeaf3c8f-dc8c-4a9d-9f18-2f1b38f85620",
+      "label": "Cesium globe visualization"
+    },
+    {
+      "type": "project",
+      "id": "1fff1119-c69b-4664-ba97-fae175e14695",
+      "label": "CHIRP fleet programming"
+    },
+    {
+      "type": "project",
+      "id": "e61a563a-2b2d-4f11-b75b-d165b9fa57f3",
+      "label": "Documentary summit in Charlotte"
+    },
+    {
+      "type": "project",
+      "id": "acaa7b2c-66d0-4c23-af93-1cb23e8a172e",
+      "label": "EV charging + Duke rate optimization"
+    },
+    {
+      "type": "project",
+      "id": "3acd0146-ae99-4e8c-9a7d-6feefab12b5d",
+      "label": "Frigate camera migration"
+    },
+    {
+      "type": "project",
+      "id": "ce1476ea-ec8d-4e60-aba3-f94e9a8ee45c",
+      "label": "Garage network drop"
+    },
+    {
+      "type": "project",
+      "id": "bc82c932-846d-4a3c-9f24-3e26ac2b6466",
+      "label": "Ham radio desk build"
+    },
+    {
+      "type": "project",
+      "id": "cf22a10c-4d86-4c0c-bcf4-63d822f0c082",
+      "label": "Home Base"
+    },
+    {
+      "type": "project",
+      "id": "dcabb855-5240-450e-bba9-5f3a5b4b4f15",
+      "label": "NAS-based camera NVR experiment"
+    },
+    {
+      "type": "project",
+      "id": "a350b275-4181-4e51-804e-8d0bd0df3eee",
+      "label": "The Misc pilot episode"
+    },
+    {
+      "type": "project",
+      "id": "3b16a268-b009-472f-8ab4-05174b3a9894",
+      "label": "Zigbee sensor expansion"
+    },
+    {
+      "type": "resurfacing_seen",
+      "id": "6424f3b9-5a77-4595-b59e-37f0ef2f94e9",
+      "label": "idea:d3576c3a-0423-4776-8c1a-25200448f645"
+    },
+    {
+      "type": "resurfacing_seen",
+      "id": "686217e0-5809-4eec-8bc2-583e71e43e29",
+      "label": "journal_entry:04109968-a978-4444-bc15-7f84b4b4a99c"
+    },
+    {
+      "type": "resurfacing_seen",
+      "id": "3782fa72-81a5-4e9e-863d-fd0bc001b821",
+      "label": "journal_entry:afc80146-24df-49a0-9ac7-24a87e98e088"
+    },
+    {
+      "type": "routine_completion",
+      "id": "e4fb3685-257f-40da-a093-7563d34d36f7",
+      "label": "Card inventory hour 2026-06-21"
+    },
+    {
+      "type": "routine_completion",
+      "id": "55fc153f-02e3-4a4c-bdcb-e3b0d0d0904f",
+      "label": "Card inventory hour 2026-06-28"
+    },
+    {
+      "type": "routine_completion",
+      "id": "68a679f1-1616-4085-bdfd-052d511be736",
+      "label": "Evening tidy 2026-05-29"
+    },
+    {
+      "type": "routine_completion",
+      "id": "c9aeb106-4dc5-4f26-8c66-ac0a842cafd8",
+      "label": "Evening tidy 2026-05-31"
+    },
+    {
+      "type": "routine_completion",
+      "id": "9ee12081-3914-4774-b38d-bfe5248317f4",
+      "label": "Evening tidy 2026-06-02"
+    },
+    {
+      "type": "routine_completion",
+      "id": "7fb3fa10-f5d1-4e84-8993-8b53af509516",
+      "label": "Evening tidy 2026-06-04"
+    },
+    {
+      "type": "routine_completion",
+      "id": "fbee85b2-7c09-443f-a94b-1d7b9a358fce",
+      "label": "Evening tidy 2026-06-07"
+    },
+    {
+      "type": "routine_completion",
+      "id": "ede9aed5-4e8a-42e8-a7e6-082dbae4b140",
+      "label": "Evening tidy 2026-06-08"
+    },
+    {
+      "type": "routine_completion",
+      "id": "a846a854-0974-42c0-b089-8ce226d49757",
+      "label": "Evening tidy 2026-06-12"
+    },
+    {
+      "type": "routine_completion",
+      "id": "0becac37-562e-4b48-b775-6df4b45a7c33",
+      "label": "Evening tidy 2026-06-13"
+    },
+    {
+      "type": "routine_completion",
+      "id": "b7255fcf-7901-4518-b543-9d20b365f731",
+      "label": "Evening tidy 2026-06-15"
+    },
+    {
+      "type": "routine_completion",
+      "id": "f5bce273-f867-4bc1-a359-b1d2ada76537",
+      "label": "Evening tidy 2026-06-18"
+    },
+    {
+      "type": "routine_completion",
+      "id": "40a99e36-58bf-4abc-8233-d61859f1d538",
+      "label": "Evening tidy 2026-06-20"
+    },
+    {
+      "type": "routine_completion",
+      "id": "00af6e1c-9194-47ed-9f06-e48ff121f4a6",
+      "label": "Evening tidy 2026-06-22"
+    },
+    {
+      "type": "routine_completion",
+      "id": "559cf238-6368-4368-98cc-3b2c82235f92",
+      "label": "Evening tidy 2026-06-26"
+    },
+    {
+      "type": "routine_completion",
+      "id": "ea73a304-9883-47da-8163-6dd3d44f9d79",
+      "label": "Evening tidy 2026-06-28"
+    },
+    {
+      "type": "routine_completion",
+      "id": "481a9db6-8175-49b6-adf3-80a1cfc28ca8",
+      "label": "Evening tidy 2026-07-01"
+    },
+    {
+      "type": "routine_completion",
+      "id": "4ec128f0-70ae-407a-b786-5ebd1738d4b3",
+      "label": "Morning stretch 2026-05-30"
+    },
+    {
+      "type": "routine_completion",
+      "id": "84bc65ec-2cae-4be1-afe1-33a6e6de6062",
+      "label": "Morning stretch 2026-05-31"
+    },
+    {
+      "type": "routine_completion",
+      "id": "1739d4e9-8024-480b-b64e-0bd840dd864e",
+      "label": "Morning stretch 2026-06-01"
+    },
+    {
+      "type": "routine_completion",
+      "id": "1027601e-b318-479b-beaa-673e418018aa",
+      "label": "Morning stretch 2026-06-02"
+    },
+    {
+      "type": "routine_completion",
+      "id": "e123618d-3229-4141-a573-42233b865780",
+      "label": "Morning stretch 2026-06-05"
+    },
+    {
+      "type": "routine_completion",
+      "id": "85c9ec81-6e25-4a7f-b1fb-bdbf331c88ea",
+      "label": "Morning stretch 2026-06-06"
+    },
+    {
+      "type": "routine_completion",
+      "id": "2721214b-af03-4c31-829f-912d9d92648a",
+      "label": "Morning stretch 2026-06-09"
+    },
+    {
+      "type": "routine_completion",
+      "id": "c34ca631-48a6-474e-82b4-74b68d038d54",
+      "label": "Morning stretch 2026-06-10"
+    },
+    {
+      "type": "routine_completion",
+      "id": "23d04a0f-6e39-4ab3-b55d-7200ad33e92e",
+      "label": "Morning stretch 2026-06-11"
+    },
+    {
+      "type": "routine_completion",
+      "id": "c705f838-ee8e-4949-a739-1e19dbf03cf3",
+      "label": "Morning stretch 2026-06-15"
+    },
+    {
+      "type": "routine_completion",
+      "id": "342441bf-ce74-4637-b905-0bf5699a0a14",
+      "label": "Morning stretch 2026-06-16"
+    },
+    {
+      "type": "routine_completion",
+      "id": "d0fd0b82-f71a-4922-93f8-74cde8874e5c",
+      "label": "Morning stretch 2026-06-17"
+    },
+    {
+      "type": "routine_completion",
+      "id": "9969ddbd-88a0-4c47-9bba-22b7fe445190",
+      "label": "Morning stretch 2026-06-18"
+    },
+    {
+      "type": "routine_completion",
+      "id": "03b228be-f698-41d0-b5fc-c72b47d58203",
+      "label": "Morning stretch 2026-06-19"
+    },
+    {
+      "type": "routine_completion",
+      "id": "aa6d8a4b-140e-4115-860c-64015bb7e3f3",
+      "label": "Morning stretch 2026-06-23"
+    },
+    {
+      "type": "routine_completion",
+      "id": "628fb907-905b-4d68-b38b-cd532867de83",
+      "label": "Morning stretch 2026-06-24"
+    },
+    {
+      "type": "routine_completion",
+      "id": "8d2708ff-dad1-4171-8955-98ed906896a1",
+      "label": "Morning stretch 2026-06-25"
+    },
+    {
+      "type": "routine_completion",
+      "id": "f12068ec-6c49-43a4-b710-82243c96cb73",
+      "label": "Morning stretch 2026-06-29"
+    },
+    {
+      "type": "routine_completion",
+      "id": "985d0701-a6bd-40ce-aafa-8262f82a789e",
+      "label": "Morning stretch 2026-06-30"
+    },
+    {
+      "type": "routine_completion",
+      "id": "8bff9ea3-18eb-4bd6-babb-ebb97fa68f4c",
+      "label": "Morning stretch 2026-07-01"
+    },
+    {
+      "type": "routine_completion",
+      "id": "ca86d801-6c94-46b8-9e2a-0890b5ab4508",
+      "label": "Radio net check-in 2026-06-01"
+    },
+    {
+      "type": "routine_completion",
+      "id": "0d534f07-a429-47ee-9e0d-edf72d16af5f",
+      "label": "Radio net check-in 2026-06-08"
+    },
+    {
+      "type": "routine_completion",
+      "id": "2b051614-89e5-4652-bf92-d6e68c93f570",
+      "label": "Radio net check-in 2026-06-15"
+    },
+    {
+      "type": "routine_completion",
+      "id": "716f331e-b987-435b-b024-a1f3ce941989",
+      "label": "Radio net check-in 2026-06-29"
+    },
+    {
+      "type": "routine",
+      "id": "a289fb42-9d50-4caf-984d-369fb9c7b688",
+      "label": "Card inventory hour"
+    },
+    {
+      "type": "routine",
+      "id": "33a7a440-b74e-4926-8e9b-581dc4c23ac9",
+      "label": "Evening tidy"
+    },
+    {
+      "type": "routine",
+      "id": "b3e1bee3-80e6-4561-8c59-abed1f832c81",
+      "label": "Morning stretch"
+    },
+    {
+      "type": "routine",
+      "id": "3d2c8e18-4ce0-4763-9ee7-3ecfc3958d3a",
+      "label": "Radio net check-in"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "4644a8a0-40a5-4528-b2d5-db51ac7c357b",
+      "label": "ask whether the antenna mount still matters"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "3ca36433-0548-4a89-a0e9-4cc9da03ae54",
+      "label": "check the museum shoot archive next month"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "17be3674-9d4b-4054-9167-431092619f37",
+      "label": "dismissed review for NAS NVR retry"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "120243f9-7ffe-45d1-aa22-3d34abd65b55",
+      "label": "done review for CHIRP image backup"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "40fdbe05-5182-4fca-933c-9bb023779903",
+      "label": "done review for garage cable labels"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "b510f931-2ed9-42db-b0be-b8a92af46489",
+      "label": "review the Duke bill when the new cycle lands"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "80f65610-727a-490d-bedb-69fa327302b5",
+      "label": "surface the porch camera note today"
+    },
+    {
+      "type": "scheduled_review",
+      "id": "a456d73d-5e32-44b3-9120-a942a394fe10",
+      "label": "wait on the trailer sale before planning the garage shelf"
+    },
+    {
+      "type": "task",
+      "id": "c0557dec-35e8-4f86-8c6f-cf6181648c8e",
+      "label": "Add single-user auth to production"
+    },
+    {
+      "type": "task",
+      "id": "dd73f3de-c095-4688-8b5a-a2688f44a8f4",
+      "label": "Archive museum shoot cards 14"
+    },
+    {
+      "type": "task",
+      "id": "3212f5b8-1158-4bc8-ba14-d099b640327b",
+      "label": "Archive museum shoot cards 22"
+    },
+    {
+      "type": "task",
+      "id": "82a81f31-3473-4962-8f39-984ab6233e45",
+      "label": "Archive museum shoot cards 30"
+    },
+    {
+      "type": "task",
+      "id": "a7661b3b-b253-4dd1-9163-7a93f535f30d",
+      "label": "Archive museum shoot cards 38"
+    },
+    {
+      "type": "task",
+      "id": "d67ee058-c72a-40ad-aa9c-6b1865eac5d8",
+      "label": "Archive museum shoot cards 6"
+    },
+    {
+      "type": "task",
+      "id": "fd4ee321-4d74-4cc4-a79e-e566374e85d8",
+      "label": "Backup Proxmox configs"
+    },
+    {
+      "type": "task",
+      "id": "1fb5cd05-f0af-4831-aabe-21fc60c2d965",
+      "label": "Book vet checkup for Louise"
+    },
+    {
+      "type": "task",
+      "id": "15025180-16e5-4af0-9929-caf0a4dea65e",
+      "label": "Build fold-down radio shelf"
+    },
+    {
+      "type": "task",
+      "id": "3560fa86-374a-429f-8e3b-35fcc5a89ff8",
+      "label": "Call Duke about EV rate plan"
+    },
+    {
+      "type": "task",
+      "id": "bc2335b6-322c-40ab-b8cb-5aa7415f1832",
+      "label": "Check audio kit"
+    },
+    {
+      "type": "task",
+      "id": "dbaab47a-1edd-4635-9fa5-d9dd1009836a",
+      "label": "Check cable path"
+    },
+    {
+      "type": "task",
+      "id": "c24f3de3-ed1c-45f9-bc75-59f671fa56de",
+      "label": "Check EV tire pressure 15"
+    },
+    {
+      "type": "task",
+      "id": "8937d08c-b8c1-415b-8182-1dbad9b59c14",
+      "label": "Check EV tire pressure 23"
+    },
+    {
+      "type": "task",
+      "id": "9137d2a7-17ac-4e5c-ad3c-97656deac7d7",
+      "label": "Check EV tire pressure 31"
+    },
+    {
+      "type": "task",
+      "id": "1f0b474c-7d8d-4346-8f4e-64f1883c9570",
+      "label": "Check EV tire pressure 39"
+    },
+    {
+      "type": "task",
+      "id": "bcd96a2a-fa54-471b-ad98-04234d302eac",
+      "label": "Check EV tire pressure 7"
+    },
+    {
+      "type": "task",
+      "id": "688e94e3-373f-4d5b-b507-90a7fece396b",
+      "label": "Check Home Assistant backups"
+    },
+    {
+      "type": "task",
+      "id": "5a65a187-e2d9-4dd4-86b8-b643d308dc1a",
+      "label": "Check smoke detector batteries"
+    },
+    {
+      "type": "task",
+      "id": "6b15736b-1e1e-452d-873b-403f3cc39a0e",
+      "label": "Check UPS runtime"
+    },
+    {
+      "type": "task",
+      "id": "0976feee-f065-4fc4-9092-a3de0478c403",
+      "label": "Choose final guest for The Misc pilot"
+    },
+    {
+      "type": "task",
+      "id": "c81c9b22-fc9c-48f1-8413-45e4156aa82a",
+      "label": "Clean BaoFeng charging shelf 16"
+    },
+    {
+      "type": "task",
+      "id": "5c26fb5a-1009-4258-923a-14795bf4f14a",
+      "label": "Clean BaoFeng charging shelf 24"
+    },
+    {
+      "type": "task",
+      "id": "4e5f94f6-0c5d-4e06-ac6d-34cd6aec987c",
+      "label": "Clean BaoFeng charging shelf 32"
+    },
+    {
+      "type": "task",
+      "id": "2d098cc2-e00e-4309-9e5b-c58d8f338cda",
+      "label": "Clean BaoFeng charging shelf 40"
+    },
+    {
+      "type": "task",
+      "id": "2b3277bd-65d1-4a80-a238-5c07815ec2dc",
+      "label": "Clean BaoFeng charging shelf 8"
+    },
+    {
+      "type": "task",
+      "id": "1c6d0e45-8672-42d7-89a2-9e3ded61a50f",
+      "label": "Clean camera bags before the museum shoot"
+    },
+    {
+      "type": "task",
+      "id": "f3546164-5592-4b76-923b-3f6e542d3b9a",
+      "label": "Clean up card inventory"
+    },
+    {
+      "type": "task",
+      "id": "94c46e48-068e-40f2-a590-eae283afb284",
+      "label": "Clean up Home Base settings copy"
+    },
+    {
+      "type": "task",
+      "id": "13dbc267-e0d8-472a-a0e5-35e72f8c1306",
+      "label": "Compare Duke bill against charging sessions"
+    },
+    {
+      "type": "task",
+      "id": "f5bfe9b4-f8e7-4c41-942c-f2ce3908532a",
+      "label": "Compare porch camera placement"
+    },
+    {
+      "type": "task",
+      "id": "2d096e06-c042-454c-b7f2-c30e302a884a",
+      "label": "Confirm antenna mount hardware"
+    },
+    {
+      "type": "task",
+      "id": "9d9579e6-8005-4fe8-89d0-8fa2643a06ad",
+      "label": "Confirm guest list"
+    },
+    {
+      "type": "task",
+      "id": "cd23442f-6454-46b6-b887-5dc44b40da66",
+      "label": "Copy Frigate config snapshot 12"
+    },
+    {
+      "type": "task",
+      "id": "0169307c-5c55-4f1f-8a34-1d38d587da51",
+      "label": "Copy Frigate config snapshot 20"
+    },
+    {
+      "type": "task",
+      "id": "6531a585-80d6-4dda-b541-31c5dcfb8cfe",
+      "label": "Copy Frigate config snapshot 28"
+    },
+    {
+      "type": "task",
+      "id": "e2eb3070-a055-435e-8a66-d7b0e431febf",
+      "label": "Copy Frigate config snapshot 36"
+    },
+    {
+      "type": "task",
+      "id": "e8b2299e-bfa0-46bf-aedd-665bb5b18e57",
+      "label": "Copy Frigate config snapshot 4"
+    },
+    {
+      "type": "task",
+      "id": "5c29f710-63ef-4f5f-a23d-125df7495dfa",
+      "label": "Cut first ten minutes of The Misc pilot"
+    },
+    {
+      "type": "task",
+      "id": "995ef8d0-a3a1-417d-873f-a0e2fd13e5f4",
+      "label": "Draft Charlotte summit venue map"
+    },
+    {
+      "type": "task",
+      "id": "62436477-6a44-4009-979c-83daeb1cdbc9",
+      "label": "Email producer contact about pilot guest timing"
+    },
+    {
+      "type": "task",
+      "id": "7597307a-a263-4d1e-b793-3c045e63498b",
+      "label": "Export pilot scratch audio 11"
+    },
+    {
+      "type": "task",
+      "id": "ae286a15-3388-45de-898f-0d8ca12b8e0f",
+      "label": "Export pilot scratch audio 19"
+    },
+    {
+      "type": "task",
+      "id": "48061223-dabb-4b95-a805-3184c2a6dc41",
+      "label": "Export pilot scratch audio 27"
+    },
+    {
+      "type": "task",
+      "id": "49c9644b-c87d-4401-8e6c-639d33bbf6cf",
+      "label": "Export pilot scratch audio 3"
+    },
+    {
+      "type": "task",
+      "id": "5672503a-72c1-45cb-aa53-705a3c23afc4",
+      "label": "Export pilot scratch audio 35"
+    },
+    {
+      "type": "task",
+      "id": "07d7b015-7faf-4465-b2b4-84f41f80d6ac",
+      "label": "Export VM list"
+    },
+    {
+      "type": "task",
+      "id": "efa16b9d-475f-4982-8a1d-a1517505dffa",
+      "label": "Figure out the thing from the driveway camera note"
+    },
+    {
+      "type": "task",
+      "id": "eccb0d41-0e5e-4039-a5dc-9ad533226756",
+      "label": "Garage mask"
+    },
+    {
+      "type": "task",
+      "id": "011b0fc3-5970-4906-8890-53dea69cc0b5",
+      "label": "Inventory spare coax adapters"
+    },
+    {
+      "type": "task",
+      "id": "c94104c0-01a9-4122-95c5-35dd8bbb7e24",
+      "label": "Label programmed radios 1"
+    },
+    {
+      "type": "task",
+      "id": "14932fac-cdb1-4aec-9af0-b2cbaa552de3",
+      "label": "Label programmed radios 17"
+    },
+    {
+      "type": "task",
+      "id": "8f091a68-09e4-4fec-9c26-72af0ff578b7",
+      "label": "Label programmed radios 25"
+    },
+    {
+      "type": "task",
+      "id": "14184432-0438-49cd-80ec-9395b2c33ad9",
+      "label": "Label programmed radios 33"
+    },
+    {
+      "type": "task",
+      "id": "6d38b8c9-d09b-4715-a4fc-686e339334c0",
+      "label": "Label programmed radios 9"
+    },
+    {
+      "type": "task",
+      "id": "c44c0ca6-30d0-4b29-9c67-165fb395fbde",
+      "label": "Measure wall"
+    },
+    {
+      "type": "task",
+      "id": "d36bdb81-e3c5-48bf-a27f-5b6fad203aad",
+      "label": "Order EVSE weather cover"
+    },
+    {
+      "type": "task",
+      "id": "c8febf72-6b17-46d2-a3c1-3d409e9aac6a",
+      "label": "Outline the cold open"
+    },
+    {
+      "type": "task",
+      "id": "92e0b73c-3a99-4415-855f-45a7a9c5b1bd",
+      "label": "Plan ham desk measurements"
+    },
+    {
+      "type": "task",
+      "id": "bcfc3ef3-cd29-4472-98f4-f19cdac43d0e",
+      "label": "Porch mask"
+    },
+    {
+      "type": "task",
+      "id": "2e60afde-264f-42a5-9eb2-2e1686a74149",
+      "label": "Prep The Misc pilot"
+    },
+    {
+      "type": "task",
+      "id": "3b630e1d-f99c-4d76-8639-0e293c721ae3",
+      "label": "Pull charger kWh numbers from the EV app"
+    },
+    {
+      "type": "task",
+      "id": "a3bb7a70-c62e-4027-8c73-760200c4f1a9",
+      "label": "Pull trades"
+    },
+    {
+      "type": "task",
+      "id": "50829539-a63b-4bad-8ceb-1138f25551ac",
+      "label": "Put the mystery USB-C cable somewhere sane"
+    },
+    {
+      "type": "task",
+      "id": "292f94f1-baa0-48cf-89a4-ca6c2f2bdb71",
+      "label": "Read the next chapter of the camera manual"
+    },
+    {
+      "type": "task",
+      "id": "05e640c9-2e92-4755-9076-9b24435da716",
+      "label": "Rebuild Frigate storage retention rules"
+    },
+    {
+      "type": "task",
+      "id": "b0b76074-f064-4489-bddd-7ab550397ed5",
+      "label": "Renew truck registration"
+    },
+    {
+      "type": "task",
+      "id": "3f53217b-9c52-4c7b-b4af-c7093919c2e2",
+      "label": "Replace CR2032 batteries in Zigbee sensors"
+    },
+    {
+      "type": "task",
+      "id": "c8523618-63a7-4698-b979-bcb61b6c6de0",
+      "label": "Review Frigate overnight logs"
+    },
+    {
+      "type": "task",
+      "id": "94ff267b-4c4b-41de-9758-c42b495cb4ad",
+      "label": "Scan old Charlotte signage ideas"
+    },
+    {
+      "type": "task",
+      "id": "98bec8e6-7283-43e8-a916-1eca0f89a7f7",
+      "label": "Sketch AI guest book answer boundaries"
+    },
+    {
+      "type": "task",
+      "id": "195e5f3f-5e2a-41da-9609-4e1513aabecf",
+      "label": "Sort Magic trade binder"
+    },
+    {
+      "type": "task",
+      "id": "8e911551-9c56-4c30-a437-fb0597433a58",
+      "label": "Sort rares"
+    },
+    {
+      "type": "task",
+      "id": "2f5d5ed4-3edf-483c-8adb-71b719920958",
+      "label": "Stage AM5 migration"
+    },
+    {
+      "type": "task",
+      "id": "24e8d49f-a923-4e45-a761-5056a6a9c82d",
+      "label": "Swap porch camera injector"
+    },
+    {
+      "type": "task",
+      "id": "63572631-0fe2-4041-ba38-ebd9d32cc42d",
+      "label": "Terminate garage keystone 10"
+    },
+    {
+      "type": "task",
+      "id": "b338f69b-bc89-4ec7-8187-2b2a3223dbbb",
+      "label": "Terminate garage keystone 18"
+    },
+    {
+      "type": "task",
+      "id": "7b4189ae-9b89-43cf-aa5e-83c7b62c3ab2",
+      "label": "Terminate garage keystone 2"
+    },
+    {
+      "type": "task",
+      "id": "3b27a453-4a84-446b-be43-c55b3991110d",
+      "label": "Terminate garage keystone 26"
+    },
+    {
+      "type": "task",
+      "id": "f2ae079c-c37a-44e0-ab4e-5a48118398ae",
+      "label": "Terminate garage keystone 34"
+    },
+    {
+      "type": "task",
+      "id": "cc42086d-11bb-4d80-9747-63e57eb2340b",
+      "label": "Test mirrored boot drives"
+    },
+    {
+      "type": "task",
+      "id": "1f6ce7eb-01a5-48d6-b42d-b6665b981777",
+      "label": "Try APRS igate on the upstairs window"
+    },
+    {
+      "type": "task",
+      "id": "86e26e66-fd87-4316-acdd-0bd4e7d307ed",
+      "label": "Tune Frigate zones"
+    },
+    {
+      "type": "task",
+      "id": "48be72df-39c6-46b5-9a83-bee27c5051f7",
+      "label": "Unpack the drawer of unlabeled SD cards"
+    },
+    {
+      "type": "task",
+      "id": "53b0866a-877e-4f20-ac11-f8db7ce941ce",
+      "label": "Update Proxmox BIOS notes 13"
+    },
+    {
+      "type": "task",
+      "id": "0d14d088-d7db-4cc4-afd7-12230b7bd186",
+      "label": "Update Proxmox BIOS notes 21"
+    },
+    {
+      "type": "task",
+      "id": "57dfe853-d49f-4407-bb40-0f38d293685f",
+      "label": "Update Proxmox BIOS notes 29"
+    },
+    {
+      "type": "task",
+      "id": "45df6b67-143a-4964-9b0b-0366ef42b313",
+      "label": "Update Proxmox BIOS notes 37"
+    },
+    {
+      "type": "task",
+      "id": "51e6c1a0-301c-4bff-ac1c-4f12ba26b29d",
+      "label": "Update Proxmox BIOS notes 5"
+    },
+    {
+      "type": "task",
+      "id": "ac0fb30a-6382-4699-8467-d0ea694a3228",
+      "label": "Water plants"
+    },
+    {
+      "type": "task",
+      "id": "3ae03b0b-56b1-49a7-805e-b048e328e31a",
+      "label": "Write AM5 rollback notes"
+    },
+    {
+      "type": "task",
+      "id": "dbb89ab8-fed8-44fe-9f42-009ba5fe24f1",
+      "label": "Write rollback note"
+    }
+  ],
+  "captureBatch": [
+    {
+      "text": "buy coax connectors before the next antenna test",
+      "status": "already_present",
+      "captureId": "940c77ad-625a-4f46-a94c-13b4051af0bd"
+    },
+    {
+      "text": "idea: make a little field card for APRS paths I actually use",
+      "status": "already_present",
+      "captureId": "8637cf37-4d92-4a31-b41a-056d952e2cd0"
+    },
+    {
+      "text": "the W4 club net is Tuesdays at 8pm on the local repeater",
+      "status": "already_present",
+      "captureId": "35fb2835-4b82-4d3d-9666-2c84c599d89b"
+    },
+    {
+      "text": "hmm something about antennas maybe",
+      "status": "already_present",
+      "captureId": "a6ff4c7b-6c7f-45b4-8bff-9471d514b49d"
+    },
+    {
+      "text": "log on the AM5 Proxmox build: BIOS is updated and the next thing is testing the mirrored boot drives",
+      "status": "already_present",
+      "captureId": "822112d1-634f-4c48-936a-28f331baac61"
+    },
+    {
+      "text": "schedule smoke detector battery check for next month",
+      "status": "already_present",
+      "captureId": "cdf61fb5-97e6-42d7-b2d3-1b64d03eb718"
+    },
+    {
+      "text": "journal: long shoot day but the crew saved it when the location got loud",
+      "status": "already_present",
+      "captureId": "09b43ce3-8f0d-47f3-bcf3-3d2647ce4b27"
+    },
+    {
+      "text": "add Dana Reyes to people, she runs the print shop, dana@example.com",
+      "status": "already_present",
+      "captureId": "01853174-c369-46c4-9399-0bf54f9e70c8"
+    },
+    {
+      "text": "note for Lauren: she wants to try the new ramen place in NoDa this fall",
+      "status": "already_present",
+      "captureId": "f2577403-6923-4f30-aae9-1a9ff094b425"
+    },
+    {
+      "text": "call Duke Energy about the EV rate plan next Tuesday",
+      "status": "already_present",
+      "captureId": "53f68d3c-d0f0-4fc8-b9fd-e710968a8dcc"
+    },
+    {
+      "text": "what if the blog had a tiny AI guest book that answers from old posts",
+      "status": "already_present",
+      "captureId": "7e3000b6-8e5a-4961-88c7-9b88eb3324a9"
+    },
+    {
+      "text": "Frigate docs recommend checking Coral USB power before blaming detection settings",
+      "status": "already_present",
+      "captureId": "eff7d989-0484-4ae9-ab22-7a8321531e05"
+    },
+    {
+      "text": "prep The Misc pilot outline this Friday morning",
+      "status": "already_present",
+      "captureId": "83a0fb7c-3e83-42d4-b3e2-abe2d5cc207a"
+    },
+    {
+      "text": "log on Frigate camera migration: garage camera is stable but porch still drops overnight",
+      "status": "already_present",
+      "captureId": "94c1c720-65bb-4448-be42-8343d7762096"
+    },
+    {
+      "text": "start a weekly card inventory hour routine on Sundays, temporary until two weeks from now",
+      "status": "already_present",
+      "captureId": "b0fa3bc2-e624-4c26-bfe7-73447fa5d16d"
+    },
+    {
+      "text": "did my morning stretch",
+      "status": "already_present",
+      "captureId": "1ff78ce3-7fc6-4a3f-b660-c658ec9fc57b"
+    },
+    {
+      "text": "backup Proxmox configs every Friday",
+      "status": "already_present",
+      "captureId": "19e0f8e1-ee5d-4ba6-81cc-2ef17d487924"
+    },
+    {
+      "text": "idea: make a Charlotte documentary summit checklist for venues and parking",
+      "status": "already_present",
+      "captureId": "ac8b14bb-4900-4af5-9c57-60a94c2905f9"
+    },
+    {
+      "text": "the sports client liked the lower-third timing from the second edit",
+      "status": "already_present",
+      "captureId": "9cff0d08-3bba-430f-9399-171a0b4c5fcf"
+    },
+    {
+      "text": "renew the truck registration next week",
+      "status": "already_present",
+      "captureId": "4d912e8b-e270-40c5-80a1-68cdd847e96a"
+    },
+    {
+      "text": "add to Ham Radio: the roll-up J-pole works better from the upstairs window",
+      "status": "already_present",
+      "captureId": "ce1d95b6-aa47-4fee-8cf1-3f884282f752"
+    },
+    {
+      "text": "water plants every Sunday",
+      "status": "already_present",
+      "captureId": "3d0e3cb3-10dd-40e6-b677-5c3af31117ec"
+    },
+    {
+      "text": "check Home Assistant backups tomorrow",
+      "status": "already_present",
+      "captureId": "fad6a540-f737-4133-9875-3af355a1a74c"
+    },
+    {
+      "text": "idea: build a small magic binder index by color and set",
+      "status": "already_present",
+      "captureId": "3ab22bc0-1628-4840-87a6-4b547b5190f2"
+    },
+    {
+      "text": "Lauren said Paulie is getting picky about the chicken food again",
+      "status": "already_present",
+      "captureId": "502e4502-8289-4b27-84de-b542e9a603a7"
+    },
+    {
+      "text": "revisit the EV charging estimate once the next Duke bill lands",
+      "status": "already_present",
+      "captureId": "47f9694b-6331-44f3-ae25-acd1151502c9"
+    },
+    {
+      "text": "clean camera bags before the museum shoot",
+      "status": "already_present",
+      "captureId": "0b31aa26-9c21-49b6-a1dd-5a4d7ea0b50b"
+    },
+    {
+      "text": "journal: got the igate receiving packets on the first try and it felt like a tiny miracle",
+      "status": "already_present",
+      "captureId": "ca31e400-6011-4bef-afef-7b51d808a219"
+    },
+    {
+      "text": "note for Chris: ask about his portable lighting kit next time we talk",
+      "status": "already_present",
+      "captureId": "cb1d3272-be6e-48ca-b117-3f2f11b6ad22"
+    },
+    {
+      "text": "order replacement CR2032 batteries for the sensors",
+      "status": "already_present",
+      "captureId": "3c313e33-44a3-4a8f-8e78-6be3b41bf081"
+    },
+    {
+      "text": "doc on AM5 Proxmox build titled Part list: motherboard, ECC RAM, mirrored NVMe boot, 10 gig card",
+      "status": "already_present",
+      "captureId": "4b580ba2-7ec7-4913-9213-88c9286d2f4f"
+    },
+    {
+      "text": "idea: a photo essay about old Charlotte signage before it disappears",
+      "status": "already_present",
+      "captureId": "d3036b1c-ccd1-460f-b1d0-e9deb1953540"
+    },
+    {
+      "text": "book vet checkup for Louise next month",
+      "status": "already_present",
+      "captureId": "77e75ffc-85b8-4741-9279-3a63ae6f1ee1"
+    },
+    {
+      "text": "BaoFeng battery eliminator part number needs double checking before ordering",
+      "status": "already_present",
+      "captureId": "e5b5de9d-1942-4cd9-9edb-e4d1960d8cce"
+    },
+    {
+      "text": "finish the bank campaign archive handoff on Monday",
+      "status": "already_present",
+      "captureId": "f4993897-6b96-4a60-b1ce-773cf5b33afb"
+    },
+    {
+      "text": "log on The Misc pilot: cold open is stronger if it starts with the weird garage audio",
+      "status": "already_present",
+      "captureId": "d1b60740-b53f-45eb-8e04-16749a132d4e"
+    },
+    {
+      "text": "check tire pressure on the EV this weekend",
+      "status": "already_present",
+      "captureId": "db90645a-1e5e-49a0-bceb-346a37a11898"
+    },
+    {
+      "text": "idea: a tiny field guide to my home network for future me",
+      "status": "already_present",
+      "captureId": "dcef1da7-c516-4c47-ae66-bcf8af8b8742"
+    },
+    {
+      "text": "neighbor mentioned the HOA bulk pickup is the second Saturday",
+      "status": "already_present",
+      "captureId": "ac69b63b-6c7a-4e0e-876e-fa0670d981f0"
+    },
+    {
+      "text": "maybe that camera thing with the driveway but not sure yet",
+      "status": "already_present",
+      "captureId": "e964b5f2-c4f2-4daa-8614-0bfe4c68aac2"
+    }
+  ],
+  "misroutes": [],
+  "notes": [
+    "Created by scripts/seed-test-corpus.mjs.",
+    "Teardown must use status changes, never deletes."
+  ]
+}
