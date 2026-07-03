@@ -4,6 +4,7 @@ import {
   dateOnlyFromString,
   localDateString,
 } from "@/lib/dates";
+import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
 
 export async function getTodayDashboard() {
@@ -118,6 +119,11 @@ export async function getTodayDashboard() {
       }),
     ]);
 
+    // Daily resurfacing selection is lazy: the first Today load of the day
+    // picks the item; later loads reuse it. Failure here must never break
+    // the Today screen.
+    const resurfacedItem = await getDailyResurfacedItem().catch(() => null);
+
     const staleMinutes =
       typeof calendarStaleMinutesSetting?.value === "number"
         ? calendarStaleMinutesSetting.value
@@ -140,6 +146,7 @@ export async function getTodayDashboard() {
       recentCaptures,
       nextTask,
       nextEvent,
+      resurfacedItem,
       calendarSync: {
         status: calendarSync?.status ?? "not_configured",
         lastSyncedAt: calendarSync?.lastSyncedAt ?? null,

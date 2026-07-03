@@ -4,6 +4,7 @@ import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
 import { createCheckInRecord } from "@/lib/checkins";
+import { boostResurfaceByMatch } from "@/lib/resurfacing";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
   captureInputSchema,
@@ -305,6 +306,20 @@ async function executeActions(
       case "journal":
         createdItems.push(await executeJournal(action, context));
         break;
+      case "boost_resurface": {
+        const boosted = await boostResurfaceByMatch(action.item_match);
+        if (!boosted) {
+          throw new Error(
+            `No idea or journal entry matched "${action.item_match}" to boost.`,
+          );
+        }
+        createdItems.push({
+          type: boosted.itemType === "idea" ? "idea" : "journal_entry",
+          id: boosted.id,
+          label: `Boosted: ${boosted.label}`,
+        });
+        break;
+      }
       case "create_entity_note":
         createdItems.push(await createEntityNote(action, context));
         break;

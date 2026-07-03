@@ -18,6 +18,7 @@ import {
   getRecentCaptureAction,
   getRecentCaptureHref,
 } from "@/lib/today-capture-actions";
+import { ResurfacedMemory } from "@/components/resurfaced-memory";
 
 export const dynamic = "force-dynamic";
 
@@ -177,6 +178,8 @@ export default async function TodayPage() {
               </TaskDropZone>
             </div>
           </section>
+
+          <ResurfacedMemory item={data.resurfacedItem} />
         </>
       )}
     </div>

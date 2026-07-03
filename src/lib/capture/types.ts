@@ -110,6 +110,11 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+const boostResurfaceAction = z.object({
+  type: z.literal("boost_resurface"),
+  item_match: z.string().min(1),
+});
+
 const journalAction = z.object({
   type: z.literal("journal"),
   body_md: z.string().min(1),
@@ -156,6 +161,7 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   convertIdeaAction,
   createReferenceAction,
   journalAction,
+  boostResurfaceAction,
   checkInAction,
   createEntityNoteAction,
   createEntityDocAction,

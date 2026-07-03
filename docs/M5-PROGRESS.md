@@ -82,3 +82,10 @@ Format per step: what was built, test result, commit hash, deviations.
 - Gates: tsc clean, eslint clean, build succeeds.
 - Commit: (step-6 commit)
 - DEVIATION: route stays `/ideas` (tab renamed only) — smallest change; a URL rename would break nothing for anyone but adds churn.
+
+### Step 7 — Resurfacing Engine
+- Built: `resurfacing_seen` table (itemType journal_entry/idea, itemId, surfacedOn date, response kept/dismissed/annotated); `Idea` gains `resurfaceWeight`/`lastSurfacedAt` (additive) so boosts work on both item types. `src/lib/resurfacing.ts`: lazy daily selection on first Today load (pool = journal entries >30d + seed/developing ideas >60d, weighted random by resurfaceWeight, items seen within 90d excluded; empty pool renders nothing; one item per day — after a response the surface stays quiet until tomorrow). `/api/cron/resurface` (CRON_SECRET) as the midnight-cron/test hook with `?force=1`. Today card after Tomorrow, styled kin to the receipt strip: item, plain age fact ("45 days ago"), three quiet actions — add a thought (idea → idea note; journal → new journal entry tagged resurfaced-thought), boost (weight ×2 cap 8, response kept), dismiss (response only). All three write audit notifications. Parser: `boost_resurface { item_match }` (prompt + fallback + service).
+- Test (work-order): seeded two backdated journal entries (45d/40d); forced the job → card showed memory alpha with all three actions; clicked Dismiss in the UI → card gone, seen row response=dismissed; forced again → different item (memory beta) rendered. Boost via capture "boost M5V p3 memory beta" → weight 1.0→2.0. PASS.
+- Gates: tsc clean, eslint clean (one react-hooks/purity error fixed by computing ageDays in the lib, not render), build succeeds.
+- Commit: (this commit)
+- DEVIATION: "add a thought" on a journal memory writes a new journal entry tagged `resurfaced-thought` (journal has no notes table; append-only preserved). DEVIATION: dismiss leaves resurfaceWeight unchanged — the 90-day seen exclusion already keeps dismissed items away; permanent down-weighting on one dismissal would drift toward hiding.

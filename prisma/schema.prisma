@@ -104,6 +104,17 @@ enum JournalEntryStatus {
   killed
 }
 
+enum ResurfaceItemType {
+  journal_entry
+  idea
+}
+
+enum ResurfaceResponse {
+  kept
+  dismissed
+  annotated
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -270,6 +281,8 @@ model Idea {
   convertedToId   String?          @map("converted_to_id")
   source          String?
   captureId       String?          @map("capture_id")
+  resurfaceWeight Float            @default(1.0) @map("resurface_weight")
+  lastSurfacedAt  DateTime?        @map("last_surfaced_at")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -337,6 +350,19 @@ model EntityNote {
   @@index([parentType, parentId, createdAt])
   @@index([captureId])
   @@map("entity_notes")
+}
+
+model ResurfacingSeen {
+  id         String             @id @default(uuid())
+  itemType   ResurfaceItemType  @map("item_type")
+  itemId     String             @map("item_id")
+  surfacedOn DateTime           @map("surfaced_on") @db.Date
+  response   ResurfaceResponse?
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([surfacedOn])
+  @@index([itemType, itemId, surfacedOn])
+  @@map("resurfacing_seen")
 }
 
 model JournalEntry {
