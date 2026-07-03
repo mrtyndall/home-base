@@ -12,6 +12,9 @@ These are the initial build defaults from SCOPE.md Section 16. They are written 
 | Google OAuth redirect URI | Option B: Railway/domain hosted redirect. Use `https://home-base-production-e3b7.up.railway.app/api/google/oauth/callback`. | Chosen by Matt on 2026-07-03 |
 | Parked-project weighting | Lost context is the main problem; parked projects stay browsable but excluded from Today attention and slipping detection | Confirmed |
 | References tab | No dedicated tab for now; references live under Search/Browse | Confirm with Matt |
+| File attachment storage | Cloudflare R2 for object storage; Railway volume remains the fallback if Matt wants fewer external services | Confirm with Matt |
+| Initial area map | Suggested domains: Home, Family, Health, Hobbies, Creative. Current seeded areas include Inbox, Ham Radio, Homelab, and Magic/Pokemon. | Confirm with Matt |
+| Catch-all areas | Inbox system area is the only catch-all; no per-domain "General" areas | Confirm with Matt explicitly; already enforced by SCOPE.md |
 
 ## Architecture Decisions
 
