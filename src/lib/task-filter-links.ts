@@ -38,6 +38,13 @@ export function normalizeTaskSection(
     : "all";
 }
 
+export function normalizeStarredFilter(
+  value: string | string[] | undefined,
+): boolean {
+  const starred = Array.isArray(value) ? value[0] : value;
+  return starred === "1" || starred === "true";
+}
+
 export function toggleFilterValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
@@ -48,15 +55,18 @@ export function buildTasksFilterHref({
   domains,
   projects,
   section,
+  starred,
 }: {
   domains: string[];
   projects: string[];
   section: TaskSectionFilter;
+  starred?: boolean;
 }) {
   const params = new URLSearchParams();
   for (const domain of domains) params.append("domain", domain);
   for (const project of projects) params.append("project", project);
   if (section !== "all") params.set("section", section);
+  if (starred) params.set("starred", "1");
   const query = params.toString();
   return query ? `/tasks?${query}` : "/tasks";
 }

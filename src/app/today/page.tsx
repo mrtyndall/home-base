@@ -4,6 +4,7 @@ import {
   Clock3,
   Inbox,
   RefreshCcw,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import type { Capture } from "@prisma/client";
@@ -11,6 +12,7 @@ import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import {
   getRecentCaptureAction,
@@ -43,6 +45,31 @@ export default async function TodayPage() {
       ) : (
         <>
           <StatusLine data={data} />
+
+          {data.topTasks.length > 0 ? (
+            <section className="space-y-3">
+              <SectionHeader icon={Star} title="Top Tasks" />
+              <div className="space-y-2">
+                {data.topTasks.map((task) => (
+                  <TodayTaskRow
+                    key={task.id}
+                    task={task}
+                    today={data.today}
+                    tomorrow={data.tomorrow}
+                  />
+                ))}
+              </div>
+              {data.starredCount > data.topTasks.length ? (
+                <Link
+                  href="/tasks?starred=1"
+                  className="inline-block text-sm text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
+                >
+                  {data.starredCount - data.topTasks.length} more starred in
+                  Tasks
+                </Link>
+              ) : null}
+            </section>
+          ) : null}
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-3">
@@ -160,6 +187,7 @@ type TodayTask = {
   id: string;
   title: string;
   dueDate: Date | null;
+  starred: boolean;
   area: { name: string };
   project: { name: string } | null;
 };
@@ -186,7 +214,10 @@ function TodayTaskRow({
         today={today}
         tomorrow={tomorrow}
       />
-      <TaskCompleteButton taskId={task.id} />
+      <div className="flex shrink-0 items-center gap-1.5">
+        <TaskStarButton taskId={task.id} starred={task.starred} />
+        <TaskCompleteButton taskId={task.id} />
+      </div>
     </div>
   );
 }

@@ -213,6 +213,7 @@ model Task {
   projectId       String?    @map("project_id")
   parentTaskId    String?    @map("parent_task_id")
   someday         Boolean    @default(false)
+  starred         Boolean    @default(false)
   recurrenceRule  String?    @map("recurrence_rule")
   reminderOffsets Json?      @map("reminder_offsets")
   source          String?
@@ -230,6 +231,7 @@ model Task {
 
   @@index([areaId, status])
   @@index([someday, status])
+  @@index([starred, status])
   @@index([dueDate, dueTime])
   @@index([projectId])
   @@index([captureId])

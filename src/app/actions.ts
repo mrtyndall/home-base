@@ -24,6 +24,36 @@ export async function completeTask(formData: FormData) {
   revalidatePath("/tasks");
 }
 
+export async function toggleTaskStar(formData: FormData) {
+  const taskId = getTrimmedString(formData, "taskId");
+  if (!taskId) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, starred: true },
+  });
+  if (!task) return;
+
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: { starred: !task.starred },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: updated.starred ? "task_starred" : "task_unstarred",
+      title: updated.starred ? "Task starred" : "Task unstarred",
+      body: updated.title,
+      sourceRef: { type: "task", id: updated.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/today");
+  revalidatePath("/tasks");
+  revalidatePath(`/tasks/${taskId}`);
+}
+
 export async function createQuickTask(formData: FormData) {
   const title = getTrimmedString(formData, "title");
   if (!title) return;

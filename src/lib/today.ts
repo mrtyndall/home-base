@@ -25,6 +25,8 @@ export async function getTodayDashboard() {
 
   try {
     const [
+      topTasks,
+      starredCount,
       dueToday,
       dueTomorrow,
       todayEvents,
@@ -36,6 +38,17 @@ export async function getTodayDashboard() {
       calendarSync,
       calendarStaleMinutesSetting,
     ] = await Promise.all([
+      prisma.task.findMany({
+        where: { status: "open", starred: true },
+        include: { area: true, project: true },
+        orderBy: [
+          { dueDate: { sort: "asc", nulls: "last" } },
+          { dueTime: "asc" },
+          { createdAt: "asc" },
+        ],
+        take: 3,
+      }),
+      prisma.task.count({ where: { status: "open", starred: true } }),
       prisma.task.findMany({
         where: {
           status: "open",
@@ -117,6 +130,8 @@ export async function getTodayDashboard() {
       ready: true as const,
       today,
       tomorrow,
+      topTasks,
+      starredCount,
       dueToday,
       dueTomorrow,
       taskInbox,

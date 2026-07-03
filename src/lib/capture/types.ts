@@ -22,11 +22,18 @@ const createTaskAction = z.object({
   priority: z.string().optional(),
   reminder_offsets: z.array(z.string()).optional(),
   someday: z.boolean().optional(),
+  starred: z.boolean().optional(),
 });
 
 const completeTaskAction = z.object({
   type: z.literal("complete_task"),
   task_match: z.string().min(1),
+});
+
+const starTaskAction = z.object({
+  type: z.literal("star_task"),
+  task_match: z.string().min(1),
+  starred: z.boolean().optional(),
 });
 
 const createAreaAction = z.object({
@@ -123,6 +130,7 @@ const createEntityDocAction = z.object({
 export const executableActionSchema = z.discriminatedUnion("type", [
   createTaskAction,
   completeTaskAction,
+  starTaskAction,
   createAreaAction,
   updateAreaStateAction,
   createProjectAction,

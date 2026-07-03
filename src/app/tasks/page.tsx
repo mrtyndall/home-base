@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { addDaysToDateString, formatDateOnly, localDateString } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
@@ -10,6 +11,7 @@ import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
 import {
   buildTasksFilterHref,
   normalizeFilterValues,
+  normalizeStarredFilter,
   normalizeTaskSection,
   toggleFilterValue,
   type TaskSectionFilter,
@@ -22,11 +24,12 @@ type TasksPageProps = {
     domain?: string | string[];
     project?: string | string[];
     section?: string | string[];
+    starred?: string | string[];
   }>;
 };
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
-  const { domain, project, section } = await searchParams;
+  const { domain, project, section, starred } = await searchParams;
 
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
@@ -51,6 +54,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     .map((item) => item.id);
   const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
   const selectedSection = normalizeTaskSection(section);
+  const starredOnly = normalizeStarredFilter(starred);
   const visibleTasks = tasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
@@ -62,6 +66,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       selectedProjectIds.length > 0 &&
       (!task.projectId || !selectedProjectIds.includes(task.projectId))
     ) {
+      return false;
+    }
+    if (starredOnly && !task.starred) {
       return false;
     }
     return true;
@@ -95,11 +102,13 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         selectedDomainIds={selectedDomainIds}
         selectedProjectIds={selectedProjectIds}
         selectedSection={selectedSection}
+        starredOnly={starredOnly}
       />
       <SectionJumps
         selectedDomainIds={selectedDomainIds}
         selectedProjectIds={selectedProjectIds}
         selectedSection={selectedSection}
+        starredOnly={starredOnly}
         todayCount={sections.today.length}
         tomorrowCount={sections.tomorrow.length}
         upcomingCount={sections.upcoming.reduce(
@@ -178,6 +187,7 @@ function SectionJumps({
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
+  starredOnly,
   todayCount,
   tomorrowCount,
   upcomingCount,
@@ -187,6 +197,7 @@ function SectionJumps({
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
+  starredOnly: boolean;
   todayCount: number;
   tomorrowCount: number;
   upcomingCount: number;
@@ -207,6 +218,7 @@ function SectionJumps({
       domains: selectedDomainIds,
       projects: selectedProjectIds,
       section: "all",
+      starred: starredOnly,
     }),
     label: "All",
     count: totalCount,
@@ -228,6 +240,7 @@ function SectionJumps({
                 domains: selectedDomainIds,
                 projects: selectedProjectIds,
                 section: sectionValue,
+                starred: starredOnly,
               })
             : href;
         const isActive =
@@ -262,11 +275,13 @@ function DomainFilter({
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
+  starredOnly,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
+  starredOnly: boolean;
 }) {
   const visibleDomains = domains.filter((domain) => !domain.isSystem);
   return (
@@ -276,6 +291,7 @@ function DomainFilter({
           domains: [],
           projects: [],
           section: selectedSection,
+          starred: starredOnly,
         })}
         className={`rounded-md border px-3 py-1.5 text-sm transition ${
           selectedDomainIds.length === 0
@@ -292,6 +308,7 @@ function DomainFilter({
             domains: toggleFilterValue(selectedDomainIds, domain.id),
             projects: selectedProjectIds,
             section: selectedSection,
+            starred: starredOnly,
           })}
           className={`rounded-md border px-3 py-1.5 text-sm transition ${
             selectedDomainIds.includes(domain.id)
@@ -312,12 +329,14 @@ function TaskFilters({
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
+  starredOnly,
 }: {
   domains: Array<Domain & { areas: Area[] }>;
   projects: Array<Project & { area: Area & { domain: Domain } }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
+  starredOnly: boolean;
 }) {
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-3">
@@ -331,6 +350,7 @@ function TaskFilters({
             selectedDomainIds={selectedDomainIds}
             selectedProjectIds={selectedProjectIds}
             selectedSection={selectedSection}
+            starredOnly={starredOnly}
           />
         </div>
         <div className="space-y-2">
@@ -342,7 +362,45 @@ function TaskFilters({
             selectedDomainIds={selectedDomainIds}
             selectedProjectIds={selectedProjectIds}
             selectedSection={selectedSection}
+            starredOnly={starredOnly}
           />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Starred
+          </p>
+          <nav className="flex flex-wrap gap-2">
+            <Link
+              href={buildTasksFilterHref({
+                domains: selectedDomainIds,
+                projects: selectedProjectIds,
+                section: selectedSection,
+                starred: false,
+              })}
+              className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                !starredOnly
+                  ? "border-teal-600 bg-teal-50 text-teal-800"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+              }`}
+            >
+              All
+            </Link>
+            <Link
+              href={buildTasksFilterHref({
+                domains: selectedDomainIds,
+                projects: selectedProjectIds,
+                section: selectedSection,
+                starred: true,
+              })}
+              className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                starredOnly
+                  ? "border-teal-600 bg-teal-50 text-teal-800"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+              }`}
+            >
+              Starred
+            </Link>
+          </nav>
         </div>
       </div>
     </section>
@@ -354,11 +412,13 @@ function ProjectFilter({
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
+  starredOnly,
 }: {
   projects: Array<Project & { area: Area & { domain: Domain } }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
+  starredOnly: boolean;
 }) {
   const visibleProjects = projects.filter(
     (project) =>
@@ -373,6 +433,7 @@ function ProjectFilter({
           domains: selectedDomainIds,
           projects: [],
           section: selectedSection,
+          starred: starredOnly,
         })}
         className={`rounded-md border px-3 py-1.5 text-sm transition ${
           selectedProjectIds.length === 0
@@ -389,6 +450,7 @@ function ProjectFilter({
             domains: selectedDomainIds,
             projects: toggleFilterValue(selectedProjectIds, project.id),
             section: selectedSection,
+            starred: starredOnly,
           })}
           className={`rounded-md border px-3 py-1.5 text-sm transition ${
             selectedProjectIds.includes(project.id)
@@ -538,7 +600,10 @@ function TaskCard({
           today={today}
           tomorrow={tomorrow}
         />
-        <TaskCompleteButton taskId={task.id} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <TaskStarButton taskId={task.id} starred={task.starred} />
+          <TaskCompleteButton taskId={task.id} />
+        </div>
       </div>
       <SubtaskList
         subtasks={task.subtasks}

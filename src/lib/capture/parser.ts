@@ -24,6 +24,7 @@ Return only a valid JSON array. Do not wrap it in Markdown.
 Use these action types:
 - create_task
 - complete_task
+- star_task
 - create_area
 - update_area_state
 - create_project
@@ -51,6 +52,8 @@ Rules:
 - Work narration on a known project or area creates project activity/update or an entity note.
 - If genuinely ambiguous or unclassifiable, return { "needs_disambiguation": true, "candidates": [...] } and create no entity.
 - If unparseable, return { "error": "..." } and create no entity.
+- "Star X" / "make X a top task" uses star_task with task_match. "Unstar X" uses star_task with starred false.
+- create_task accepts starred true when the capture marks the new task as a top or starred task.
 - Interpret park/unpark project requests as update_project_state with status parked/active.
 - Someday means wanted, not committed. "Someday project" uses create_project with status "someday"; "someday task" uses create_task with someday true.
 - Parked means started and set down. Do not use parked for someday items.
@@ -224,6 +227,17 @@ function fallbackParse(rawText: string): ParserAction[] {
   const referenceMatch = trimmed.match(/^(reference|remember)\s*[:,-]\s*(.+)$/i);
   if (referenceMatch?.[2]) {
     return [{ type: "create_reference", body: referenceMatch[2].trim() }];
+  }
+
+  const starMatch = trimmed.match(/^(un)?star\s+(?:the\s+)?(.+?)(?:\s+task)?$/i);
+  if (starMatch?.[2]) {
+    return [
+      {
+        type: "star_task",
+        task_match: starMatch[2].trim(),
+        starred: !starMatch[1],
+      },
+    ];
   }
 
   const completeMatch = normalized.match(/^complete\s+(.+)$/);

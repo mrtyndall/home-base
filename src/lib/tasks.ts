@@ -170,6 +170,45 @@ export async function completeTaskByMatch(taskMatch: string, actor: WriteActor) 
   return completeTaskById(task.id, actor);
 }
 
+export async function setTaskStarredByMatch(
+  taskMatch: string,
+  starred: boolean,
+  actor: WriteActor,
+) {
+  const task = await prisma.task.findFirst({
+    where: {
+      status: "open",
+      title: { contains: taskMatch, mode: "insensitive" },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!task) {
+    throw new Error(`No open task matched "${taskMatch}".`);
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: task.id },
+    data: { starred },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: starred ? "task_starred" : "task_unstarred",
+      title: starred ? "Task starred" : "Task unstarred",
+      body: updated.title,
+      sourceRef: {
+        type: "task",
+        id: updated.id,
+        source: actor.source,
+        actor: actor.label ?? null,
+      },
+    },
+  });
+
+  return updated;
+}
+
 function getNextRecurrenceDue(task: Task) {
   if (!task.recurrenceRule) {
     return null;

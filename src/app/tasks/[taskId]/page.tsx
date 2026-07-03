@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { addSubtask, updateTaskDetail } from "@/app/actions";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { TaskStarButton } from "@/components/task-star-button";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
@@ -57,7 +58,12 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
               {task.dueDate ? ` / ${formatDateOnly(task.dueDate)}` : ""}
             </p>
           </div>
-          {task.status === "open" ? <TaskCompleteButton taskId={task.id} /> : null}
+          {task.status === "open" ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <TaskStarButton taskId={task.id} starred={task.starred} />
+              <TaskCompleteButton taskId={task.id} />
+            </div>
+          ) : null}
         </div>
       </header>
 

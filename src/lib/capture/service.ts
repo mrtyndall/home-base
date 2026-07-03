@@ -2,7 +2,7 @@ import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
-import { completeTaskByMatch } from "@/lib/tasks";
+import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
   captureInputSchema,
   type CaptureConfirmation,
@@ -251,6 +251,22 @@ async function executeActions(
         createdItems.push(completed);
         break;
       }
+      case "star_task": {
+        const starred = action.starred ?? true;
+        const task = await setTaskStarredByMatch(
+          action.task_match,
+          starred,
+          context.actor,
+        );
+        createdItems.push({
+          type: "task",
+          id: task.id,
+          label: starred
+            ? `Starred "${task.title}"`
+            : `Unstarred "${task.title}"`,
+        });
+        break;
+      }
       case "create_area":
         createdItems.push(await createArea(action, context));
         break;
@@ -364,6 +380,7 @@ async function createTask(
       areaId,
       projectId: project?.id,
       someday: action.someday ?? false,
+      starred: action.starred ?? false,
       source: context.writeSource,
       captureId: context.captureId,
     },
