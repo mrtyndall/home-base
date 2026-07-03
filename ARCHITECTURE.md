@@ -150,6 +150,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Added a project timeframe control that makes target date/open-ended status more prominent than manual state.
 - Expanded docs creation into an in-page markdown editor/import surface with `.md` upload support.
 - Added task drag hover previews so destination sections show the moving task card before drop.
+- Tamed the Tasks project filter into one grouped selector so the filter surface stays readable as the project list grows.
 - Documented iOS Shortcut failure fallback and the Google OAuth redirect decision blocker.
 - Confirmed local-first operation for the initial trust-building phase.
 - Created the project scaffold.

@@ -6,6 +6,7 @@ import { TaskCompleteButton } from "@/components/task-complete-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
 import { TaskQuickAdd } from "@/components/task-quick-add";
 import { SetupNotice } from "@/components/setup-notice";
+import { buildProjectFilterGroups } from "@/lib/task-filter-options";
 
 export const dynamic = "force-dynamic";
 
@@ -250,38 +251,48 @@ function ProjectFilter({
   const visibleProjects = selectedDomainId
     ? projects.filter((project) => project.area.domainId === selectedDomainId)
     : projects;
+  const projectGroups = buildProjectFilterGroups(projects, selectedDomainId);
+  const selectedProject = visibleProjects.find(
+    (project) => project.id === selectedProjectId,
+  );
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href={selectedDomainId ? `/tasks?domain=${selectedDomainId}` : "/tasks"}
-        className={`rounded-md border px-3 py-1.5 text-sm transition ${
-          !selectedProjectId
-            ? "border-teal-600 bg-teal-50 text-teal-800"
-            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
-        }`}
+    <form action="/tasks" className="flex flex-wrap items-center gap-2">
+      {selectedDomainId ? (
+        <input type="hidden" name="domain" value={selectedDomainId} />
+      ) : null}
+      <select
+        name="project"
+        defaultValue={selectedProject?.id ?? ""}
+        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-800 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        aria-label="Project filter"
       >
-        All projects
-      </Link>
-      {visibleProjects.map((project) => {
-        const href = selectedDomainId
-          ? `/tasks?domain=${selectedDomainId}&project=${project.id}`
-          : `/tasks?project=${project.id}`;
-        return (
-          <Link
-            key={project.id}
-            href={href}
-            className={`rounded-md border px-3 py-1.5 text-sm transition ${
-              selectedProjectId === project.id
-                ? "border-teal-600 bg-teal-50 text-teal-800"
-                : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
-            }`}
-          >
-            {project.name}
-          </Link>
-        );
-      })}
-    </div>
+        <option value="">All projects ({visibleProjects.length})</option>
+        {projectGroups.map((group) => (
+          <optgroup key={group.domainName} label={group.domainName}>
+            {group.projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <button
+        type="submit"
+        className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-400"
+      >
+        Apply
+      </button>
+      {selectedProjectId ? (
+        <Link
+          href={selectedDomainId ? `/tasks?domain=${selectedDomainId}` : "/tasks"}
+          className="h-9 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 transition hover:border-stone-400"
+        >
+          Clear
+        </Link>
+      ) : null}
+    </form>
   );
 }
 
