@@ -6,11 +6,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Deployment verification
 
+Railway production is exactly:
+- Project: `home-base` (`293a006f-f2d5-408d-abcb-8de2218be25f`)
+- Environment: `production` (`4bea8124-cb21-4c56-83d3-7105aed019ff`)
+- App service: `home-base` (`1dc07615-ae44-4dd1-b95b-6d85bac7a07b`)
+- Production domain: `https://home-base-production-e3b7.up.railway.app`
+
 After any deploy, before reporting success:
 1. Confirm the active Railway deployment serves the intended commit. `railway up` uploads carry no git metadata, so verify by content fingerprint: curl the production URL and check for markers unique to the new commit (a new route, nav label, or API endpoint), and note the deploy timestamp against your upload.
 2. Confirm the deploy logs show `prisma migrate deploy` applying any new migrations cleanly.
 3. Smoke-test the production URL: key pages return 200 and render expected content.
 4. Deploy only from a clean `git worktree` at the exact commit — the working tree often has another agent's uncommitted edits.
+
+Any future claim that Railway production is current must paste the raw external curl output from `https://home-base-production-e3b7.up.railway.app` in the report. Localhost, tailnet, Railway status, and Railway internal URLs do not count.
 
 Never run destructive database commands against production (`migrate reset`, `db push --force-reset`, drops). Migrations must be additive.
 
