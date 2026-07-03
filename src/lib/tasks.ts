@@ -15,33 +15,36 @@ export type CreateTaskInput = {
   dueDate?: Date | null;
   dueTime?: string | null;
   priority?: string | null;
-  domainId: string;
+  areaId: string;
   projectId?: string | null;
   parentTaskId?: string | null;
+  someday?: boolean | null;
   recurrenceRule?: string | null;
   reminderOffsets?: Prisma.InputJsonValue;
   source?: string | null;
   captureId?: string | null;
 };
 
-export type CreateTaskWithDefaultDomainInput = Omit<
+export type CreateTaskWithDefaultAreaInput = Omit<
   CreateTaskInput,
-  "domainId"
+  "areaId"
 > & {
-  domainId?: string | null;
+  areaId?: string | null;
 };
 
-export async function createTaskWithDefaultDomain(
-  input: CreateTaskWithDefaultDomainInput,
+export async function createTaskWithDefaultArea(
+  input: CreateTaskWithDefaultAreaInput,
   actor: WriteActor,
 ) {
-  const domainId = input.domainId ?? (await getDefaultDomainId());
-  if (!domainId) {
-    throw new Error("No active domain is available for task creation.");
+  const areaId = input.areaId ?? (await getDefaultAreaId());
+  if (!areaId) {
+    throw new Error("No active area is available for task creation.");
   }
 
-  return createTaskWithAudit({ ...input, domainId }, actor);
+  return createTaskWithAudit({ ...input, areaId }, actor);
 }
+
+export const createTaskWithDefaultDomain = createTaskWithDefaultArea;
 
 export async function createTaskWithAudit(
   input: CreateTaskInput,
@@ -54,15 +57,16 @@ export async function createTaskWithAudit(
       dueDate: input.dueDate ?? undefined,
       dueTime: input.dueTime ?? undefined,
       priority: input.priority ?? undefined,
-      domainId: input.domainId,
+      areaId: input.areaId,
       projectId: input.projectId ?? undefined,
       parentTaskId: input.parentTaskId ?? undefined,
+      someday: input.someday ?? undefined,
       recurrenceRule: input.recurrenceRule ?? undefined,
       reminderOffsets: input.reminderOffsets,
       source: formatSource(actor, input.source),
       captureId: input.captureId ?? undefined,
     },
-    include: { domain: true, project: true },
+    include: { area: true, project: true },
   });
 
   await prisma.notification.create({
@@ -117,9 +121,10 @@ export async function completeTaskById(taskId: string, actor: WriteActor) {
             dueDate: nextDue.dueDate,
             dueTime: task.dueTime,
             priority: task.priority,
-            domainId: task.domainId,
+            areaId: task.areaId,
             projectId: task.projectId,
             parentTaskId: task.parentTaskId,
+            someday: task.someday,
             recurrenceRule: task.recurrenceRule,
             reminderOffsets: task.reminderOffsets ?? Prisma.JsonNull,
             source: "recurrence",
@@ -186,17 +191,17 @@ function getNextRecurrenceDue(task: Task) {
   };
 }
 
-async function getDefaultDomainId() {
-  const inbox = await prisma.domain.findUnique({
-    where: { name: "Inbox" },
-    select: { id: true, active: true },
+async function getDefaultAreaId() {
+  const inbox = await prisma.area.findUnique({
+    where: { id: "area_inbox" },
+    select: { id: true, status: true },
   });
-  if (inbox?.active) {
+  if (inbox?.status === "active") {
     return inbox.id;
   }
 
-  const fallback = await prisma.domain.findFirst({
-    where: { active: true },
+  const fallback = await prisma.area.findFirst({
+    where: { status: "active" },
     orderBy: { sortOrder: "asc" },
     select: { id: true },
   });

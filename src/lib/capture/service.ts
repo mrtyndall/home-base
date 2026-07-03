@@ -15,13 +15,22 @@ import {
 type DomainContext = {
   id: string;
   name: string;
+  areas: AreaContext[];
+};
+
+type AreaContext = {
+  id: string;
+  name: string;
+  domain: string;
+  status: string;
 };
 
 type ExecutionContext = {
   captureId: string;
   rawText: string;
-  inboxDomainId: string;
+  inboxAreaId: string;
   domains: DomainContext[];
+  areas: AreaContext[];
   actor: { source: "capture" | "api"; label?: string };
   writeSource: string;
   calendarSource: "capture" | "api";
@@ -56,8 +65,9 @@ export async function submitCapture(
     const context: ExecutionContext = {
       captureId: capture.id,
       rawText: parsedInput.rawText,
-      inboxDomainId: await getInboxDomainId(),
+      inboxAreaId: await getInboxAreaId(),
       domains: parserContext.domains,
+      areas: parserContext.areas,
       ...buildActorContext(parsedInput),
     };
 
@@ -77,8 +87,9 @@ export async function submitCapture(
     createdItems = await createInboxFallbackTask({
       captureId: capture.id,
       rawText: parsedInput.rawText,
-      inboxDomainId: await getInboxDomainId(),
+      inboxAreaId: await getInboxAreaId(),
       domains: [],
+      areas: [],
       ...buildActorContext(parsedInput),
     });
   }
@@ -103,13 +114,21 @@ export async function submitCapture(
 async function buildParserContext(source: string) {
   const [domains, projects, recentIdeas] = await Promise.all([
     prisma.domain.findMany({
-      where: { active: true },
+      where: { active: true, isSystem: false },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        areas: {
+          where: { status: { in: ["active", "parked"] } },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          select: { id: true, name: true, status: true },
+        },
+      },
     }),
     prisma.project.findMany({
-      where: { status: { in: ["active", "parked"] } },
-      include: { domain: { select: { name: true } } },
+      where: { status: { in: ["active", "someday", "parked"] } },
+      include: { area: { include: { domain: { select: { name: true } } } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.idea.findMany({
@@ -124,15 +143,28 @@ async function buildParserContext(source: string) {
     }),
   ]);
 
+  const domainContext = domains.map((domain) => ({
+    id: domain.id,
+    name: domain.name,
+    areas: domain.areas.map((area) => ({
+      id: area.id,
+      name: area.name,
+      domain: domain.name,
+      status: area.status,
+    })),
+  }));
+  const areas = domainContext.flatMap((domain) => domain.areas);
+
   return {
     now: new Date().toISOString(),
     timezone: "America/New_York" as const,
     source,
-    domains,
+    domains: domainContext,
+    areas,
     projects: projects.map((project) => ({
       id: project.id,
       name: project.name,
-      domain: project.domain.name,
+      area: project.area.name,
       current_state: project.currentState,
     })),
     recentIdeas,
@@ -168,16 +200,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function getInboxDomainId() {
-  const inbox = await prisma.domain.upsert({
-    where: { name: "Inbox" },
-    update: { active: true, isSystem: true },
+async function getInboxAreaId() {
+  const systemDomain = await prisma.domain.upsert({
+    where: { name: "System" },
+    update: { active: false, isSystem: true },
     create: {
-      name: "Inbox",
-      description: "System catch-all for genuinely ambiguous captures.",
+      name: "System",
+      description: "Hidden system grouping for the Inbox area.",
       sortOrder: 0,
       isSystem: true,
-      active: true,
+      active: false,
+    },
+  });
+
+  const inbox = await prisma.area.upsert({
+    where: { id: "area_inbox" },
+    update: {
+      name: "Inbox",
+      domainId: systemDomain.id,
+      isSystem: true,
+      status: "active",
+    },
+    create: {
+      id: "area_inbox",
+      name: "Inbox",
+      domainId: systemDomain.id,
+      isSystem: true,
+      status: "active",
+      currentState: "System catch-all for quick-add and genuinely ambiguous captures.",
+      nextStep: "Route items when the right area becomes clear.",
     },
   });
 
@@ -200,6 +251,12 @@ async function executeActions(
         createdItems.push(completed);
         break;
       }
+      case "create_area":
+        createdItems.push(await createArea(action, context));
+        break;
+      case "update_area_state":
+        createdItems.push(...(await updateAreaState(action, context)));
+        break;
       case "create_project":
         createdItems.push(await createProject(action, context));
         break;
@@ -220,6 +277,12 @@ async function executeActions(
         break;
       case "create_reference":
         createdItems.push(await createReference(action, context));
+        break;
+      case "create_entity_note":
+        createdItems.push(await createEntityNote(action, context));
+        break;
+      case "create_entity_doc":
+        createdItems.push(await createEntityDoc(action, context));
         break;
     }
   }
@@ -253,7 +316,7 @@ async function createInboxFallbackTask(context: ExecutionContext) {
   const task = await prisma.task.create({
     data: {
       title: context.rawText,
-      domainId: context.inboxDomainId,
+      areaId: context.inboxAreaId,
       source:
         context.actor.source === "api" ? context.writeSource : "capture_fallback",
       captureId: context.captureId,
@@ -295,10 +358,10 @@ async function createTask(
   const project = action.project_match
     ? await matchProject(action.project_match)
     : undefined;
-  const domainId =
-    matchDomainId(action.domain_match, context.domains) ??
-    project?.domainId ??
-    context.inboxDomainId;
+  const areaId =
+    project?.areaId ??
+    matchAreaId(action.area_match, context.areas) ??
+    context.inboxAreaId;
 
   const task = await prisma.task.create({
     data: {
@@ -308,19 +371,99 @@ async function createTask(
       dueTime: action.due_time,
       priority: action.priority,
       reminderOffsets: action.reminder_offsets as Prisma.InputJsonValue,
-      domainId,
+      areaId,
       projectId: project?.id,
+      someday: action.someday ?? false,
       source: context.writeSource,
       captureId: context.captureId,
     },
-    include: { domain: true },
+    include: { area: true, project: true },
   });
 
   return {
     type: "task" as const,
     id: task.id,
-    label: `Task in ${task.domain.name}: ${task.title}`,
+    label: `Task in ${task.area.name}: ${task.title}`,
   };
+}
+
+async function createArea(
+  action: Extract<ExecutableAction, { type: "create_area" }>,
+  context: ExecutionContext,
+) {
+  const domain = matchDomain(action.domain_match, context.domains);
+  if (!domain) {
+    throw new Error(`No domain matched "${action.domain_match}".`);
+  }
+
+  const area = await prisma.area.create({
+    data: {
+      name: action.name,
+      domainId: domain.id,
+      currentState: "Created from capture. Current state needs detail.",
+      nextStep: "Define the next physical step.",
+    },
+    include: { domain: true },
+  });
+
+  const note = await prisma.entityNote.create({
+    data: {
+      parentType: "area",
+      parentId: area.id,
+      bodyMd: `Area created from capture: ${context.rawText}`,
+      source: context.writeSource,
+      captureId: context.captureId,
+    },
+  });
+
+  return {
+    type: "area" as const,
+    id: area.id,
+    label: `Area in ${area.domain.name}: ${area.name}`,
+    noteId: note.id,
+  };
+}
+
+async function updateAreaState(
+  action: Extract<ExecutableAction, { type: "update_area_state" }>,
+  context: ExecutionContext,
+) {
+  const areaId = matchAreaId(action.area_match, context.areas);
+  if (!areaId) {
+    throw new Error(`No area matched "${action.area_match}".`);
+  }
+
+  const area = await prisma.area.update({
+    where: { id: areaId },
+    data: {
+      currentState: action.current_state,
+      nextStep: action.next_step,
+      status: action.status,
+    },
+  });
+
+  const note = await prisma.entityNote.create({
+    data: {
+      parentType: "area",
+      parentId: area.id,
+      bodyMd: action.log_entry ?? context.rawText,
+      source: context.writeSource,
+      captureId: context.captureId,
+    },
+  });
+
+  return [
+    {
+      type: "area" as const,
+      id: area.id,
+      label: `Updated area: ${area.name}`,
+    },
+    {
+      type: "entity_note" as const,
+      id: note.id,
+      label: "Area note logged",
+    },
+  ];
 }
 
 async function completeTask(taskMatch: string, context: ExecutionContext) {
@@ -342,13 +485,13 @@ async function createProject(
   action: Extract<ExecutableAction, { type: "create_project" }>,
   context: ExecutionContext,
 ) {
-  const domainId =
-    matchDomainId(action.domain_match, context.domains) ?? context.inboxDomainId;
+  const areaId = matchAreaId(action.area_match, context.areas) ?? context.inboxAreaId;
 
   const project = await prisma.project.create({
     data: {
       name: action.name,
-      domainId,
+      areaId,
+      status: action.status ?? "active",
       targetDate: parseDateOnly(action.target_date),
       currentState: "Created from capture. Current state needs detail.",
       nextStep: "Define the next physical step.",
@@ -360,13 +503,13 @@ async function createProject(
         },
       },
     },
-    include: { domain: true },
+    include: { area: true },
   });
 
   return {
     type: "project" as const,
     id: project.id,
-    label: `Project in ${project.domain.name}: ${project.name}`,
+    label: `Project in ${project.area.name}: ${project.name}`,
   };
 }
 
@@ -451,12 +594,19 @@ async function createIdea(
   action: Extract<ExecutableAction, { type: "create_idea" }>,
   context: ExecutionContext,
 ) {
+  const project = action.project_match
+    ? await matchProject(action.project_match)
+    : undefined;
   const idea = await prisma.idea.create({
     data: {
       title: action.title,
       body: action.body,
       tags: action.tags ?? [],
-      domainId: matchDomainId(action.domain_match, context.domains),
+      areaId:
+        project?.areaId ??
+        matchAreaId(action.area_match, context.areas) ??
+        undefined,
+      projectId: project?.id,
       source: context.writeSource,
       captureId: context.captureId,
     },
@@ -522,7 +672,7 @@ async function convertIdea(
       {
         type: "create_project",
         name: action.title ?? idea.title,
-        domain_match: action.domain_match,
+        area_match: action.area_match,
       },
       context,
     );
@@ -546,7 +696,8 @@ async function convertIdea(
     {
       type: "create_task",
       title: action.title ?? idea.title,
-      domain_match: action.domain_match,
+      area_match: action.area_match,
+      project_match: action.project_match,
     },
     context,
   );
@@ -570,12 +721,19 @@ async function createReference(
   action: Extract<ExecutableAction, { type: "create_reference" }>,
   context: ExecutionContext,
 ) {
+  const project = action.project_match
+    ? await matchProject(action.project_match)
+    : undefined;
   const reference = await prisma.reference.create({
     data: {
       body: action.body,
       url: action.url,
       tags: action.tags ?? [],
-      domainId: matchDomainId(action.domain_match, context.domains),
+      areaId:
+        project?.areaId ??
+        matchAreaId(action.area_match, context.areas) ??
+        undefined,
+      projectId: project?.id,
       relatedType: action.related_match ? "unknown" : undefined,
       relatedId: action.related_match,
       source: context.writeSource,
@@ -590,7 +748,64 @@ async function createReference(
   };
 }
 
-function matchDomainId(
+async function createEntityNote(
+  action: Extract<ExecutableAction, { type: "create_entity_note" }>,
+  context: ExecutionContext,
+) {
+  const parent = await resolveEntityParent(
+    action.parent_type,
+    action.area_match,
+    action.project_match,
+    context,
+  );
+
+  const note = await prisma.entityNote.create({
+    data: {
+      parentType: parent.type,
+      parentId: parent.id,
+      bodyMd: action.body_md,
+      source: context.writeSource,
+      captureId: context.captureId,
+    },
+  });
+
+  return {
+    type: "entity_note" as const,
+    id: note.id,
+    label: `Note added to ${parent.label}`,
+  };
+}
+
+async function createEntityDoc(
+  action: Extract<ExecutableAction, { type: "create_entity_doc" }>,
+  context: ExecutionContext,
+) {
+  const parent = await resolveEntityParent(
+    action.parent_type,
+    action.area_match,
+    action.project_match,
+    context,
+  );
+
+  const doc = await prisma.entityDoc.create({
+    data: {
+      parentType: parent.type,
+      parentId: parent.id,
+      title: action.title,
+      bodyMd: action.body_md,
+      source: context.writeSource,
+      captureId: context.captureId,
+    },
+  });
+
+  return {
+    type: "entity_doc" as const,
+    id: doc.id,
+    label: `Doc added to ${parent.label}: ${doc.title}`,
+  };
+}
+
+function matchDomain(
   domainMatch: string | undefined,
   domains: DomainContext[],
 ) {
@@ -599,7 +814,22 @@ function matchDomainId(
   }
 
   const normalized = normalizeMatch(domainMatch);
-  return domains.find((domain) => normalizeMatch(domain.name) === normalized)?.id;
+  return domains.find((domain) => normalizeMatch(domain.name) === normalized);
+}
+
+function matchAreaId(
+  areaMatch: string | undefined,
+  areas: AreaContext[],
+) {
+  if (!areaMatch) {
+    return undefined;
+  }
+
+  const normalized = normalizeMatch(areaMatch);
+  const exact = areas.find((area) => normalizeMatch(area.name) === normalized);
+  if (exact) return exact.id;
+
+  return areas.find((area) => normalizeMatch(area.name).includes(normalized))?.id;
 }
 
 async function matchProjectId(projectMatch: string) {
@@ -610,14 +840,42 @@ async function matchProjectId(projectMatch: string) {
 async function matchProject(projectMatch: string) {
   const project = await prisma.project.findFirst({
     where: {
-      status: { in: ["active", "parked"] },
+      status: { in: ["active", "someday", "parked"] },
       name: { contains: projectMatch, mode: "insensitive" },
     },
-    select: { id: true, domainId: true },
+    select: { id: true, areaId: true, name: true },
     orderBy: { createdAt: "desc" },
   });
 
   return project;
+}
+
+async function resolveEntityParent(
+  parentType: "area" | "project",
+  areaMatch: string | undefined,
+  projectMatch: string | undefined,
+  context: ExecutionContext,
+) {
+  if (parentType === "project") {
+    if (!projectMatch) {
+      throw new Error("Project note/doc requires project_match.");
+    }
+
+    const project = await matchProject(projectMatch);
+    if (!project) {
+      throw new Error(`No project matched "${projectMatch}".`);
+    }
+
+    return { type: "project" as const, id: project.id, label: project.name };
+  }
+
+  const areaId = matchAreaId(areaMatch, context.areas);
+  if (!areaId) {
+    throw new Error(`No area matched "${areaMatch ?? ""}".`);
+  }
+
+  const area = context.areas.find((candidate) => candidate.id === areaId);
+  return { type: "area" as const, id: areaId, label: area?.name ?? "area" };
 }
 
 function normalizeMatch(value: string) {

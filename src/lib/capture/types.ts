@@ -12,7 +12,7 @@ export type CaptureInput = z.infer<typeof captureInputSchema>;
 
 const createTaskAction = z.object({
   type: z.literal("create_task"),
-  domain_match: z.string().optional(),
+  area_match: z.string().optional(),
   project_match: z.string().optional(),
   parent_task_match: z.string().optional(),
   title: z.string().min(1),
@@ -21,6 +21,7 @@ const createTaskAction = z.object({
   due_time: z.string().optional(),
   priority: z.string().optional(),
   reminder_offsets: z.array(z.string()).optional(),
+  someday: z.boolean().optional(),
 });
 
 const completeTaskAction = z.object({
@@ -28,11 +29,27 @@ const completeTaskAction = z.object({
   task_match: z.string().min(1),
 });
 
+const createAreaAction = z.object({
+  type: z.literal("create_area"),
+  name: z.string().min(1),
+  domain_match: z.string().min(1),
+});
+
+const updateAreaStateAction = z.object({
+  type: z.literal("update_area_state"),
+  area_match: z.string().min(1),
+  current_state: z.string().optional(),
+  next_step: z.string().optional(),
+  log_entry: z.string().optional(),
+  status: z.enum(["active", "parked", "retired"]).optional(),
+});
+
 const createProjectAction = z.object({
   type: z.literal("create_project"),
   name: z.string().min(1),
-  domain_match: z.string().optional(),
+  area_match: z.string().optional(),
   target_date: z.string().optional(),
+  status: z.enum(["someday", "active"]).optional(),
 });
 
 const updateProjectStateAction = z.object({
@@ -41,7 +58,7 @@ const updateProjectStateAction = z.object({
   current_state: z.string().optional(),
   next_step: z.string().optional(),
   log_entry: z.string().optional(),
-  status: z.enum(["active", "parked", "completed", "killed"]).optional(),
+  status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
 });
 
 const createCalendarEventAction = z.object({
@@ -56,7 +73,8 @@ const createIdeaAction = z.object({
   type: z.literal("create_idea"),
   title: z.string().min(1),
   body: z.string().optional(),
-  domain_match: z.string().optional(),
+  area_match: z.string().optional(),
+  project_match: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -71,7 +89,8 @@ const convertIdeaAction = z.object({
   idea_match: z.string().min(1),
   to: z.enum(["task", "project"]),
   title: z.string().optional(),
-  domain_match: z.string().optional(),
+  area_match: z.string().optional(),
+  project_match: z.string().optional(),
 });
 
 const createReferenceAction = z.object({
@@ -79,13 +98,33 @@ const createReferenceAction = z.object({
   body: z.string().min(1),
   url: z.string().url().optional(),
   tags: z.array(z.string()).optional(),
-  domain_match: z.string().optional(),
+  area_match: z.string().optional(),
+  project_match: z.string().optional(),
   related_match: z.string().optional(),
+});
+
+const createEntityNoteAction = z.object({
+  type: z.literal("create_entity_note"),
+  parent_type: z.enum(["area", "project"]),
+  area_match: z.string().optional(),
+  project_match: z.string().optional(),
+  body_md: z.string().min(1),
+});
+
+const createEntityDocAction = z.object({
+  type: z.literal("create_entity_doc"),
+  parent_type: z.enum(["area", "project"]),
+  area_match: z.string().optional(),
+  project_match: z.string().optional(),
+  title: z.string().min(1),
+  body_md: z.string().min(1),
 });
 
 export const executableActionSchema = z.discriminatedUnion("type", [
   createTaskAction,
   completeTaskAction,
+  createAreaAction,
+  updateAreaStateAction,
   createProjectAction,
   updateProjectStateAction,
   createCalendarEventAction,
@@ -93,6 +132,8 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   appendToIdeaAction,
   convertIdeaAction,
   createReferenceAction,
+  createEntityNoteAction,
+  createEntityDocAction,
 ]);
 
 export const ambiguousActionSchema = z.object({
@@ -119,12 +160,15 @@ export type ParserAction = z.infer<typeof parserActionSchema>;
 export type CreatedItemRef = {
   type:
     | "task"
+    | "area"
     | "project"
     | "project_activity"
     | "calendar_event"
     | "idea"
     | "idea_note"
     | "reference"
+    | "entity_note"
+    | "entity_doc"
     | "notification";
   id: string;
   label: string;
