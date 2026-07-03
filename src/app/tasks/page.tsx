@@ -64,6 +64,14 @@ export default async function TasksPage() {
         tomorrow={tomorrow}
       />
       <TaskSection
+        title="Someday"
+        empty="No someday tasks."
+        targetDate={null}
+        tasks={sections.someday}
+        today={today}
+        tomorrow={tomorrow}
+      />
+      <TaskSection
         title="No date"
         empty="No undated tasks."
         targetDate={null}
@@ -262,10 +270,16 @@ function formatTaskDetail(task: TaskListItem) {
 function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
   const todayTasks: TaskListItem[] = [];
   const tomorrowTasks: TaskListItem[] = [];
+  const somedayTasks: TaskListItem[] = [];
   const noDate: TaskListItem[] = [];
   const upcomingByDate = new Map<string, TaskListItem[]>();
 
   for (const task of tasks) {
+    if (task.someday) {
+      somedayTasks.push(task);
+      continue;
+    }
+
     const dueDate = task.dueDate?.toISOString().slice(0, 10) ?? null;
     if (!dueDate) {
       noDate.push(task);
@@ -290,6 +304,7 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
   return {
     today: todayTasks,
     tomorrow: tomorrowTasks,
+    someday: somedayTasks,
     upcoming: Array.from(upcomingByDate.entries())
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([date, groupedTasks]) => ({ date, tasks: groupedTasks })),

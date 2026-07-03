@@ -11,8 +11,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { taskId } = await context.params;
   const body = await request.json().catch(() => null);
   const dueDateValue = body?.dueDate;
+  const somedayValue = body?.someday === true;
 
   if (
+    dueDateValue !== undefined &&
     dueDateValue !== null &&
     (typeof dueDateValue !== "string" ||
       !/^\d{4}-\d{2}-\d{2}$/.test(dueDateValue))
@@ -34,9 +36,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const nextDueDate = dueDateValue ? dateOnlyFromString(dueDateValue) : null;
+  const nextDueDate = somedayValue
+    ? null
+    : dueDateValue
+      ? dateOnlyFromString(dueDateValue)
+      : null;
   const currentDueDate = task.dueDate?.toISOString().slice(0, 10) ?? null;
-  if (currentDueDate === dueDateValue) {
+  if (!somedayValue && currentDueDate === dueDateValue) {
     return NextResponse.json({
       task: { id: task.id, dueDate: currentDueDate },
     });
@@ -44,7 +50,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const updated = await prisma.task.update({
     where: { id: task.id },
-    data: { dueDate: nextDueDate },
+    data: {
+      dueDate: nextDueDate,
+      someday: somedayValue ? true : false,
+    },
   });
 
   await prisma.notification.create({
@@ -56,7 +65,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         type: "task",
         id: updated.id,
         source: "manual",
-        dueDate: dueDateValue,
+        dueDate: somedayValue ? null : dueDateValue,
+        someday: somedayValue,
       },
     },
   });
@@ -69,6 +79,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     task: {
       id: updated.id,
       dueDate: updated.dueDate?.toISOString().slice(0, 10) ?? null,
+      someday: updated.someday,
     },
   });
 }

@@ -278,10 +278,49 @@ export async function unparkProject(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+export async function activateProject(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  if (!projectId) return;
+
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      status: "active",
+      parkedAt: null,
+    },
+  });
+
+  await prisma.projectActivity.create({
+    data: {
+      projectId,
+      entry: "Project activated.",
+      source: "manual",
+      stateSnapshot: {
+        status: project.status,
+        current_state: project.currentState,
+        next_step: project.nextStep,
+      },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "project_activated",
+      title: "Project activated",
+      body: project.name,
+      sourceRef: { type: "project", id: project.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+}
+
 export async function createProject(formData: FormData) {
   const name = getTrimmedString(formData, "name");
   const areaId = getTrimmedString(formData, "areaId");
   const targetDate = getTrimmedString(formData, "targetDate");
+  const startMode = getTrimmedString(formData, "startMode");
   if (!name || !areaId) return;
 
   const area = await prisma.area.findFirst({
@@ -296,6 +335,7 @@ export async function createProject(formData: FormData) {
     data: {
       name,
       areaId: area.id,
+      status: startMode === "someday" ? "someday" : "active",
       targetDate: targetDate ? dateOnlyFromString(targetDate) : null,
       currentState,
       nextStep,
@@ -304,7 +344,7 @@ export async function createProject(formData: FormData) {
           entry: "Project created.",
           source: "manual",
           stateSnapshot: {
-            status: "active",
+            status: startMode === "someday" ? "someday" : "active",
             current_state: currentState,
             next_step: nextStep,
           },

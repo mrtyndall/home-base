@@ -4,7 +4,11 @@ import { Plus } from "lucide-react";
 import { createProject } from "@/app/actions";
 import { prisma } from "@/lib/db";
 import { formatDateOnly } from "@/lib/dates";
-import { ParkProjectForm, UnparkProjectButton } from "@/components/project-actions";
+import {
+  ActivateProjectButton,
+  ParkProjectForm,
+  UnparkProjectButton,
+} from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +25,7 @@ export default async function ProjectsPage() {
 
   const { projects, domains } = result;
   const activeProjects = projects.filter((project) => project.status === "active");
+  const somedayProjects = projects.filter((project) => project.status === "someday");
   const parkedProjects = projects.filter((project) => project.status === "parked");
 
   return (
@@ -36,7 +41,13 @@ export default async function ProjectsPage() {
         mode="active"
       />
       <ProjectShelf
-        title="Parked / Someday"
+        title="Someday"
+        empty="No someday projects."
+        projects={somedayProjects}
+        mode="someday"
+      />
+      <ProjectShelf
+        title="Parked"
         empty="No parked projects."
         projects={parkedProjects}
         mode="parked"
@@ -53,7 +64,7 @@ function CreateProjectForm({
   return (
     <form
       action={createProject}
-      className="grid gap-2 rounded-lg border border-stone-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_12rem_10rem_auto]"
+      className="grid gap-2 rounded-lg border border-stone-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_12rem_10rem_8rem_auto]"
     >
       <input
         name="name"
@@ -83,6 +94,15 @@ function CreateProjectForm({
         aria-label="Target date"
         className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
       />
+      <select
+        name="startMode"
+        aria-label="Start mode"
+        defaultValue="active"
+        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+      >
+        <option value="active">Start now</option>
+        <option value="someday">Someday</option>
+      </select>
       <button
         type="submit"
         title="Create project"
@@ -104,7 +124,7 @@ function ProjectShelf({
   title: string;
   empty: string;
   projects: ProjectListItem[];
-  mode: "active" | "parked";
+  mode: "active" | "someday" | "parked";
 }) {
   return (
     <section className="space-y-3">
@@ -144,6 +164,8 @@ function ProjectShelf({
               </Link>
               {mode === "active" ? (
                 <ParkProjectForm projectId={project.id} />
+              ) : mode === "someday" ? (
+                <ActivateProjectButton projectId={project.id} />
               ) : (
                 <UnparkProjectButton projectId={project.id} />
               )}
@@ -161,7 +183,7 @@ async function loadProjects() {
   try {
     const [projects, domains] = await Promise.all([
       prisma.project.findMany({
-        where: { status: { in: ["active", "parked"] } },
+        where: { status: { in: ["active", "someday", "parked"] } },
         include: { area: true },
         orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
         take: 80,

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { addProjectTask, updateProjectState } from "@/app/actions";
 import {
+  ActivateProjectButton,
   CompleteProjectButton,
   KillProjectButton,
   ParkProjectForm,
@@ -111,6 +112,8 @@ export default async function ProjectDetailPage({
             </>
           ) : project.status === "parked" ? (
             <UnparkProjectButton projectId={project.id} />
+          ) : project.status === "someday" ? (
+            <ActivateProjectButton projectId={project.id} />
           ) : (
             <p className="text-sm text-stone-600">
               This project remains searchable with its full history.

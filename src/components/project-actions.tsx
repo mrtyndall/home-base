@@ -1,5 +1,6 @@
 import { ArchiveRestore, Check, Pause, X } from "lucide-react";
 import {
+  activateProject,
   completeProject,
   killProject,
   parkProject,
@@ -36,6 +37,21 @@ export function UnparkProjectButton({ projectId }: { projectId: string }) {
       >
         <ArchiveRestore size={15} />
         Unpark
+      </button>
+    </form>
+  );
+}
+
+export function ActivateProjectButton({ projectId }: { projectId: string }) {
+  return (
+    <form action={activateProject} className="mt-4">
+      <input type="hidden" name="projectId" value={projectId} />
+      <button
+        type="submit"
+        className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
+      >
+        <ArchiveRestore size={15} />
+        Activate
       </button>
     </form>
   );

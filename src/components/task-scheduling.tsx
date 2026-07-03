@@ -54,7 +54,7 @@ export function TaskDropZone({
 
     setPending(true);
     try {
-      await updateTaskDueDate(taskId, targetDate);
+      await updateTaskSchedule(taskId, { dueDate: targetDate });
       startTransition(() => router.refresh());
     } finally {
       setPending(false);
@@ -68,7 +68,7 @@ export function TaskDropZone({
 
     setPending(true);
     try {
-      await updateTaskDueDate(taskId, targetDate);
+      await updateTaskSchedule(taskId, { dueDate: targetDate });
       startTransition(() => router.refresh());
     } finally {
       setPending(false);
@@ -173,7 +173,7 @@ export function DraggableTaskLink({
     event.preventDefault();
     setDragPending(true);
     try {
-      await updateTaskDueDate(taskId, targetDate);
+      await updateTaskSchedule(taskId, { dueDate: targetDate });
       startTransition(() => router.refresh());
     } finally {
       setDragPending(false);
@@ -283,7 +283,7 @@ function ScheduleMenu({
     setPending(true);
     setError("");
     try {
-      await updateTaskDueDate(taskId, dueDate);
+      await updateTaskSchedule(taskId, { dueDate });
       setOpen(false);
       setPicking(false);
       startTransition(() => router.refresh());
@@ -329,6 +329,25 @@ function ScheduleMenu({
           <MenuButton disabled={pending} onClick={() => schedule(null)}>
             Clear date
           </MenuButton>
+          <MenuButton
+            disabled={pending}
+            onClick={async () => {
+              setPending(true);
+              setError("");
+              try {
+                await updateTaskSchedule(taskId, { someday: true });
+                setOpen(false);
+                setPicking(false);
+                startTransition(() => router.refresh());
+              } catch {
+                setError("Task was not updated.");
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            Someday
+          </MenuButton>
           {error ? <p className="px-2 py-1 text-xs text-stone-600">{error}</p> : null}
         </div>
       ) : null}
@@ -357,11 +376,14 @@ function MenuButton({
   );
 }
 
-async function updateTaskDueDate(taskId: string, dueDate: string | null) {
+async function updateTaskSchedule(
+  taskId: string,
+  body: { dueDate?: string | null; someday?: boolean },
+) {
   const response = await fetch(`/api/tasks/${taskId}/schedule`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dueDate }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
