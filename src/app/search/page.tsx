@@ -76,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 async function runSearch(query: string) {
   try {
-    const [captures, tasks, ideas, references] = await Promise.all([
+    const [captures, tasks, projects, ideas, references] = await Promise.all([
       prisma.capture.findMany({
         where: { rawText: { contains: query, mode: "insensitive" } },
         orderBy: { createdAt: "desc" },
@@ -87,6 +87,17 @@ async function runSearch(query: string) {
           OR: [
             { title: { contains: query, mode: "insensitive" } },
             { notes: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.project.findMany({
+        where: {
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { currentState: { contains: query, mode: "insensitive" } },
+            { nextStep: { contains: query, mode: "insensitive" } },
           ],
         },
         orderBy: { createdAt: "desc" },
@@ -126,6 +137,12 @@ async function runSearch(query: string) {
         id: task.id,
         title: task.title,
         detail: task.status,
+      })),
+      ...projects.map((project) => ({
+        type: "Project",
+        id: project.id,
+        title: project.name,
+        detail: project.status,
       })),
       ...ideas.map((idea) => ({
         type: "Idea",

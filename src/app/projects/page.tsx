@@ -1,4 +1,7 @@
 import type { Domain, Project } from "@prisma/client";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { createProject } from "@/app/actions";
 import { prisma } from "@/lib/db";
 import { formatDateOnly } from "@/lib/dates";
 import { ParkProjectForm, UnparkProjectButton } from "@/components/project-actions";
@@ -16,7 +19,7 @@ export default async function ProjectsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { projects } = result;
+  const { projects, domains } = result;
   const activeProjects = projects.filter((project) => project.status === "active");
   const parkedProjects = projects.filter((project) => project.status === "parked");
 
@@ -25,6 +28,7 @@ export default async function ProjectsPage() {
       <header>
         <h1 className="text-3xl font-semibold tracking-normal">Projects</h1>
       </header>
+      <CreateProjectForm domains={domains} />
       <ProjectShelf
         title="Active"
         empty="No active projects."
@@ -38,6 +42,48 @@ export default async function ProjectsPage() {
         mode="parked"
       />
     </div>
+  );
+}
+
+function CreateProjectForm({ domains }: { domains: Domain[] }) {
+  return (
+    <form
+      action={createProject}
+      className="grid gap-2 rounded-lg border border-stone-200 bg-white p-3 shadow-sm md:grid-cols-[1fr_12rem_10rem_auto]"
+    >
+      <input
+        name="name"
+        required
+        placeholder="New project"
+        className="h-10 min-w-0 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+      />
+      <select
+        name="domainId"
+        required
+        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        defaultValue={domains[0]?.id ?? ""}
+      >
+        {domains.map((domain) => (
+          <option key={domain.id} value={domain.id}>
+            {domain.name}
+          </option>
+        ))}
+      </select>
+      <input
+        type="date"
+        name="targetDate"
+        aria-label="Target date"
+        className="h-10 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+      />
+      <button
+        type="submit"
+        title="Create project"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
+      >
+        <Plus size={16} />
+        Create
+      </button>
+    </form>
   );
 }
 
@@ -67,7 +113,10 @@ function ProjectShelf({
               className="rounded-lg border border-stone-200 bg-white p-4"
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+                >
                   <h2 className="font-semibold">{project.name}</h2>
                   <p className="mt-1 text-sm text-stone-500">
                     {project.domain.name} / {project.status}
@@ -75,14 +124,16 @@ function ProjectShelf({
                       ? ` / target ${formatDateOnly(project.targetDate)}`
                       : ""}
                   </p>
-                </div>
+                </Link>
               </div>
-              <p className="mt-3 text-sm text-stone-800">
-                {project.currentState}
-              </p>
-              <p className="mt-3 border-l-2 border-teal-600 pl-3 text-sm text-stone-700">
-                {project.nextStep}
-              </p>
+              <Link href={`/projects/${project.id}`} className="block">
+                <p className="mt-3 text-sm text-stone-800">
+                  {project.currentState}
+                </p>
+                <p className="mt-3 border-l-2 border-teal-600 pl-3 text-sm text-stone-700">
+                  {project.nextStep}
+                </p>
+              </Link>
               {mode === "active" ? (
                 <ParkProjectForm projectId={project.id} />
               ) : (
@@ -100,14 +151,20 @@ type ProjectListItem = Project & { domain: Domain };
 
 async function loadProjects() {
   try {
-    const projects = await prisma.project.findMany({
-      where: { status: { in: ["active", "parked"] } },
-      include: { domain: true },
-      orderBy: [{ domain: { sortOrder: "asc" } }, { createdAt: "desc" }],
-      take: 80,
-    });
+    const [projects, domains] = await Promise.all([
+      prisma.project.findMany({
+        where: { status: { in: ["active", "parked"] } },
+        include: { domain: true },
+        orderBy: [{ domain: { sortOrder: "asc" } }, { createdAt: "desc" }],
+        take: 80,
+      }),
+      prisma.domain.findMany({
+        where: { active: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+    ]);
 
-    return { ok: true as const, projects };
+    return { ok: true as const, projects, domains };
   } catch {
     return { ok: false as const };
   }

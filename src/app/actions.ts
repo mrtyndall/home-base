@@ -181,6 +181,7 @@ export async function parkProject(formData: FormData) {
   });
 
   revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
 }
 
 function getTrimmedString(formData: FormData, key: string) {
@@ -233,4 +234,141 @@ export async function unparkProject(formData: FormData) {
   });
 
   revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function createProject(formData: FormData) {
+  const name = getTrimmedString(formData, "name");
+  const domainId = getTrimmedString(formData, "domainId");
+  const targetDate = getTrimmedString(formData, "targetDate");
+  if (!name || !domainId) return;
+
+  const domain = await prisma.domain.findFirst({
+    where: { id: domainId, active: true },
+    select: { id: true },
+  });
+  if (!domain) return;
+
+  const currentState = "Created from Projects.";
+  const nextStep = "Define the next physical step.";
+  const project = await prisma.project.create({
+    data: {
+      name,
+      domainId: domain.id,
+      targetDate: targetDate ? dateOnlyFromString(targetDate) : null,
+      currentState,
+      nextStep,
+      activity: {
+        create: {
+          entry: "Project created.",
+          source: "manual",
+          stateSnapshot: {
+            status: "active",
+            current_state: currentState,
+            next_step: nextStep,
+          },
+        },
+      },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "project_created",
+      title: "Project created",
+      body: project.name,
+      sourceRef: { type: "project", id: project.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  redirect(`/projects/${project.id}`);
+}
+
+export async function updateProjectState(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  const currentState = getTrimmedString(formData, "currentState");
+  const nextStep = getTrimmedString(formData, "nextStep");
+  if (!projectId || !currentState || !nextStep) return;
+
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data: { currentState, nextStep },
+  });
+
+  await prisma.projectActivity.create({
+    data: {
+      projectId,
+      entry: "Project state updated.",
+      source: "manual",
+      stateSnapshot: {
+        status: project.status,
+        current_state: project.currentState,
+        next_step: project.nextStep,
+      },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "project_updated",
+      title: "Project updated",
+      body: project.name,
+      sourceRef: { type: "project", id: project.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
+export async function completeProject(formData: FormData) {
+  await setProjectTerminalStatus(formData, "completed");
+}
+
+export async function killProject(formData: FormData) {
+  await setProjectTerminalStatus(formData, "killed");
+}
+
+async function setProjectTerminalStatus(
+  formData: FormData,
+  status: "completed" | "killed",
+) {
+  const projectId = getTrimmedString(formData, "projectId");
+  if (!projectId) return;
+
+  const project = await prisma.project.update({
+    where: { id: projectId },
+    data:
+      status === "completed"
+        ? { status, completedAt: new Date(), parkedAt: null }
+        : { status, killedAt: new Date(), parkedAt: null },
+  });
+
+  await prisma.projectActivity.create({
+    data: {
+      projectId,
+      entry: status === "completed" ? "Project completed." : "Project killed.",
+      source: "manual",
+      stateSnapshot: {
+        status: project.status,
+        current_state: project.currentState,
+        next_step: project.nextStep,
+      },
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: `project_${status}`,
+      title: status === "completed" ? "Project completed" : "Project killed",
+      body: project.name,
+      sourceRef: { type: "project", id: project.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  redirect("/projects");
 }
