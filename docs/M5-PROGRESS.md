@@ -96,3 +96,11 @@ Format per step: what was built, test result, commit hash, deviations.
 - Gates: tsc clean, eslint clean, build succeeds.
 - Commit: (this commit)
 - DEVIATION: condition-only reviews (no date) are shown in the Needs review group as "Waiting: <condition>" rather than hidden until a date exists — nothing is ever invisible, and there is no other surface for them. DEVIATION: every date-anchored review that comes due sends the time-sensitive nudge (that is the trigger-2 semantic); condition-only reviews never push.
+
+### Phase 3 VERIFY
+- Fresh-eyes verification subagent: **PASS**. Gates green; Steps 6–8 re-executed live (voice journal, FTS indexes, resurfacing pool/exclusion/one-per-day logic, cron auth 401/503, snooze via the real UI form, honest nudged=0, convert-settles-review); constitution grep clean; regressions clean.
+- Defects reported and fixed in the follow-up commit:
+  1. Resurfaced card formatted journal `entryDate` (date-only UTC) in America/New_York — showed the previous day and disagreed with Library → journal dates now use `formatDateOnly` (UTC); idea timestamps keep `formatShortDate`.
+  2. "Needs review" group rendered below Check-ins on the Inbox area page — moved to the top, per the work order.
+- Noted, accepted: `resurfacing_seen` has no unique constraint on surfaced_on (single-user; a concurrent-first-load race could double-select — harmless); /search uses ILIKE rather than the GIN FTS indexes (pre-existing search approach; indexes are in place for a future FTS query switch).
+- Phase 3 gate: PASSED. Proceeding to Phase 4.

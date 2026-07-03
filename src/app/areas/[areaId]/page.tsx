@@ -72,15 +72,15 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </div>
       </header>
 
+      {area.id === "area_inbox" ? (
+        <NeedsReviewPanel reviews={reviews} domains={domains} />
+      ) : null}
+
       <CheckInFeed
         parentType="area"
         parentId={area.id}
         checkIns={area.checkIns}
       />
-
-      {area.id === "area_inbox" ? (
-        <NeedsReviewPanel reviews={reviews} domains={domains} />
-      ) : null}
 
       {area.id === "area_inbox" ? (
         <PendingCapturesPanel captures={pendingCaptures} domains={domains} />

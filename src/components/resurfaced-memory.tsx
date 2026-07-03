@@ -4,7 +4,7 @@ import {
   boostResurfacedItem,
   dismissResurfacedItem,
 } from "@/app/resurface-actions";
-import { formatShortDate } from "@/lib/dates";
+import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import type { ResurfacedItem } from "@/lib/resurfacing";
 
 export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
@@ -17,8 +17,11 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
       <div className="mb-2 flex items-center gap-2 text-stone-800">
         <Archive size={16} />
         <h2 className="text-sm font-semibold">
-          {item.itemType === "idea" ? "An idea" : "A journal entry"} from{" "}
-          {formatShortDate(item.itemDate)}
+          {/* Journal entryDate is date-only (UTC midnight) — format in UTC
+              or the card shows the previous day. */}
+          {item.itemType === "idea"
+            ? `An idea from ${formatShortDate(item.itemDate)}`
+            : `A journal entry from ${formatDateOnly(item.itemDate)}`}
         </h2>
         <span className="text-xs text-stone-500">{item.ageDays} days ago</span>
       </div>
