@@ -459,4 +459,22 @@ Recurring habits separate from tasks, with completion history. Explicitly exclud
 
 ---
 
+## Section 19: M5 Amendments (2026-07-03)
+
+These amendments were adopted with the M5 work order (`docs/M5-MASTER-WORK-ORDER.md`). Where they conflict with earlier sections, the amendments win.
+
+1. **Check-ins replace current_state as the living record of projects and areas.** A check-in is a timestamped markdown status update, event-shaped: written when there is something to say, never prompted. The latest check-in snippet is what cards surface. The `current_state` and `next_step` columns are retired from all UI (the columns are retained; existing values are migrated into an initial check-in per project/area).
+
+2. **Slippage is factual surfacing, never disappearance.** A slipping project or aging task gains visibility with plain facts (last activity date). Nothing is ever hidden, dimmed, archived, or removed by the system for inactivity.
+
+3. **Streak amendment to the no-guilt rule:** routines may record completion history and current run length as plain fact. Banned forever: broken-chain framing, red states, "you lost your streak" copy, or any rendering that makes a gap look like failure. Grace windows are configurable. A gap renders as nothing.
+
+4. **Domain pages are views, not containers.** A domain gets a description (set once via an explicit edit action) and a page aggregating its areas, projects, and task pulse, all derived. Nothing ever attaches to a domain.
+
+5. **Memory layer, phase 1: journal plus resurfacing.** Quotes and books are explicitly deferred to a future phase (recorded in DECISIONS.md as Deferred, not dropped).
+
+6. **AI services are a first-class layer:** the capture parser (exists), the check-in summarizer, the needs-review scheduler, and data chat. All use the Anthropic API (Haiku for cheap routes, Sonnet where quality matters); all writes they produce carry lineage and appear in the notifications feed.
+
+---
+
 *End of scope. When reality diverges from this document, update the document. It only stays useful if it stays true.*

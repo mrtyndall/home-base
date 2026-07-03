@@ -16,6 +16,13 @@ These are the initial build defaults from SCOPE.md Section 16. They are written 
 | Initial area map | Suggested domains: Home, Family, Health, Hobbies, Creative. Current seeded areas include Inbox, Ham Radio, Homelab, and Magic/Pokemon. | Confirm with Matt |
 | Catch-all areas | Inbox system area is the only catch-all; no per-domain "General" areas | Confirm with Matt explicitly; already enforced by SCOPE.md |
 
+## M5 Decisions (2026-07-03)
+
+- **Routines module ACTIVATED** (SCOPE.md Section 18), with the streak amendment (SCOPE.md Section 19.3): completion history and current run length may render as plain fact; broken-chain framing, red states, and gap-as-failure rendering are banned forever. Grace windows configurable; a gap renders as nothing.
+- **People CRM module ACTIVATED** (SCOPE.md Section 18). Nudges from this module use the existing time-sensitive trigger only.
+- **Quotes and books DEFERRED** (not dropped) to a future memory-layer phase. Memory layer phase 1 is journal + resurfacing only.
+- **In-app data chat REVIVED.** Previously paused in favor of MCP; MCP remains, and chat is a thin read-only client over the same capability set. Writes remain capture's job.
+
 ## Architecture Decisions
 
 - Use a single Next.js App Router codebase with route handlers instead of a separate Fastify/Hono backend. This matches Production Hub's deployment shape and keeps Railway operations simple.
