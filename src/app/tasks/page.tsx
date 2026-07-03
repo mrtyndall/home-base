@@ -1,4 +1,5 @@
-import type { Area, Project, Task } from "@prisma/client";
+import type { Area, Domain, Project, Task } from "@prisma/client";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { addSubtask } from "@/app/actions";
 import { prisma } from "@/lib/db";
@@ -10,7 +11,13 @@ import { SetupNotice } from "@/components/setup-notice";
 
 export const dynamic = "force-dynamic";
 
-export default async function TasksPage() {
+type TasksPageProps = {
+  searchParams: Promise<{ domain?: string }>;
+};
+
+export default async function TasksPage({ searchParams }: TasksPageProps) {
+  const { domain } = await searchParams;
+
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
   }
@@ -21,9 +28,13 @@ export default async function TasksPage() {
   }
 
   const { tasks, projects, domains } = result;
+  const selectedDomainId = domains.some((item) => item.id === domain) ? domain : "";
+  const visibleTasks = selectedDomainId
+    ? tasks.filter((task) => task.area.domainId === selectedDomainId)
+    : tasks;
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
-  const sections = groupTasks(tasks, today, tomorrow);
+  const sections = groupTasks(visibleTasks, today, tomorrow);
 
   return (
     <div className="space-y-5">
@@ -42,6 +53,7 @@ export default async function TasksPage() {
           areaName: project.area.name,
         }))}
       />
+      <DomainFilter domains={domains} selectedDomainId={selectedDomainId} />
       <TaskSection
         title="Today"
         empty="No tasks due today."
@@ -80,6 +92,43 @@ export default async function TasksPage() {
         tomorrow={tomorrow}
       />
     </div>
+  );
+}
+
+function DomainFilter({
+  domains,
+  selectedDomainId,
+}: {
+  domains: Array<Domain & { areas: Area[] }>;
+  selectedDomainId: string | undefined;
+}) {
+  const visibleDomains = domains.filter((domain) => !domain.isSystem);
+  return (
+    <nav className="flex flex-wrap gap-2">
+      <Link
+        href="/tasks"
+        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+          !selectedDomainId
+            ? "border-teal-600 bg-teal-50 text-teal-800"
+            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+        }`}
+      >
+        All
+      </Link>
+      {visibleDomains.map((domain) => (
+        <Link
+          key={domain.id}
+          href={`/tasks?domain=${domain.id}`}
+          className={`rounded-md border px-3 py-1.5 text-sm transition ${
+            selectedDomainId === domain.id
+              ? "border-teal-600 bg-teal-50 text-teal-800"
+              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+          }`}
+        >
+          {domain.name}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -251,13 +300,14 @@ function AddSubtaskForm({ parentTaskId }: { parentTaskId: string }) {
 }
 
 type TaskListItem = Task & {
-  area: Area;
+  area: Area & { domain: Domain };
   project: Project | null;
   subtasks: Task[];
 };
 
 function formatTaskDetail(task: TaskListItem) {
   return [
+    task.area.domain.name,
     task.area.name,
     task.project?.name,
     task.dueDate ? formatDateOnly(task.dueDate) : null,
@@ -318,7 +368,7 @@ async function loadTasks() {
       prisma.task.findMany({
         where: { status: "open", parentTaskId: null },
         include: {
-          area: true,
+          area: { include: { domain: true } },
           project: true,
           subtasks: {
             where: { status: "open" },
@@ -330,7 +380,7 @@ async function loadTasks() {
       }),
       prisma.project.findMany({
         where: { status: { in: ["active", "parked", "someday"] } },
-        include: { area: true },
+        include: { area: { include: { domain: true } } },
         orderBy: [{ area: { sortOrder: "asc" } }, { name: "asc" }],
       }),
       prisma.domain.findMany({

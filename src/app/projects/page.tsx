@@ -70,18 +70,25 @@ function ProjectShelf({
   empty: string;
   projects: ProjectListItem[];
 }) {
+  const groups = groupProjectsByDomain(projects);
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-stone-800">
         {title} <span className="font-normal text-stone-500">{projects.length}</span>
       </h2>
-      <div className="grid gap-3 md:grid-cols-2">
-        {projects.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-            {empty}
-          </div>
-        ) : (
-          projects.map((project) => (
+      {projects.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+          {empty}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {groups.map((group) => (
+            <details key={group.domain.id} open className="space-y-2">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-stone-700 [&::-webkit-details-marker]:hidden">
+                {group.domain.name}
+              </summary>
+              <div className="grid gap-3 md:grid-cols-2">
+                {group.projects.map((project) => (
             <article
               key={project.id}
               className="rounded-lg border border-stone-200 bg-white p-4"
@@ -122,9 +129,12 @@ function ProjectShelf({
                 ) : null}
               </Link>
             </article>
-          ))
-        )}
-      </div>
+                ))}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -166,6 +176,24 @@ function getFreshNote(project: ProjectListItem) {
   const note = project.notes.find((item) => Number(item.createdAt) >= cutoff);
   if (!note) return null;
   return note.bodyMd.length > 140 ? `${note.bodyMd.slice(0, 137)}...` : note.bodyMd;
+}
+
+function groupProjectsByDomain(projects: ProjectListItem[]) {
+  const groups = new Map<string, { domain: Domain; projects: ProjectListItem[] }>();
+  for (const project of projects) {
+    const existing = groups.get(project.area.domain.id) ?? {
+      domain: project.area.domain,
+      projects: [],
+    };
+    existing.projects.push(project);
+    groups.set(project.area.domain.id, existing);
+  }
+
+  return Array.from(groups.values()).sort((left, right) =>
+    left.domain.sortOrder === right.domain.sortOrder
+      ? left.domain.name.localeCompare(right.domain.name)
+      : left.domain.sortOrder - right.domain.sortOrder,
+  );
 }
 
 async function loadProjects() {

@@ -125,6 +125,7 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - Remediated project/area surfaces to derive card content from tasks, notes, and activity instead of asking for state. Project state fields became nullable, creation paths stopped generating placeholder state, and park/status actions moved into overflow controls.
 - Remediated capture classification so ambiguous/unclassifiable captures no longer create fallback tasks. Pending captures stay as raw ledger rows in the Inbox area and can be converted to task, idea, note, or reference while preserving capture lineage.
 - Remediated the persistent capture bar so text and voice are peer inputs. Web Speech API interim transcripts are written into the text field, submitted through the same `/api/capture` route, and preserved on unsupported/error paths.
+- Surfaced domains as a real organizing layer on project and task surfaces: Projects groups cards under collapsible domain headers and Tasks can filter every section by domain. Today remains domain-agnostic.
 - Added progressive task depth: a fast Inbox-default quick task row, task detail pages for all extended task fields, linked task rows from Today/Tasks, and notification-audited manual detail updates.
 - Added one-gesture task rescheduling from Today and Tasks rows, backed by an audited date-only schedule endpoint and Today drop zones.
 - Reworked the Tasks tab into Today, Tomorrow, Upcoming grouped by date, and No date sections using the same row-level rescheduling and drop-zone primitives.
