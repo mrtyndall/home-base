@@ -117,11 +117,15 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - `src/lib/db.ts`: Prisma client configured for PostgreSQL.
 - `src/lib/reminders.ts`: due reminder selection, Pushover delivery, and audit writes.
 - `src/lib/tasks.ts`: shared task creation/completion and recurrence behavior.
+- `src/app/settings/page.tsx`: integration control surface with per-variable configuration status (names only, never values), Google Calendar connect flow, Pushover test delivery, API key list with revoke, and MCP posture/health.
+- `src/app/settings/actions.ts`: server actions for the Pushover test notification and API key revocation, both audited through the notifications feed.
+- `src/app/api/settings/mcp-health/route.ts`: read-only probe of the MCP server `/health` endpoint (`MCP_HEALTH_URL` override, defaults to the local port).
 
 ## Changelog
 
 ### 2026-07-03
 
+- Turned `/settings` into an integration control surface. Google Calendar shows connect/missing-variable/sync-freshness states plus the required OAuth redirect URI; Pushover shows per-variable presence and a test notification button with audit entries; API access lists key labels, scopes, last-used, and revoked state with two-step revoke (revoke only, creation stays on the command line so tokens never pass through the page); MCP shows local/Tailscale routes and an on-demand health check. Fixed the settings env check to use `GOOGLE_TOKEN_ENCRYPTION_KEY` instead of the nonexistent `ENCRYPTION_KEY`. Nothing syncs on page load.
 - Migrated the data model to Domains -> Areas -> Projects -> Tasks. Added `areas`, shared markdown container tables, file attachment metadata, project milestones, someday project status, and someday tasks. Existing 3 projects and 12 tasks were mapped to areas with zero missing area assignments and zero row loss in the local alpha database.
 - Updated the REST API and MCP layer for the area hierarchy, someday projects/tasks, shared markdown notes/docs, milestones, area reads/state updates, and search across first-class containers. API proof covered bearer-auth area creation/update, someday project creation, project activation, entity notes/docs, milestone completion, search readback, and audited notifications.
 - Remediated project/area surfaces to derive card content from tasks, notes, and activity instead of asking for state. Project state fields became nullable, creation paths stopped generating placeholder state, and park/status actions moved into overflow controls.
