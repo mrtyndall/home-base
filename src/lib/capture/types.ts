@@ -110,6 +110,13 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+const journalAction = z.object({
+  type: z.literal("journal"),
+  body_md: z.string().min(1),
+  entry_date: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
 const checkInAction = z.object({
   type: z.literal("check_in"),
   parent_type: z.enum(["area", "project"]).optional(),
@@ -148,6 +155,7 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   appendToIdeaAction,
   convertIdeaAction,
   createReferenceAction,
+  journalAction,
   checkInAction,
   createEntityNoteAction,
   createEntityDocAction,
@@ -188,6 +196,7 @@ export type CreatedItemRef = {
     | "entity_note"
     | "entity_doc"
     | "check_in"
+    | "journal_entry"
     | "notification";
   id: string;
   label: string;

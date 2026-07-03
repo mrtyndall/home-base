@@ -76,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 async function runSearch(query: string) {
   try {
-    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs, checkIns] =
+    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs, checkIns, journalEntries] =
       await Promise.all([
       prisma.capture.findMany({
         where: { rawText: { contains: query, mode: "insensitive" } },
@@ -145,6 +145,11 @@ async function runSearch(query: string) {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      prisma.journalEntry.findMany({
+        where: { bodyMd: { contains: query, mode: "insensitive" } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
     ]);
 
     const results = [
@@ -195,6 +200,12 @@ async function runSearch(query: string) {
         id: checkIn.id,
         title: checkIn.bodyMd,
         detail: formatShortDate(checkIn.createdAt),
+      })),
+      ...journalEntries.map((entry) => ({
+        type: "Journal",
+        id: entry.id,
+        title: entry.bodyMd,
+        detail: formatShortDate(entry.entryDate),
       })),
     ].slice(0, 40);
 

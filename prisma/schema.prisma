@@ -93,6 +93,17 @@ enum CheckInSource {
   voice
 }
 
+enum JournalSource {
+  typed
+  voice
+  import
+}
+
+enum JournalEntryStatus {
+  active
+  killed
+}
+
 enum EntityDocStatus {
   active
   archived
@@ -115,6 +126,7 @@ model Capture {
 
   calendarEvents  CalendarEvent[]
   checkIns        CheckIn[]
+  journalEntries  JournalEntry[]
   entityDocs      EntityDoc[]
   entityNotes     EntityNote[]
   ideaNotes       IdeaNote[]
@@ -325,6 +337,26 @@ model EntityNote {
   @@index([parentType, parentId, createdAt])
   @@index([captureId])
   @@map("entity_notes")
+}
+
+model JournalEntry {
+  id              String             @id @default(uuid())
+  entryDate       DateTime           @map("entry_date") @db.Date
+  bodyMd          String             @map("body_md")
+  source          JournalSource      @default(typed)
+  tags            String[]           @default([])
+  resurfaceWeight Float              @default(1.0) @map("resurface_weight")
+  lastSurfacedAt  DateTime?          @map("last_surfaced_at")
+  captureId       String?            @map("capture_id")
+  status          JournalEntryStatus @default(active)
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  capture Capture? @relation(fields: [captureId], references: [id])
+
+  @@index([status, entryDate])
+  @@index([entryDate])
+  @@index([captureId])
+  @@map("journal_entries")
 }
 
 model CheckIn {

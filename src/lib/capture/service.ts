@@ -1,5 +1,6 @@
 import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
+import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
 import { createCheckInRecord } from "@/lib/checkins";
@@ -29,6 +30,7 @@ type AreaContext = {
 type ExecutionContext = {
   captureId: string;
   rawText: string;
+  captureSource: CaptureInput["source"];
   inboxAreaId: string;
   domains: DomainContext[];
   areas: AreaContext[];
@@ -66,6 +68,7 @@ export async function submitCapture(
     const context: ExecutionContext = {
       captureId: capture.id,
       rawText: parsedInput.rawText,
+      captureSource: parsedInput.source,
       inboxAreaId: await getInboxAreaId(),
       domains: parserContext.domains,
       areas: parserContext.areas,
@@ -88,6 +91,7 @@ export async function submitCapture(
     createdItems = await markCapturePending({
       captureId: capture.id,
       rawText: parsedInput.rawText,
+      captureSource: parsedInput.source,
       inboxAreaId: await getInboxAreaId(),
       domains: [],
       areas: [],
@@ -298,6 +302,9 @@ async function executeActions(
       case "check_in":
         createdItems.push(await executeCheckIn(action, context));
         break;
+      case "journal":
+        createdItems.push(await executeJournal(action, context));
+        break;
       case "create_entity_note":
         createdItems.push(await createEntityNote(action, context));
         break;
@@ -485,7 +492,7 @@ async function updateAreaState(
         bodyMd:
           action.current_state.trim() +
           (nextStep ? `\n\nNext step: ${nextStep}` : ""),
-        source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+        source: context.captureSource === "in_app_voice" ? "voice" : "manual",
         captureId: context.captureId,
       },
       context.actor,
@@ -610,7 +617,7 @@ async function updateProjectState(
         bodyMd:
           action.current_state.trim() +
           (nextStep ? `\n\nNext step: ${nextStep}` : ""),
-        source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+        source: context.captureSource === "in_app_voice" ? "voice" : "manual",
         captureId: context.captureId,
       },
       context.actor,
@@ -909,6 +916,28 @@ async function matchProject(projectMatch: string) {
   return project;
 }
 
+async function executeJournal(
+  action: Extract<ExecutableAction, { type: "journal" }>,
+  context: ExecutionContext,
+) {
+  const today = new Date(`${localDateString()}T00:00:00.000Z`);
+  const entry = await prisma.journalEntry.create({
+    data: {
+      entryDate: parseDateOnly(action.entry_date) ?? today,
+      bodyMd: action.body_md,
+      source: context.captureSource === "in_app_voice" ? "voice" : "typed",
+      tags: action.tags ?? [],
+      captureId: context.captureId,
+    },
+  });
+
+  return {
+    type: "journal_entry" as const,
+    id: entry.id,
+    label: "Journal entry saved",
+  };
+}
+
 async function executeCheckIn(
   action: Extract<ExecutableAction, { type: "check_in" }>,
   context: ExecutionContext,
@@ -953,7 +982,7 @@ async function executeCheckIn(
       parentType: parent.type,
       parentId: parent.id,
       bodyMd: action.body_md,
-      source: context.writeSource === "in_app_voice" ? "voice" : "manual",
+      source: context.captureSource === "in_app_voice" ? "voice" : "manual",
       captureId: context.captureId,
     },
     context.actor,

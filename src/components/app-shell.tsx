@@ -3,10 +3,10 @@ import {
   CalendarCheck2,
   FolderKanban,
   House,
-  Settings,
-  Lightbulb,
+  Library,
   ListTodo,
   Search,
+  Settings,
 } from "lucide-react";
 import { CaptureBar } from "@/components/capture-bar";
 
@@ -15,7 +15,7 @@ const tabs = [
   { href: "/today", label: "Today", icon: CalendarCheck2 },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/ideas", label: "Ideas", icon: Lightbulb },
+  { href: "/ideas", label: "Library", icon: Library },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

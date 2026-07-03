@@ -72,3 +72,13 @@ Format per step: what was built, test result, commit hash, deviations.
   3. ACCEPTED (not fixed): AI-draft provenance is client-asserted — the server compares posted text to a client-supplied draft string; a modified client could post AI text as `manual`. Single-user app, self-deception risk only; server-side draft persistence would be the fix if it ever matters. Logged as a known limitation.
 - Cosmetic: the garbled `ai_draft_edited` test check-in was displaced by a clean follow-up check-in (append-only respected).
 - Phase 2 gate: PASSED. Proceeding to Phase 3.
+
+## Phase 3
+
+### Step 6 — Journal
+- Built: `journal_entries` table (entryDate, bodyMd, source typed/voice/import, tags[], resurfaceWeight 1.0, lastSurfacedAt, captureId, status active/killed) via additive migration with GIN FTS indexes on journal_entries.body_md AND check_ins.body_md (the latter was missed in Phase 2). Ideas tab renamed **Library** (tab label + page heading; route stays /ideas) with a Journal section — reverse-chron, grouped by date, no heatmap, no empty-day placeholders, no streaks. Parser: `journal` action (prompt rule for "journal:" + reflective first-person narration, zod, fallback regex, service execution with entry_date defaulting to today in America/New_York). Journal entries added to Search.
+- Fixed along the way: capture voice detection was dead code — `writeSource` never carried the raw capture source, so voice check-ins/journal recorded as manual/typed. `ExecutionContext` now carries `captureSource`; all four voice-detection sites use it.
+- Test (work-order): voice-captured a journal entry (`source: in_app_voice`) → "Journal entry saved"; renders in Library under today's date with source "voice"; found via /search?q=digipeat with type "Journal". PASS. (One earlier capture failed against a stale dev-server Prisma client — raw capture preserved as pending Inbox per the sacred path; server restarted.)
+- Gates: tsc clean, eslint clean, build succeeds.
+- Commit: (step-6 commit)
+- DEVIATION: route stays `/ideas` (tab renamed only) — smallest change; a URL rename would break nothing for anyone but adds churn.
