@@ -98,7 +98,9 @@ export default async function LibraryPage() {
                   <span>{idea.status}</span>
                   <span>Created {formatShortDate(idea.createdAt)}</span>
                   {idea.captureId ? <span>Linked capture</span> : null}
-                  {idea.tags.length > 0 ? <span>{idea.tags.join(", ")}</span> : null}
+                  {idea.tags.length > 0 ? (
+                    <span>{idea.tags.join(", ")}</span>
+                  ) : null}
                 </div>
               </div>
             </details>
@@ -172,7 +174,9 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
         <div className="max-w-2xl">
           {Array.from(groups.entries()).map(([date, dateEntries], index) => (
             <div key={date}>
-              {index > 0 ? <div className="my-[18px] h-px bg-[#DDE2DA]" /> : null}
+              {index > 0 ? (
+                <div className="my-[18px] h-px bg-[#DDE2DA]" />
+              ) : null}
               <h3 className="font-serif text-[15px] italic text-stone-500">
                 {formatDateOnly(date)}
               </h3>
