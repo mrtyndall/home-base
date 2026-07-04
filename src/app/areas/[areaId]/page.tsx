@@ -92,6 +92,12 @@ export default async function AreaPage({ params }: AreaPageProps) {
         checkIns={area.checkIns}
       />
 
+      <AreaHubOverview
+        area={area}
+        pendingCaptureCount={pendingCaptures.length}
+        reviewCount={reviews.length}
+      />
+
       {area.id === "area_inbox" ? (
         <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
           <NeedsReviewPanel reviews={reviews} domains={domains} />
@@ -109,21 +115,9 @@ export default async function AreaPage({ params }: AreaPageProps) {
       />
 
       {area.id === "area_inbox" ? null : (
-        <section className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-          <Panel title="Standing tasks">
-            {area.tasks.map((task) => (
-              <Link
-                key={task.id}
-                href={`/tasks/${task.id}`}
-                className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
-              >
-                {task.title}
-              </Link>
-            ))}
-          </Panel>
-
+        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.9fr]">
           <div className="space-y-6">
-            <Panel title="Projects">
+            <Panel title="Projects in this area">
               {area.projects.map((project) => (
                 <Link
                   key={project.id}
@@ -142,7 +136,6 @@ export default async function AreaPage({ params }: AreaPageProps) {
                 </Link>
               ))}
             </Panel>
-
             <Panel title="Linked ideas">
               {area.ideas.map((idea) => (
                 <Link
@@ -155,9 +148,106 @@ export default async function AreaPage({ params }: AreaPageProps) {
               ))}
             </Panel>
           </div>
+
+          <div className="space-y-6">
+            <Panel title="Standing tasks">
+              {area.tasks.map((task) => (
+                <Link
+                  key={task.id}
+                  href={`/tasks/${task.id}`}
+                  className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
+                >
+                  {task.title}
+                  {task.dueDate ? (
+                    <span className="ml-2 text-xs font-normal text-[#9AA096]">
+                      {formatDateOnly(task.dueDate)}
+                    </span>
+                  ) : null}
+                </Link>
+              ))}
+            </Panel>
+          </div>
         </section>
       )}
     </div>
+  );
+}
+
+type AreaHubOverviewArea = NonNullable<
+  Awaited<ReturnType<typeof loadArea>> extends infer Result
+    ? Result extends { ok: true; area: infer LoadedArea | null }
+      ? LoadedArea
+      : never
+    : never
+>;
+
+function AreaHubOverview({
+  area,
+  pendingCaptureCount,
+  reviewCount,
+}: {
+  area: AreaHubOverviewArea;
+  pendingCaptureCount: number;
+  reviewCount: number;
+}) {
+  const facts = [
+    `${area.tasks.length} standing task${area.tasks.length === 1 ? "" : "s"}`,
+    `${area.projects.length} project${area.projects.length === 1 ? "" : "s"}`,
+    area.importantNoteCount > 0
+      ? `${area.importantNoteCount} important note${area.importantNoteCount === 1 ? "" : "s"}`
+      : null,
+    area.docs.length > 0
+      ? `${area.docs.length} doc${area.docs.length === 1 ? "" : "s"}`
+      : null,
+    area.ideas.length > 0
+      ? `${area.ideas.length} linked idea${area.ideas.length === 1 ? "" : "s"}`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+
+  const needs = [
+    area.dueStandingTaskCount > 0
+      ? `${area.dueStandingTaskCount} dated task${area.dueStandingTaskCount === 1 ? "" : "s"} in view`
+      : null,
+    pendingCaptureCount > 0
+      ? `${pendingCaptureCount} capture${pendingCaptureCount === 1 ? "" : "s"} waiting`
+      : null,
+    reviewCount > 0
+      ? `${reviewCount} review${reviewCount === 1 ? "" : "s"} ready`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return (
+    <section className="grid gap-3 rounded-[18px] border border-[#E2E6DF] bg-white p-4 shadow-[0_2px_8px_rgba(28,25,23,0.04)] sm:grid-cols-[1fr_1.15fr] sm:p-5">
+      <div>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          At a glance
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-stone-700">
+          {facts.length > 0 ? facts.join(" · ") : "No active area records."}
+        </p>
+      </div>
+      <div>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Heads up
+        </h2>
+        {needs.length > 0 ? (
+          <p className="mt-2 text-sm leading-relaxed text-stone-700">
+            {needs.join(" · ")}
+          </p>
+        ) : area.latestNote ? (
+          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-700">
+            {area.latestNote.bodyMd}{" "}
+            <span className="text-[#9AA096]">
+              · {formatShortDate(area.latestNote.createdAt)}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-2 text-sm leading-relaxed text-stone-500">
+            Nothing needs handling here.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -547,6 +637,11 @@ async function loadArea(areaId: string) {
             docs,
             attachments,
             checkIns,
+            dueStandingTaskCount: area.tasks.filter(
+              (task) => task.dueDate && Number(task.dueDate) <= Number(today),
+            ).length,
+            importantNoteCount: notes.filter((note) => note.starredAt).length,
+            latestNote: notes[0] ?? null,
             projects: area.projects.map((project) => ({
               ...project,
               latestCheckIn: latestProjectCheckIns.get(project.id) ?? null,

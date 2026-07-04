@@ -9,7 +9,12 @@ import type {
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { formatDateOnly, formatShortDate } from "@/lib/dates";
+import {
+  dateOnlyFromString,
+  formatDateOnly,
+  formatShortDate,
+  localDateString,
+} from "@/lib/dates";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
@@ -28,15 +33,7 @@ export default async function ProjectsPage() {
   }
 
   const { projects, domains } = result;
-  const activeProjects = projects.filter(
-    (project) => project.status === "active",
-  );
-  const somedayProjects = projects.filter(
-    (project) => project.status === "someday",
-  );
-  const parkedProjects = projects.filter(
-    (project) => project.status === "parked",
-  );
+  const recentProjects = getRecentProjects(projects);
 
   return (
     <div className="space-y-7">
@@ -53,26 +50,7 @@ export default async function ProjectsPage() {
         </Link>
       </header>
       <AreaShelves domains={domains} />
-      <section className="space-y-5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          Projects
-        </h2>
-        <ProjectShelf
-          title="Active"
-          empty="No active projects."
-          projects={activeProjects}
-        />
-        <ProjectShelf
-          title="Someday"
-          empty="No someday projects."
-          projects={somedayProjects}
-        />
-        <ProjectShelf
-          title="Parked"
-          empty="No parked projects."
-          projects={parkedProjects}
-        />
-      </section>
+      <RecentProjectsRail projects={recentProjects} />
     </div>
   );
 }
@@ -109,64 +87,69 @@ function AreaShelves({ domains }: { domains: DomainWithAreas[] }) {
 }
 
 function AreaCard({ area }: { area: AreaListItem }) {
-  const factParts = [
-    `${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`,
+  const headline = getAreaHeadline(area);
+  const facts = [
+    area.dueTaskCount > 0
+      ? `${area.dueTaskCount} due`
+      : `${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`,
     `${area.activeProjectCount} active project${area.activeProjectCount === 1 ? "" : "s"}`,
     area.starredNoteCount > 0
       ? `${area.starredNoteCount} important note${area.starredNoteCount === 1 ? "" : "s"}`
+      : null,
+    area.docCount > 0
+      ? `${area.docCount} doc${area.docCount === 1 ? "" : "s"}`
       : null,
   ].filter((item): item is string => Boolean(item));
 
   return (
     <Link
       href={`/areas/${area.id}`}
-      className="block rounded-[14px] border border-[#E2E6DF] bg-white p-4 transition hover:border-teal-700/50"
+      className="block rounded-[18px] border border-[#E2E6DF] bg-white p-4 shadow-[0_2px_8px_rgba(28,25,23,0.04)] transition hover:border-teal-700/50 sm:p-5"
     >
-      <h3 className="text-[17px] font-medium leading-[1.3] text-stone-950">
-        {area.name}
-      </h3>
-      {area.currentState ? (
-        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-700">
-          {area.currentState}
-        </p>
-      ) : null}
-      {area.latestCheckIn ? (
-        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-700">
-          {checkInSnippet(area.latestCheckIn.bodyMd, 120)}{" "}
-          <span className="text-[#9AA096]">
-            · {formatShortDate(area.latestCheckIn.createdAt)}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[18px] font-medium leading-[1.25] text-stone-950">
+            {area.name}
+          </h3>
+          <p className="mt-1 text-xs text-[#9AA096]">{facts.join(" · ")}</p>
+        </div>
+        {headline.tone ? (
+          <span className="shrink-0 rounded-full border border-[#DDE2DA] bg-[#F7F9F5] px-2.5 py-1 text-[11px] font-medium text-stone-600">
+            {headline.tone}
           </span>
+        ) : null}
+      </div>
+
+      {headline.body ? (
+        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-stone-700">
+          {headline.body}
         </p>
       ) : null}
-      <p className="mt-2 text-xs text-[#9AA096]">{factParts.join(" · ")}</p>
+
+      {area.recentNote ? (
+        <p className="mt-3 line-clamp-2 border-l-2 border-[#DDE2DA] pl-3 text-[13px] italic leading-relaxed text-stone-500">
+          {area.recentNote.bodyMd}
+        </p>
+      ) : null}
     </Link>
   );
 }
 
-function ProjectShelf({
-  title,
-  empty,
-  projects,
-}: {
-  title: string;
-  empty: string;
-  projects: ProjectListItem[];
-}) {
+function RecentProjectsRail({ projects }: { projects: ProjectListItem[] }) {
+  if (projects.length === 0) {
+    return null;
+  }
+
   return (
-    <section className="space-y-3">
+    <section className="space-y-3 border-t border-[#DDE2DA] pt-6">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        {title}{" "}
-        <span className="font-medium text-[#B0ACA2]">{projects.length}</span>
+        Recent projects
       </h2>
-      {projects.length === 0 ? (
-        <p className="text-sm text-[#6B7268]">{empty}</p>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      )}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {projects.map((project) => (
+          <ProjectCard key={project.id} project={project} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -294,9 +277,14 @@ type ProjectListItem = Project & {
 
 type AreaListItem = Area & {
   openTaskCount: number;
+  dueTaskCount: number;
   activeProjectCount: number;
   starredNoteCount: number;
+  docCount: number;
   latestCheckIn: { bodyMd: string; createdAt: Date } | null;
+  recentNote: Pick<EntityNote, "bodyMd" | "createdAt"> | null;
+  pendingCaptureCount: number;
+  reviewCount: number;
 };
 
 type DomainWithAreas = Domain & {
@@ -330,8 +318,75 @@ function getFreshNote(project: ProjectListItem) {
     : note.bodyMd;
 }
 
+function getRecentProjects(projects: ProjectListItem[]) {
+  return [...projects]
+    .filter(
+      (project) => project.status === "active" || project.status === "someday",
+    )
+    .sort((a, b) => getProjectSortTime(b) - getProjectSortTime(a))
+    .slice(0, 6);
+}
+
+function getProjectSortTime(project: ProjectListItem) {
+  const nextDatedTask = getNextDatedTask(project);
+  const dates = [
+    project.latestCheckIn?.createdAt,
+    getLastTouched(project),
+    nextDatedTask?.dueDate,
+    project.createdAt,
+  ].filter((date): date is Date => Boolean(date));
+
+  return Math.max(...dates.map((date) => Number(date)));
+}
+
+function getAreaHeadline(area: AreaListItem) {
+  if (area.pendingCaptureCount > 0 || area.reviewCount > 0) {
+    return {
+      tone: "Inbox",
+      body: [
+        area.pendingCaptureCount > 0
+          ? `${area.pendingCaptureCount} capture${area.pendingCaptureCount === 1 ? "" : "s"} waiting`
+          : null,
+        area.reviewCount > 0
+          ? `${area.reviewCount} review${area.reviewCount === 1 ? "" : "s"} ready`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
+
+  if (area.dueTaskCount > 0) {
+    return {
+      tone: "Today",
+      body: `${area.dueTaskCount} dated task${area.dueTaskCount === 1 ? "" : "s"} in view.`,
+    };
+  }
+
+  if (area.latestCheckIn) {
+    return {
+      tone: formatShortDate(area.latestCheckIn.createdAt),
+      body: checkInSnippet(area.latestCheckIn.bodyMd, 150),
+    };
+  }
+
+  if (area.currentState) {
+    return { tone: "State", body: area.currentState };
+  }
+
+  if (area.recentNote) {
+    return {
+      tone: formatShortDate(area.recentNote.createdAt),
+      body: area.recentNote.bodyMd,
+    };
+  }
+
+  return { tone: null, body: null };
+}
+
 async function loadProjects() {
   try {
+    const today = dateOnlyFromString(localDateString());
     const [projects, domains] = await Promise.all([
       prisma.project.findMany({
         where: { status: { in: ["active", "someday", "parked"] } },
@@ -375,6 +430,11 @@ async function loadProjects() {
       areaActiveProjectGroups,
       areaStarredNoteGroups,
       latestAreaCheckIns,
+      areaDueTaskGroups,
+      areaNoteRows,
+      areaDocGroups,
+      pendingCaptureCount,
+      readyReviewCount,
     ] = await Promise.all([
       prisma.entityNote.findMany({
         where: {
@@ -415,6 +475,43 @@ async function loadProjects() {
         _count: { _all: true },
       }),
       getLatestCheckIns("area", areaIds),
+      prisma.task.groupBy({
+        by: ["areaId"],
+        where: {
+          areaId: { in: areaIds },
+          status: "open",
+          dueDate: { lte: today },
+        },
+        _count: { _all: true },
+      }),
+      prisma.entityNote.findMany({
+        where: { parentType: "area", parentId: { in: areaIds } },
+        orderBy: { createdAt: "desc" },
+        take: 160,
+      }),
+      prisma.entityDoc.groupBy({
+        by: ["parentId"],
+        where: {
+          parentType: "area",
+          parentId: { in: areaIds },
+          status: "active",
+        },
+        _count: { _all: true },
+      }),
+      prisma.capture.count({
+        where: {
+          OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
+        },
+      }),
+      prisma.scheduledReview.count({
+        where: {
+          OR: [
+            { status: "surfaced" },
+            { status: "pending", reviewAt: { lte: today } },
+            { status: "pending", reviewAt: null },
+          ],
+        },
+      }),
     ]);
     const notesByProject = new Map<string, EntityNote[]>();
     for (const note of notes) {
@@ -467,14 +564,31 @@ async function loadProjects() {
     const starredNotesByArea = new Map(
       areaStarredNoteGroups.map((group) => [group.parentId, group._count._all]),
     );
+    const dueTasksByArea = new Map(
+      areaDueTaskGroups.map((group) => [group.areaId, group._count._all]),
+    );
+    const docsByArea = new Map(
+      areaDocGroups.map((group) => [group.parentId, group._count._all]),
+    );
+    const recentNotesByArea = new Map<string, EntityNote>();
+    for (const note of areaNoteRows) {
+      if (!recentNotesByArea.has(note.parentId)) {
+        recentNotesByArea.set(note.parentId, note);
+      }
+    }
     const domainsWithAreas = domains.map((domain) => ({
       ...domain,
       areas: domain.areas.map((area) => ({
         ...area,
         openTaskCount: openTasksByArea.get(area.id) ?? 0,
+        dueTaskCount: dueTasksByArea.get(area.id) ?? 0,
         activeProjectCount: activeProjectsByArea.get(area.id) ?? 0,
         starredNoteCount: starredNotesByArea.get(area.id) ?? 0,
+        docCount: docsByArea.get(area.id) ?? 0,
         latestCheckIn: latestAreaCheckIns.get(area.id) ?? null,
+        recentNote: recentNotesByArea.get(area.id) ?? null,
+        pendingCaptureCount: area.id === "area_inbox" ? pendingCaptureCount : 0,
+        reviewCount: area.id === "area_inbox" ? readyReviewCount : 0,
       })),
     }));
 
