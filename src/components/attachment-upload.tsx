@@ -76,7 +76,17 @@ export function AttachmentUpload({
         {pending ? "Uploading" : "Upload file"}
         <input type="file" className="sr-only" onChange={upload} />
       </label>
-      {message ? <p className="text-[13px] text-[#6B7268]">{message}</p> : null}
+      {message ? (
+        <p
+          className={`text-[13px] ${
+            message === "Attachment uploaded."
+              ? "text-[#6B7268]"
+              : "text-amber-800"
+          }`}
+        >
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

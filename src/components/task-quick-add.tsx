@@ -202,7 +202,7 @@ export function TaskQuickAdd({
           {savedTask.projectName ? ` / ${savedTask.projectName}` : ""}
         </Link>
       ) : null}
-      {error ? <p className="text-sm text-stone-700">{error}</p> : null}
+      {error ? <p className="text-[13px] text-amber-800">{error}</p> : null}
     </div>
   );
 }
