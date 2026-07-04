@@ -195,7 +195,7 @@ function ReferenceSection({
   return (
     <section className="space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        {title}
+        {title} {references.length}
       </h2>
       <div className="space-y-2.5">
         {references.map((reference) => (
@@ -344,13 +344,13 @@ async function loadIdeas() {
         }),
         prisma.reference.findMany({
           where: { kind: "book" },
-          orderBy: [{ createdAt: "desc" }],
-          take: 12,
+          orderBy: [{ title: "asc" }, { createdAt: "desc" }],
+          take: 500,
         }),
         prisma.reference.findMany({
           where: { kind: "movie" },
-          orderBy: [{ createdAt: "desc" }],
-          take: 12,
+          orderBy: [{ title: "asc" }, { createdAt: "desc" }],
+          take: 500,
         }),
         prisma.reference.findMany({
           where: { kind: "reference" },
