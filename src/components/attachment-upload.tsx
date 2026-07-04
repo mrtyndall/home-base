@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 export function AttachmentUpload({
   parentType,
   parentId,
+  variant = "pill",
 }: {
   parentType: "area" | "project";
   parentId: string;
+  variant?: "pill" | "quiet";
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -64,7 +66,13 @@ export function AttachmentUpload({
 
   return (
     <div className="space-y-2">
-      <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700">
+      <label
+        className={
+          variant === "quiet"
+            ? "inline-flex h-8 cursor-pointer items-center px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
+            : "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+        }
+      >
         {pending ? "Uploading" : "Upload file"}
         <input type="file" className="sr-only" onChange={upload} />
       </label>

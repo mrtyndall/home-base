@@ -44,13 +44,34 @@ export function EntityDepth({
   notes,
   docs,
   attachments,
+  variant = "default",
 }: {
   parentType: "area" | "project";
   parentId: string;
   notes: EntityNoteItem[];
   docs: EntityDocItem[];
   attachments: AttachmentItem[];
+  variant?: "default" | "project";
 }) {
+  if (variant === "project") {
+    return (
+      <section className="space-y-6">
+        <NotesPanel
+          parentType={parentType}
+          parentId={parentId}
+          notes={notes}
+          variant="paper"
+        />
+        <DocsPanel parentType={parentType} parentId={parentId} docs={docs} />
+        <AttachmentsPanel
+          parentType={parentType}
+          parentId={parentId}
+          attachments={attachments}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <NotesPanel parentType={parentType} parentId={parentId} notes={notes} />
@@ -68,13 +89,20 @@ function NotesPanel({
   parentType,
   parentId,
   notes,
+  variant = "boxed",
 }: {
   parentType: "area" | "project";
   parentId: string;
   notes: EntityNoteItem[];
+  variant?: "boxed" | "paper";
 }) {
+  const wrapperClass =
+    variant === "paper"
+      ? "space-y-2.5"
+      : "space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4";
+
   return (
-    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+    <div className={wrapperClass}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Notes
@@ -89,7 +117,10 @@ function NotesPanel({
           >
             <input type="hidden" name="parentType" value={parentType} />
             <input type="hidden" name="parentId" value={parentId} />
-            <label className="sr-only" htmlFor={`${parentType}-${parentId}-note`}>
+            <label
+              className="sr-only"
+              htmlFor={`${parentType}-${parentId}-note`}
+            >
               Note
             </label>
             <textarea
@@ -106,11 +137,34 @@ function NotesPanel({
         </details>
       </div>
       {notes.length === 0 ? null : (
-        <div className="divide-y divide-[#EEF1EC]">
+        <div
+          className={
+            variant === "paper" ? "space-y-3" : "divide-y divide-[#EEF1EC]"
+          }
+        >
           {notes.map((note) => (
-            <div key={note.id} className="py-3">
-              <MarkdownPreview body={note.bodyMd} />
-              <p className="mt-2 text-xs text-[#9AA096]">
+            <div
+              key={note.id}
+              className={
+                variant === "paper"
+                  ? "relative rounded-[8px] bg-[linear-gradient(315deg,transparent_13px,#FBF7EA_0)] p-4 shadow-[0_2px_5px_rgba(28,25,23,0.10)] odd:-rotate-[0.5deg] even:rotate-[0.6deg]"
+                  : "py-3"
+              }
+            >
+              {variant === "paper" ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 right-0 h-[13px] w-[13px] bg-[linear-gradient(to_top_left,transparent_50%,#EAE2C9_50%)]"
+                />
+              ) : null}
+              <div
+                className={
+                  variant === "paper" ? "italic text-stone-700" : undefined
+                }
+              >
+                <MarkdownPreview body={note.bodyMd} />
+              </div>
+              <p className="mt-2 text-xs not-italic text-[#B0ACA2]">
                 {formatShortDate(note.createdAt)}
               </p>
             </div>
@@ -130,6 +184,10 @@ function DocsPanel({
   parentId: string;
   docs: EntityDocItem[];
 }) {
+  if (docs.length === 0) {
+    return null;
+  }
+
   return (
     <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
@@ -137,84 +195,14 @@ function DocsPanel({
           Docs
         </h2>
       </div>
-      <details className="rounded-[12px] border border-[#EEF1EC] bg-[#F7F9F5] p-3">
-        <summary className="cursor-pointer list-none text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
-          Create or import markdown
-        </summary>
-        <div className="mt-3 grid gap-4 lg:grid-cols-2">
-          <form action={createEntityDoc} className="space-y-3">
-            <input type="hidden" name="parentType" value={parentType} />
-            <input type="hidden" name="parentId" value={parentId} />
-            <label
-              className="block text-[13px] font-medium text-stone-600"
-              htmlFor={`${parentType}-${parentId}-doc-title`}
-            >
-              <span>Title</span>
-              <input
-                id={`${parentType}-${parentId}-doc-title`}
-                name="title"
-                required
-                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
-              />
-            </label>
-            <label
-              className="block text-[13px] font-medium text-stone-600"
-              htmlFor={`${parentType}-${parentId}-doc-body`}
-            >
-              <span>Body</span>
-              <textarea
-                id={`${parentType}-${parentId}-doc-body`}
-                name="bodyMd"
-                required
-                rows={12}
-                className="mt-1 w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 font-mono text-sm outline-none transition focus:border-teal-700"
-              />
-            </label>
-            <button className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800">
-              Create doc
-            </button>
-          </form>
-          <form
-            action={importEntityDocMarkdown}
-            className="space-y-3 rounded-[12px] border border-[#EEF1EC] bg-white p-3"
-          >
-            <input type="hidden" name="parentType" value={parentType} />
-            <input type="hidden" name="parentId" value={parentId} />
-            <label
-              className="block text-[13px] font-medium text-stone-600"
-              htmlFor={`${parentType}-${parentId}-doc-upload-title`}
-            >
-              <span>Title override</span>
-              <input
-                id={`${parentType}-${parentId}-doc-upload-title`}
-                name="title"
-                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
-              />
-            </label>
-            <label
-              className="block text-[13px] font-medium text-stone-600"
-              htmlFor={`${parentType}-${parentId}-doc-upload`}
-            >
-              <span>Markdown file</span>
-              <input
-                id={`${parentType}-${parentId}-doc-upload`}
-                type="file"
-                name="markdownFile"
-                accept=".md,.markdown,.txt,text/markdown,text/plain"
-                required
-                className="mt-1 block w-full rounded-full border border-[#E2E6DF] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-[#EFF2EE] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700"
-              />
-            </label>
-            <button className="inline-flex h-10 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-4 text-sm font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700">
-              Import markdown
-            </button>
-          </form>
-        </div>
-      </details>
+      <DocCreateImport parentType={parentType} parentId={parentId} />
       {docs.length === 0 ? null : (
         <div className="space-y-3">
           {docs.map((doc) => (
-            <details key={doc.id} className="rounded-[12px] border border-[#EEF1EC] p-3">
+            <details
+              key={doc.id}
+              className="rounded-[12px] border border-[#EEF1EC] p-3"
+            >
               <summary className="cursor-pointer">
                 <span className="text-sm font-semibold text-stone-800">
                   {doc.title}
@@ -263,6 +251,110 @@ function DocsPanel({
   );
 }
 
+export function EntityDocAction({
+  parentType,
+  parentId,
+}: {
+  parentType: "area" | "project";
+  parentId: string;
+}) {
+  return (
+    <details className="relative">
+      <summary className="inline-flex h-8 cursor-pointer list-none items-center px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950 [&::-webkit-details-marker]:hidden">
+        Add doc
+      </summary>
+      <div className="absolute right-0 z-10 mt-2 w-[min(calc(100vw-2rem),42rem)] rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-3 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
+        <DocCreateImport parentType={parentType} parentId={parentId} />
+      </div>
+    </details>
+  );
+}
+
+function DocCreateImport({
+  parentType,
+  parentId,
+}: {
+  parentType: "area" | "project";
+  parentId: string;
+}) {
+  return (
+    <details className="rounded-[12px] border border-[#EEF1EC] bg-[#F7F9F5] p-3">
+      <summary className="cursor-pointer list-none text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
+        Create or import markdown
+      </summary>
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        <form action={createEntityDoc} className="space-y-3">
+          <input type="hidden" name="parentType" value={parentType} />
+          <input type="hidden" name="parentId" value={parentId} />
+          <label
+            className="block text-[13px] font-medium text-stone-600"
+            htmlFor={`${parentType}-${parentId}-doc-title`}
+          >
+            <span>Title</span>
+            <input
+              id={`${parentType}-${parentId}-doc-title`}
+              name="title"
+              required
+              className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
+            />
+          </label>
+          <label
+            className="block text-[13px] font-medium text-stone-600"
+            htmlFor={`${parentType}-${parentId}-doc-body`}
+          >
+            <span>Body</span>
+            <textarea
+              id={`${parentType}-${parentId}-doc-body`}
+              name="bodyMd"
+              required
+              rows={12}
+              className="mt-1 w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 font-mono text-sm outline-none transition focus:border-teal-700"
+            />
+          </label>
+          <button className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800">
+            Create doc
+          </button>
+        </form>
+        <form
+          action={importEntityDocMarkdown}
+          className="space-y-3 rounded-[12px] border border-[#EEF1EC] bg-white p-3"
+        >
+          <input type="hidden" name="parentType" value={parentType} />
+          <input type="hidden" name="parentId" value={parentId} />
+          <label
+            className="block text-[13px] font-medium text-stone-600"
+            htmlFor={`${parentType}-${parentId}-doc-upload-title`}
+          >
+            <span>Title override</span>
+            <input
+              id={`${parentType}-${parentId}-doc-upload-title`}
+              name="title"
+              className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
+            />
+          </label>
+          <label
+            className="block text-[13px] font-medium text-stone-600"
+            htmlFor={`${parentType}-${parentId}-doc-upload`}
+          >
+            <span>Markdown file</span>
+            <input
+              id={`${parentType}-${parentId}-doc-upload`}
+              type="file"
+              name="markdownFile"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              required
+              className="mt-1 block w-full rounded-full border border-[#E2E6DF] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-[#EFF2EE] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700"
+            />
+          </label>
+          <button className="inline-flex h-10 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-4 text-sm font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700">
+            Import markdown
+          </button>
+        </form>
+      </div>
+    </details>
+  );
+}
+
 function AttachmentsPanel({
   parentType,
   parentId,
@@ -272,6 +364,10 @@ function AttachmentsPanel({
   parentId: string;
   attachments: AttachmentItem[];
 }) {
+  if (attachments.length === 0) {
+    return null;
+  }
+
   return (
     <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -298,6 +394,22 @@ function AttachmentsPanel({
   );
 }
 
+export function EntityAttachmentAction({
+  parentType,
+  parentId,
+}: {
+  parentType: "area" | "project";
+  parentId: string;
+}) {
+  return (
+    <AttachmentUpload
+      parentType={parentType}
+      parentId={parentId}
+      variant="quiet"
+    />
+  );
+}
+
 export function MilestonesPanel({
   projectId,
   milestones,
@@ -309,9 +421,13 @@ export function MilestonesPanel({
     (milestone) => milestone.status === "completed",
   ).length;
   const total = milestones.length;
+  const orderedMilestones = [
+    ...milestones.filter((milestone) => milestone.status === "open"),
+    ...milestones.filter((milestone) => milestone.status === "completed"),
+  ];
 
   return (
-    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Milestones{" "}
@@ -346,50 +462,58 @@ export function MilestonesPanel({
         </details>
       </div>
       {milestones.length === 0 ? null : (
-      <div className="divide-y divide-[#EEF1EC]">
-        {milestones.map((milestone) => (
-          <div key={milestone.id} className="flex items-center gap-2.5 py-2">
-            <form action={completeMilestone}>
-              <input type="hidden" name="milestoneId" value={milestone.id} />
-              <button
-                title={milestone.status === "completed" ? "Completed" : "Complete milestone"}
-                aria-label={
+        <div className="space-y-[7px]">
+          {orderedMilestones.map((milestone) => (
+            <div key={milestone.id} className="flex items-center gap-2.5">
+              <form action={completeMilestone}>
+                <input type="hidden" name="milestoneId" value={milestone.id} />
+                <button
+                  title={
+                    milestone.status === "completed"
+                      ? "Completed"
+                      : "Complete milestone"
+                  }
+                  aria-label={
+                    milestone.status === "completed"
+                      ? "Completed"
+                      : "Complete milestone"
+                  }
+                  className={
+                    milestone.status === "completed"
+                      ? "grid h-6 w-6 place-items-center rounded-full bg-teal-700 text-white"
+                      : "grid h-6 w-6 place-items-center rounded-full border-[1.5px] border-[#C9CFC5] bg-white text-transparent transition hover:border-teal-700/50 hover:text-teal-700"
+                  }
+                  disabled={milestone.status === "completed"}
+                >
+                  <Check size={12} />
+                </button>
+              </form>
+              <p
+                className={`min-w-0 flex-1 text-sm ${
                   milestone.status === "completed"
-                    ? "Completed"
-                    : "Complete milestone"
-                }
-                className={
-                  milestone.status === "completed"
-                    ? "grid h-7 w-7 place-items-center rounded-full bg-[#F0F5F1] text-teal-700"
-                    : "grid h-7 w-7 place-items-center rounded-full border border-[#E2E6DF] text-transparent transition hover:border-teal-700/50 hover:text-teal-700"
-                }
-                disabled={milestone.status === "completed"}
+                    ? "text-stone-500 line-through decoration-[#C9CFC5]"
+                    : "font-medium text-stone-900"
+                }`}
               >
-                <Check size={13} />
-              </button>
-            </form>
-            <p
-              className={`min-w-0 flex-1 text-sm ${
-                milestone.status === "completed"
-                  ? "text-stone-500"
-                  : "font-medium text-stone-900"
-              }`}
-            >
-              {milestone.title}
-            </p>
-            {milestone.status === "open" ? (
-              <div className="flex gap-0.5">
-                <MoveButton milestoneId={milestone.id} direction="up" label="Up" />
-                <MoveButton
-                  milestoneId={milestone.id}
-                  direction="down"
-                  label="Down"
-                />
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
+                {milestone.title}
+              </p>
+              {milestone.status === "open" ? (
+                <div className="flex gap-0.5">
+                  <MoveButton
+                    milestoneId={milestone.id}
+                    direction="up"
+                    label="Up"
+                  />
+                  <MoveButton
+                    milestoneId={milestone.id}
+                    direction="down"
+                    label="Down"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -413,7 +537,11 @@ function MoveButton({
         aria-label={`Move ${direction}`}
         className="grid h-7 w-7 place-items-center rounded-full text-[#B0ACA2] transition hover:bg-[#F7F9F5] hover:text-stone-700"
       >
-        {direction === "up" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        {direction === "up" ? (
+          <ChevronUp size={14} />
+        ) : (
+          <ChevronDown size={14} />
+        )}
       </button>
     </form>
   );

@@ -2,14 +2,7 @@
 
 import type { ProjectStatus } from "@prisma/client";
 import type { ReactNode } from "react";
-import {
-  ArchiveRestore,
-  Check,
-  Ellipsis,
-  Pause,
-  Play,
-  X,
-} from "lucide-react";
+import { ArchiveRestore, Check, Ellipsis, Pause, Play, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -28,7 +21,9 @@ export function ProjectOverflowMenu({
     return null;
   }
 
-  async function updateStatus(nextStatus: "active" | "parked" | "completed" | "killed") {
+  async function updateStatus(
+    nextStatus: "active" | "parked" | "completed" | "killed",
+  ) {
     if (pending) return;
     setPending(true);
     try {

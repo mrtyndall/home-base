@@ -11,6 +11,26 @@ export function CheckInFeed({
   parentId: string;
   checkIns: Array<Pick<CheckIn, "id" | "bodyMd" | "createdAt">>;
 }) {
+  const visibleCheckIns = checkIns.slice(0, 3);
+  const earlierCheckIns = checkIns.slice(3);
+
+  function CheckInRow({
+    checkIn,
+  }: {
+    checkIn: Pick<CheckIn, "id" | "bodyMd" | "createdAt">;
+  }) {
+    return (
+      <div className="px-4 py-3.5">
+        <p className="text-xs text-[#9AA096]">
+          {formatShortDate(checkIn.createdAt)}
+        </p>
+        <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
+          {checkIn.bodyMd}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <section className="space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -21,16 +41,22 @@ export function CheckInFeed({
       </div>
       {checkIns.length === 0 ? null : (
         <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-          {checkIns.map((checkIn) => (
-            <div key={checkIn.id} className="px-4 py-3.5">
-              <p className="text-xs text-[#9AA096]">
-                {formatShortDate(checkIn.createdAt)}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
-                {checkIn.bodyMd}
-              </p>
-            </div>
+          {visibleCheckIns.map((checkIn) => (
+            <CheckInRow key={checkIn.id} checkIn={checkIn} />
           ))}
+          {earlierCheckIns.length > 0 ? (
+            <details>
+              <summary className="cursor-pointer list-none px-4 py-[11px] text-[13px] font-medium text-stone-600 transition hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+                Earlier · {earlierCheckIns.length} more, back to{" "}
+                {formatShortDate(checkIns[checkIns.length - 1].createdAt)}
+              </summary>
+              <div className="divide-y divide-[#EEF1EC]">
+                {earlierCheckIns.map((checkIn) => (
+                  <CheckInRow key={checkIn.id} checkIn={checkIn} />
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       )}
     </section>
