@@ -3,6 +3,7 @@ import {
   addDaysToDateString,
   dateOnlyFromString,
   localDateString,
+  zonedDayBounds,
 } from "@/lib/dates";
 import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getRoutinesWithState } from "@/lib/routines";
@@ -14,7 +15,9 @@ export async function getTodayDashboard() {
   const dayAfterTomorrow = addDaysToDateString(today, 2);
   const todayDate = dateOnlyFromString(today);
   const tomorrowDate = dateOnlyFromString(tomorrow);
-  const dayAfterTomorrowDate = dateOnlyFromString(dayAfterTomorrow);
+  const todayCalendarBounds = zonedDayBounds(today);
+  const tomorrowCalendarBounds = zonedDayBounds(tomorrow);
+  const dayAfterTomorrowCalendarBounds = zonedDayBounds(dayAfterTomorrow);
 
   if (!process.env.DATABASE_URL) {
     return {
@@ -73,14 +76,17 @@ export async function getTodayDashboard() {
       }),
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: todayDate, lt: tomorrowDate },
+          start: { gte: todayCalendarBounds.start, lt: todayCalendarBounds.end },
         },
         orderBy: { start: "asc" },
         take: 8,
       }),
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: tomorrowDate, lt: dayAfterTomorrowDate },
+          start: {
+            gte: tomorrowCalendarBounds.start,
+            lt: tomorrowCalendarBounds.end,
+          },
         },
         orderBy: { start: "asc" },
         take: 6,
@@ -109,7 +115,7 @@ export async function getTodayDashboard() {
         orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }],
       }),
       prisma.calendarEvent.findFirst({
-        where: { start: { gte: dayAfterTomorrowDate } },
+        where: { start: { gte: dayAfterTomorrowCalendarBounds.start } },
         orderBy: { start: "asc" },
       }),
       prisma.calendarSyncState.findUnique({

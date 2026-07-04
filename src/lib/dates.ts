@@ -1,3 +1,5 @@
+import { fromZonedTime } from "date-fns-tz";
+
 export const APP_TIMEZONE = "America/New_York";
 
 export function localDateString(date = new Date(), timeZone = APP_TIMEZONE) {
@@ -25,6 +27,15 @@ export function addDaysToDateString(value: string, days: number) {
   const date = dateOnlyFromString(value);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+export function zonedDayBounds(value: string, timeZone = APP_TIMEZONE) {
+  const nextDay = addDaysToDateString(value, 1);
+
+  return {
+    start: fromZonedTime(`${value}T00:00:00`, timeZone),
+    end: fromZonedTime(`${nextDay}T00:00:00`, timeZone),
+  };
 }
 
 export function formatShortDate(value: Date | string | null | undefined) {
