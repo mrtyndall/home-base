@@ -286,6 +286,58 @@ export async function parkProjectById(projectId: string) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+export async function setEntityNoteStarred(formData: FormData) {
+  const noteId = getTrimmedString(formData, "noteId");
+  const nextValue = getTrimmedString(formData, "starred") === "true";
+  if (!noteId) return;
+
+  const note = await prisma.entityNote.findUnique({
+    where: { id: noteId },
+    select: {
+      id: true,
+      parentType: true,
+      parentId: true,
+      bodyMd: true,
+      starredAt: true,
+    },
+  });
+  if (!note) return;
+
+  const shouldChange = nextValue ? !note.starredAt : Boolean(note.starredAt);
+  if (!shouldChange) return;
+
+  const updated = await prisma.entityNote.update({
+    where: { id: noteId },
+    data: { starredAt: nextValue ? new Date() : null },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: nextValue ? "note_starred" : "note_unstarred",
+      title: nextValue ? "Note starred" : "Note unstarred",
+      body:
+        updated.bodyMd.length > 120
+          ? `${updated.bodyMd.slice(0, 117)}...`
+          : updated.bodyMd,
+      sourceRef: {
+        type: "entity_note",
+        id: updated.id,
+        parentType: updated.parentType,
+        parentId: updated.parentId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath("/");
+  if (updated.parentType === "area") {
+    revalidatePath(`/areas/${updated.parentId}`);
+    revalidatePath("/projects");
+  } else {
+    revalidatePath(`/projects/${updated.parentId}`);
+  }
+}
+
 function getTrimmedString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";

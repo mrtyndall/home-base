@@ -372,11 +372,13 @@ model EntityNote {
   bodyMd     String           @map("body_md")
   source     String?
   captureId  String?          @map("capture_id")
+  starredAt  DateTime?        @map("starred_at")
   createdAt  DateTime         @default(now()) @map("created_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
 
   @@index([parentType, parentId, createdAt])
+  @@index([parentType, parentId, starredAt])
   @@index([captureId])
   @@map("entity_notes")
 }
