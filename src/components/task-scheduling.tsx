@@ -151,32 +151,38 @@ export function TaskDropZone({
         event.dataTransfer.dropEffect = "move";
       }}
       onDrop={handleDrop}
-      className={`relative min-h-20 space-y-2 rounded-lg border border-transparent p-1 transition ${
-        draggingTask
-          ? "border-dashed border-teal-300 bg-teal-50/60 ring-1 ring-teal-200"
-          : ""
-      } ${isActive ? "border-teal-500 bg-teal-50 ring-2 ring-teal-300" : ""}`}
+      className={`relative min-h-20 space-y-2 rounded-[14px] border p-1.5 transition ${
+        isActive
+          ? "border-teal-700 bg-teal-700/5"
+          : draggingTask
+            ? "border-dashed border-teal-700/40 bg-white/50"
+            : "border-transparent"
+      }`}
     >
       {draggingTask ? (
         <div
-          className={`mb-2 rounded-md px-3 py-2 text-sm font-medium transition ${
-            isActive ? "bg-teal-700 text-white" : "bg-white/80 text-teal-800"
+          className={`mb-2 inline-flex h-[30px] items-center rounded-full px-3 text-[13px] font-medium transition ${
+            isActive
+              ? "bg-teal-700 text-white"
+              : "border border-teal-700/40 bg-white text-teal-800"
           }`}
         >
           Move here: {label}
         </div>
       ) : null}
       {draggingTask && isActive && preview ? (
-        <div className="mb-2 rounded-lg border border-teal-400 bg-white p-4 shadow-md ring-2 ring-teal-200">
-          <h3 className="font-medium text-stone-950">{preview.title}</h3>
-          <p className="mt-1 text-sm text-stone-500">{preview.detail}</p>
+        <div className="mb-2 rounded-[12px] border border-teal-700/50 bg-white p-3.5 shadow-[0_4px_14px_rgba(28,25,23,0.10)]">
+          <h3 className="text-sm font-medium text-stone-950">
+            {preview.title}
+          </h3>
+          <p className="mt-0.5 text-xs text-[#9AA096]">{preview.detail}</p>
         </div>
       ) : null}
       <div className={`${draggingTask ? "space-y-2" : ""}`}>
         {isEmpty ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
+          <p className="px-2.5 py-2 text-sm text-[#6B7268]">
             {pending ? "Updating date." : emptyText}
-          </div>
+          </p>
         ) : (
           children
         )}
@@ -349,13 +355,13 @@ export function DraggableTaskLink({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-md p-1 transition active:cursor-grabbing hover:bg-stone-50 ${
+        className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-[10px] p-1 transition active:cursor-grabbing hover:bg-[#F7F9F5] ${
           dragPending ? "opacity-60" : ""
         } ${dragPreviewPosition ? "opacity-50" : ""}`}
       >
         <GripVertical
           aria-hidden="true"
-          className="mt-0.5 hidden shrink-0 text-stone-300 sm:block"
+          className="mt-0.5 hidden shrink-0 text-[#C9CFC5] sm:block"
           size={16}
         />
         <Link
@@ -368,8 +374,8 @@ export function DraggableTaskLink({
           }}
           className="min-w-0 flex-1"
         >
-          <h3 className="font-medium">{title}</h3>
-          <p className="mt-1 text-sm text-stone-500">{detail}</p>
+          <h3 className="text-[15px] font-medium">{title}</h3>
+          <p className="mt-0.5 text-[13px] text-stone-500">{detail}</p>
         </Link>
         <ScheduleMenu
           taskId={taskId}
@@ -417,12 +423,12 @@ const TaskFloatingPreview = ({
 }) => (
   <div
     ref={ref}
-    className="rounded-xl border border-teal-400 bg-white p-4 text-stone-900 shadow-xl ring-2 ring-teal-100"
+    className="-rotate-1 rounded-[14px] border border-teal-700/50 bg-white p-4 text-stone-900 shadow-[0_16px_40px_rgba(28,25,23,0.22)]"
   >
     <div className="flex items-start gap-2">
       <GripVertical
         aria-hidden="true"
-        className="mt-0.5 shrink-0 text-teal-500"
+        className="mt-0.5 shrink-0 text-teal-700"
         size={16}
       />
       <div className="min-w-0">
@@ -514,13 +520,17 @@ function ScheduleMenu({
         type="button"
         title="Move, schedule, or assign task"
         onClick={() => setOpen(!open)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
+        className={`inline-flex h-8 items-center gap-1.5 rounded-full border bg-white px-3 text-[13px] font-medium transition ${
+          open
+            ? "border-teal-700/40 text-teal-800"
+            : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
+        }`}
       >
         <CalendarDays size={15} />
         Move
       </button>
       {open ? (
-        <div className="absolute right-0 top-10 z-30 w-52 rounded-lg border border-stone-200 bg-white p-2 text-sm shadow-lg">
+        <div className="absolute right-0 top-10 z-30 w-56 rounded-[20px] border border-white/65 bg-[#FAFBF9]/80 p-2 text-sm shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
           <MenuButton disabled={pending} onClick={() => schedule(today)}>
             Today
           </MenuButton>
@@ -533,7 +543,7 @@ function ScheduleMenu({
           {picking ? (
             <input
               type="date"
-              className="mt-1 h-9 w-full rounded-md border border-stone-300 px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
               onChange={(event) => {
                 if (event.target.value) {
                   void schedule(event.target.value);
@@ -570,14 +580,14 @@ function ScheduleMenu({
             </MenuButton>
           ) : null}
           {assigning ? (
-            <div className="space-y-2 border-t border-stone-100 px-2 pt-2">
+            <div className="space-y-2 border-t border-[#EEF1EC] px-2 pt-2">
               <select
                 value={selectedAreaId}
                 onChange={(event) => {
                   setSelectedAreaId(event.target.value);
                   setSelectedProjectId("");
                 }}
-                className="h-9 w-full rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
               >
                 {areaGroups.map((group) => (
                   <optgroup key={group.domainName} label={group.domainName}>
@@ -593,7 +603,7 @@ function ScheduleMenu({
                 <select
                   value={selectedProjectId}
                   onChange={(event) => setSelectedProjectId(event.target.value)}
-                  className="h-9 w-full rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                  className="h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
                 >
                   <option value="">No project</option>
                   {filteredProjects.map((project) => (
@@ -607,13 +617,13 @@ function ScheduleMenu({
                 type="button"
                 disabled={pending}
                 onClick={assign}
-                className="h-9 w-full rounded-md bg-teal-700 px-2 text-left text-sm font-medium text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+                className="h-10 w-full rounded-full bg-teal-700 px-3 text-center text-sm font-medium text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-[#D6DBD3]"
               >
                 Save assignment
               </button>
             </div>
           ) : null}
-          {error ? <p className="px-2 py-1 text-xs text-stone-600">{error}</p> : null}
+          {error ? <p className="px-3 py-1 text-xs text-amber-800">{error}</p> : null}
         </div>
       ) : null}
     </div>
@@ -634,7 +644,7 @@ function MenuButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="block h-9 w-full rounded-md px-2 text-left text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400"
+      className="block h-10 w-full rounded-[10px] px-3 text-left text-stone-700 transition hover:bg-white/85 disabled:cursor-not-allowed disabled:text-stone-400"
     >
       {children}
     </button>

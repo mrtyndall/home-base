@@ -14,7 +14,7 @@ export function TaskStarButton({
       <button
         type="submit"
         title={starred ? "Unstar task" : "Star task"}
-        className="grid h-8 w-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
+        className="grid h-8 w-8 place-items-center rounded-full border border-[#E2E6DF] bg-white text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
       >
         <Star
           size={16}

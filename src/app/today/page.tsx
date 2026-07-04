@@ -1,12 +1,4 @@
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Inbox,
-  RefreshCcw,
-  Star,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckCircle2, Inbox } from "lucide-react";
 import type { Capture } from "@prisma/client";
 import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
@@ -27,9 +19,9 @@ export default async function TodayPage() {
   const data = await getTodayDashboard();
 
   return (
-    <div className="space-y-5">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-normal text-stone-950">
+    <div className="space-y-7">
+      <header>
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Today
         </h1>
       </header>
@@ -50,14 +42,15 @@ export default async function TodayPage() {
 
           {data.topTasks.length > 0 ? (
             <section className="space-y-3">
-              <SectionHeader icon={Star} title="Top Tasks" />
-              <div className="space-y-2">
+              <SectionHeader title="Top tasks" />
+              <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
                 {data.topTasks.map((task) => (
                   <TodayTaskRow
                     key={task.id}
                     task={task}
                     today={data.today}
                     tomorrow={data.tomorrow}
+                    grouped
                   />
                 ))}
               </div>
@@ -77,34 +70,40 @@ export default async function TodayPage() {
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-3">
-              <SectionHeader icon={CalendarDays} title="Today's Calendar" />
-              <CalendarSyncMeta data={data.calendarSync} />
-              <div className="space-y-2">
-                {data.todayEvents.length === 0 ? (
-                  <EmptyLine text="No calendar events today." />
-                ) : (
-                  data.todayEvents.map((event) => (
+              <div className="flex items-baseline justify-between gap-3">
+                <SectionHeader title="Today's calendar" />
+                <CalendarSyncMeta data={data.calendarSync} />
+              </div>
+              {data.todayEvents.length === 0 ? (
+                <EmptyLine text="No calendar events today." />
+              ) : (
+                <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+                  {data.todayEvents.map((event) => (
                     <div
                       key={event.id}
-                      className="rounded-lg border border-stone-200 bg-white p-4"
+                      className="flex items-baseline gap-3 px-4 py-3"
                     >
-                      <p className="text-sm text-stone-500">
+                      <p className="min-w-14 text-sm text-stone-500">
                         {formatTime(event.start)}
                       </p>
-                      <h3 className="mt-1 font-medium">{event.title}</h3>
-                      {event.location ? (
-                        <p className="mt-1 text-sm text-stone-600">
-                          {event.location}
-                        </p>
-                      ) : null}
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] font-medium">
+                          {event.title}
+                        </h3>
+                        {event.location ? (
+                          <p className="mt-0.5 text-sm text-stone-500">
+                            {event.location}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
-              <SectionHeader icon={Clock3} title="Due Today" />
+              <SectionHeader title="Due today" />
               <TaskDropZone
                 targetDate={data.today}
                 label="Today"
@@ -127,19 +126,27 @@ export default async function TodayPage() {
 
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
-              <SectionHeader icon={CalendarDays} title="Tomorrow" />
+              <SectionHeader title="Tomorrow" />
               <div className="space-y-2">
-                {data.tomorrowEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-lg border border-stone-200 bg-white p-4"
-                  >
-                    <p className="text-sm text-stone-500">
-                      {formatTime(event.start)}
-                    </p>
-                    <h3 className="mt-1 font-medium">{event.title}</h3>
+                {data.tomorrowEvents.length > 0 ? (
+                  <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+                    {data.tomorrowEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-baseline gap-3 px-4 py-3"
+                      >
+                        <p className="min-w-14 text-sm text-stone-500">
+                          {formatTime(event.start)}
+                        </p>
+                        <div className="min-w-0">
+                          <h3 className="text-[15px] font-medium">
+                            {event.title}
+                          </h3>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : null}
                 <TaskDropZone
                   targetDate={data.tomorrow}
                   label="Tomorrow"
@@ -163,7 +170,7 @@ export default async function TodayPage() {
             </div>
 
             <div className="space-y-3">
-              <SectionHeader icon={Inbox} title="Task inbox" />
+              <SectionHeader title="Task inbox" />
               <TaskDropZone
                 targetDate={null}
                 label="Task inbox"
@@ -202,15 +209,23 @@ function TodayTaskRow({
   task,
   today,
   tomorrow,
+  grouped = false,
 }: {
   task: TodayTask;
   today: string;
   tomorrow: string;
+  grouped?: boolean;
 }) {
   const detail = `${task.area.name}${task.project ? ` / ${task.project.name}` : ""}`;
 
   return (
-    <div className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div
+      className={
+        grouped
+          ? "flex items-start justify-between gap-3 p-4"
+          : "flex items-start justify-between gap-3 rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+      }
+    >
       <DraggableTaskLink
         taskId={task.id}
         href={`/tasks/${task.id}`}
@@ -236,12 +251,19 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-stone-800">
-        <Inbox size={16} />
-        <h2 className="text-sm font-semibold">Recent capture actions</h2>
+    <section className="space-y-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Recently captured
+        </h2>
+        <Link
+          href="/areas/area_inbox"
+          className="text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-teal-700 hover:underline"
+        >
+          Open
+        </Link>
       </div>
-      <div className="space-y-2">
+      <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {captures.slice(0, 5).map((capture) => {
           const outcome =
             formatCaptureOutcome(capture.createdItems) ??
@@ -257,19 +279,19 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
             <Link
               key={capture.id}
               href={href}
-              className="grid gap-3 rounded-lg border border-stone-200 bg-stone-50/60 p-3 transition hover:border-teal-400 hover:bg-white sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              className="grid gap-3 px-4 py-3 transition hover:bg-[#F7F9F5] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-stone-900">
                   {capture.rawText}
                 </p>
-                <p className="mt-1 text-xs text-stone-500">{outcome}</p>
+                <p className="mt-0.5 text-xs text-[#9AA096]">{outcome}</p>
               </div>
               <span
-                className={`inline-flex h-8 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-medium ${
+                className={`inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-sm font-medium ${
                   action.tone === "primary"
-                    ? "border-teal-600 bg-teal-50 text-teal-800"
-                    : "border-stone-300 bg-white text-stone-700"
+                    ? "border-teal-700/40 bg-white text-teal-800"
+                    : "border-[#E2E6DF] bg-white text-stone-700"
                 }`}
               >
                 {action.label}
@@ -295,16 +317,15 @@ function CalendarSyncMeta({
 }) {
   const configured = data.status !== "not_configured";
   const needsAttention = !configured || data.stale || data.status === "failed";
-  const tone = needsAttention ? "text-amber-800" : "text-stone-500";
+  const tone = needsAttention ? "text-amber-800" : "text-[#9AA096]";
   const message = !configured
     ? "Google Calendar is not configured yet."
     : data.lastSyncedAt
-      ? `Calendar synced ${formatTime(data.lastSyncedAt)}`
+      ? `synced ${formatTime(data.lastSyncedAt)}`
       : "Calendar has not synced yet";
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
-      <RefreshCcw className="shrink-0" size={13} />
+    <div className={`flex flex-wrap items-center gap-1.5 text-xs ${tone}`}>
       <p>
         {message}
         {data.stale && configured
@@ -343,59 +364,42 @@ function StatusLine({
         : "No upcoming dated commitments.";
 
     return (
-      <section className="rounded-lg border border-teal-300 bg-teal-50 p-5 text-teal-950">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 shrink-0" size={21} />
-          <div>
-            <h2 className="text-lg font-semibold">
-              Nothing due through tomorrow.
-            </h2>
-            <p className="mt-1 text-sm">{nextCommitment} Nothing slipping.</p>
-          </div>
+      <section className="flex items-start gap-2.5">
+        <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={17} />
+        <div>
+          <h2 className="text-[15px] font-medium text-stone-950">
+            Nothing due through tomorrow.
+          </h2>
+          <p className="mt-0.5 text-sm text-[#6B7268]">
+            {nextCommitment} Nothing slipping.
+          </p>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="rounded-lg border border-cyan-300 bg-cyan-50 p-5 text-cyan-950">
-      <div className="flex items-start gap-3">
-        <Clock3 className="mt-0.5 shrink-0" size={21} />
-        <div>
-          <h2 className="text-lg font-semibold">Today has active items.</h2>
-          <p className="mt-1 text-sm">
-            {data.todayEvents.length} calendar event
-            {data.todayEvents.length === 1 ? "" : "s"} and{" "}
-            {data.dueToday.length} task
-            {data.dueToday.length === 1 ? "" : "s"} due today.
-          </p>
-        </div>
-      </div>
+    <section>
+      <h2 className="text-[15px] font-medium text-stone-950">
+        {data.todayEvents.length} calendar event
+        {data.todayEvents.length === 1 ? "" : "s"} and {data.dueToday.length}{" "}
+        task{data.dueToday.length === 1 ? "" : "s"} due today.
+      </h2>
+      <p className="mt-0.5 text-sm text-[#6B7268]">Nothing slipping.</p>
     </section>
   );
 }
 
-function SectionHeader({
-  icon: Icon,
-  title,
-}: {
-  icon: LucideIcon;
-  title: string;
-}) {
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 text-stone-800">
-      <Icon size={18} />
-      <h2 className="text-base font-semibold">{title}</h2>
-    </div>
+    <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+      {title}
+    </h2>
   );
 }
 
 function EmptyLine({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-      {text}
-    </div>
-  );
+  return <p className="text-sm text-[#6B7268]">{text}</p>;
 }
 
 function formatCaptureOutcome(value: unknown) {
