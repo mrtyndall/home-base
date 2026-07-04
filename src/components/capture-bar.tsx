@@ -177,7 +177,7 @@ export function CaptureBar() {
               : "border-[#E2E6DF] bg-white/80 text-stone-700 hover:border-teal-700/50 hover:text-teal-700"
           }`}
         >
-          {listening ? <Square size={18} /> : <Mic size={19} />}
+          {listening ? <Square size={16} /> : <Mic size={18} />}
         </button>
         <label className="sr-only" htmlFor="capture-text">
           Capture text
@@ -198,7 +198,7 @@ export function CaptureBar() {
           disabled={status === "saving" || rawText.trim().length === 0}
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-[#D6DBD3]"
         >
-          <Send size={18} />
+          <Send size={17} />
         </button>
       </form>
       {message ? (
