@@ -317,7 +317,6 @@ function MemoryCard({ item }: { item: ResurfacedItem | null }) {
             ? `An idea from ${formatShortDate(item.itemDate)}`
             : `A journal entry from ${formatDateOnly(item.itemDate)}`}
         </h2>
-        <span className="text-xs text-stone-500">{item.ageDays} days ago</span>
       </div>
       <p className="line-clamp-4 text-sm leading-6 text-stone-700">
         {item.body}

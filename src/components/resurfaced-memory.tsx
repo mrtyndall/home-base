@@ -19,11 +19,10 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
         <h2 className="text-sm font-semibold">
           {/* Journal entryDate is date-only (UTC midnight) — format in UTC
               or the card shows the previous day. */}
-          {item.itemType === "idea"
-            ? `An idea from ${formatShortDate(item.itemDate)}`
-            : `A journal entry from ${formatDateOnly(item.itemDate)}`}
+        {item.itemType === "idea"
+          ? `An idea from ${formatShortDate(item.itemDate)}`
+          : `A journal entry from ${formatDateOnly(item.itemDate)}`}
         </h2>
-        <span className="text-xs text-stone-500">{item.ageDays} days ago</span>
       </div>
       <p className="whitespace-pre-wrap text-sm leading-6 text-stone-800">
         {item.body}
