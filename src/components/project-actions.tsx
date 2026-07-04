@@ -22,6 +22,7 @@ export function ProjectOverflowMenu({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [confirmingKill, setConfirmingKill] = useState(false);
 
   if (status === "completed" || status === "killed") {
     return null;
@@ -50,14 +51,19 @@ export function ProjectOverflowMenu({
   }
 
   return (
-    <details className="relative">
+    <details
+      className="relative"
+      onToggle={(event) => {
+        if (!event.currentTarget.open) setConfirmingKill(false);
+      }}
+    >
       <summary
         title="Project actions"
-        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-950 [&::-webkit-details-marker]:hidden"
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-stone-500 transition hover:bg-white hover:text-stone-950 [&::-webkit-details-marker]:hidden"
       >
         <Ellipsis size={17} />
       </summary>
-      <div className="absolute right-0 z-10 mt-2 w-44 rounded-md border border-stone-200 bg-white p-1 shadow-lg">
+      <div className="absolute right-0 z-10 mt-2 w-44 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-1.5 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
         {status === "active" ? (
           <MenuButton
             disabled={pending}
@@ -90,9 +96,16 @@ export function ProjectOverflowMenu({
         />
         <MenuButton
           disabled={pending}
-          label="Kill"
+          label={confirmingKill ? "Confirm kill?" : "Kill"}
           icon={<X size={15} />}
-          onClick={() => updateStatus("killed")}
+          emphasis={confirmingKill}
+          onClick={() => {
+            if (confirmingKill) {
+              void updateStatus("killed");
+            } else {
+              setConfirmingKill(true);
+            }
+          }}
         />
       </div>
     </details>
@@ -104,18 +117,22 @@ function MenuButton({
   label,
   icon,
   onClick,
+  emphasis = false,
 }: {
   disabled: boolean;
   label: string;
   icon: ReactNode;
   onClick: () => void;
+  emphasis?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-stone-950 disabled:cursor-wait disabled:opacity-60"
+      className={`flex h-10 w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-sm text-stone-700 transition hover:bg-white/85 hover:text-stone-950 disabled:cursor-wait disabled:opacity-60 ${
+        emphasis ? "bg-white/90 font-medium text-stone-950" : ""
+      }`}
     >
       {icon}
       {label}

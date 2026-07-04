@@ -12,20 +12,22 @@ export function CheckInFeed({
   checkIns: Array<Pick<CheckIn, "id" | "bodyMd" | "createdAt">>;
 }) {
   return (
-    <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-stone-800">Check-ins</h2>
+    <section className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Check-ins
+        </h2>
         <CheckInComposer parentType={parentType} parentId={parentId} />
       </div>
       {checkIns.length === 0 ? null : (
-        <div className="divide-y divide-stone-100">
+        <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
           {checkIns.map((checkIn) => (
-            <div key={checkIn.id} className="py-3">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-stone-800">
-                {checkIn.bodyMd}
-              </p>
-              <p className="mt-1 text-xs text-stone-500">
+            <div key={checkIn.id} className="px-4 py-3.5">
+              <p className="text-xs text-[#9AA096]">
                 {formatShortDate(checkIn.createdAt)}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
+                {checkIn.bodyMd}
               </p>
             </div>
           ))}

@@ -26,12 +26,12 @@ export function CheckInComposer({
             setOpen(true);
             setNotice(null);
           }}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
         >
-          <MessageSquarePlus size={15} />
+          <MessageSquarePlus size={14} />
           Check in
         </button>
-        {notice ? <p className="text-sm text-stone-500">{notice}</p> : null}
+        {notice ? <p className="text-[13px] text-[#6B7268]">{notice}</p> : null}
       </div>
     );
   }
@@ -69,22 +69,22 @@ export function CheckInComposer({
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-stone-200 bg-stone-50/60 p-3">
+    <div className="w-full space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-3">
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={5}
         autoFocus
         aria-label="Check-in"
-        className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm leading-relaxed outline-none transition focus:border-teal-700"
       />
-      {notice ? <p className="text-sm text-stone-500">{notice}</p> : null}
+      {notice ? <p className="text-[13px] text-[#6B7268]">{notice}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={post}
           disabled={pending || text.trim().length === 0}
-          className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800 disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800 disabled:opacity-50"
         >
           Post check-in
         </button>
@@ -92,9 +92,9 @@ export function CheckInComposer({
           type="button"
           onClick={generateDraft}
           disabled={pending}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 disabled:opacity-50"
         >
-          <Sparkles size={14} />
+          <Sparkles size={13} />
           {pending ? "Working…" : "AI draft"}
         </button>
         <button
@@ -104,7 +104,7 @@ export function CheckInComposer({
             setNotice(null);
           }}
           disabled={pending}
-          className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-stone-600 transition hover:text-stone-950"
+          className="inline-flex h-9 items-center justify-center px-2.5 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
         >
           Close
         </button>

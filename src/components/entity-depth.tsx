@@ -10,6 +10,7 @@ import {
 } from "@/app/actions";
 import { AttachmentUpload } from "@/components/attachment-upload";
 import { formatShortDate } from "@/lib/dates";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 type EntityNoteItem = {
   id: string;
@@ -73,16 +74,18 @@ function NotesPanel({
   notes: EntityNoteItem[];
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-stone-800">Notes</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Notes
+        </h2>
         <details className="relative">
-          <summary className="inline-flex h-8 cursor-pointer list-none items-center justify-center rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-700 transition hover:border-stone-400 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
             Add
           </summary>
           <form
             action={addEntityNote}
-            className="absolute right-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-2 rounded-md border border-stone-200 bg-white p-2 shadow-lg"
+            className="absolute right-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-2 rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
           >
             <input type="hidden" name="parentType" value={parentType} />
             <input type="hidden" name="parentId" value={parentId} />
@@ -94,22 +97,20 @@ function NotesPanel({
               name="bodyMd"
               required
               rows={3}
-              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-700"
             />
-            <button className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800">
+            <button className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800">
               Save
             </button>
           </form>
         </details>
       </div>
-      {notes.length === 0 ? (
-        <p className="text-sm text-stone-500">No notes yet.</p>
-      ) : (
-        <div className="divide-y divide-stone-100">
+      {notes.length === 0 ? null : (
+        <div className="divide-y divide-[#EEF1EC]">
           {notes.map((note) => (
             <div key={note.id} className="py-3">
               <MarkdownPreview body={note.bodyMd} />
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-[#9AA096]">
                 {formatShortDate(note.createdAt)}
               </p>
             </div>
@@ -130,12 +131,14 @@ function DocsPanel({
   docs: EntityDocItem[];
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-stone-800">Docs</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Docs
+        </h2>
       </div>
-      <details className="rounded-md border border-stone-200 bg-stone-50 p-3">
-        <summary className="cursor-pointer list-none text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
+      <details className="rounded-[12px] border border-[#EEF1EC] bg-[#F7F9F5] p-3">
+        <summary className="cursor-pointer list-none text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
           Create or import markdown
         </summary>
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
@@ -143,7 +146,7 @@ function DocsPanel({
             <input type="hidden" name="parentType" value={parentType} />
             <input type="hidden" name="parentId" value={parentId} />
             <label
-              className="block text-sm font-medium text-stone-700"
+              className="block text-[13px] font-medium text-stone-600"
               htmlFor={`${parentType}-${parentId}-doc-title`}
             >
               <span>Title</span>
@@ -151,11 +154,11 @@ function DocsPanel({
                 id={`${parentType}-${parentId}-doc-title`}
                 name="title"
                 required
-                className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
               />
             </label>
             <label
-              className="block text-sm font-medium text-stone-700"
+              className="block text-[13px] font-medium text-stone-600"
               htmlFor={`${parentType}-${parentId}-doc-body`}
             >
               <span>Body</span>
@@ -164,32 +167,32 @@ function DocsPanel({
                 name="bodyMd"
                 required
                 rows={12}
-                className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 font-mono text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="mt-1 w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 font-mono text-sm outline-none transition focus:border-teal-700"
               />
             </label>
-            <button className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800">
+            <button className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800">
               Create doc
             </button>
           </form>
           <form
             action={importEntityDocMarkdown}
-            className="space-y-3 rounded-md border border-stone-200 bg-white p-3"
+            className="space-y-3 rounded-[12px] border border-[#EEF1EC] bg-white p-3"
           >
             <input type="hidden" name="parentType" value={parentType} />
             <input type="hidden" name="parentId" value={parentId} />
             <label
-              className="block text-sm font-medium text-stone-700"
+              className="block text-[13px] font-medium text-stone-600"
               htmlFor={`${parentType}-${parentId}-doc-upload-title`}
             >
               <span>Title override</span>
               <input
                 id={`${parentType}-${parentId}-doc-upload-title`}
                 name="title"
-                className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
               />
             </label>
             <label
-              className="block text-sm font-medium text-stone-700"
+              className="block text-[13px] font-medium text-stone-600"
               htmlFor={`${parentType}-${parentId}-doc-upload`}
             >
               <span>Markdown file</span>
@@ -199,26 +202,24 @@ function DocsPanel({
                 name="markdownFile"
                 accept=".md,.markdown,.txt,text/markdown,text/plain"
                 required
-                className="mt-1 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700"
+                className="mt-1 block w-full rounded-full border border-[#E2E6DF] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-[#EFF2EE] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700"
               />
             </label>
-            <button className="inline-flex h-10 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700">
+            <button className="inline-flex h-10 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-4 text-sm font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700">
               Import markdown
             </button>
           </form>
         </div>
       </details>
-      {docs.length === 0 ? (
-        <p className="text-sm text-stone-500">No docs yet.</p>
-      ) : (
+      {docs.length === 0 ? null : (
         <div className="space-y-3">
           {docs.map((doc) => (
-            <details key={doc.id} className="rounded-md border border-stone-200 p-3">
+            <details key={doc.id} className="rounded-[12px] border border-[#EEF1EC] p-3">
               <summary className="cursor-pointer">
                 <span className="text-sm font-semibold text-stone-800">
                   {doc.title}
                 </span>
-                <span className="ml-2 text-xs text-stone-500">
+                <span className="ml-2 text-xs text-[#9AA096]">
                   {formatShortDate(doc.updatedAt)}
                 </span>
               </summary>
@@ -229,28 +230,28 @@ function DocsPanel({
                     name="title"
                     required
                     defaultValue={doc.title}
-                    className="h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                    className="h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none focus:border-teal-700"
                   />
                   <textarea
                     name="bodyMd"
                     required
                     rows={8}
                     defaultValue={doc.bodyMd}
-                    className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                    className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 font-mono text-sm outline-none focus:border-teal-700"
                   />
                   <div className="flex gap-2">
-                    <button className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800">
+                    <button className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800">
                       Save
                     </button>
                     <button
                       formAction={archiveEntityDoc}
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-stone-400"
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
                     >
                       Archive
                     </button>
                   </div>
                 </form>
-                <div className="rounded-md border border-stone-200 bg-stone-50 p-3">
+                <div className="rounded-[12px] border border-[#EEF1EC] bg-[#F7F9F5] p-3">
                   <MarkdownPreview body={doc.bodyMd} />
                 </div>
               </div>
@@ -272,13 +273,13 @@ function AttachmentsPanel({
   attachments: AttachmentItem[];
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="text-base font-semibold text-stone-800">Attachments</h2>
+    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Attachments
+      </h2>
       <AttachmentUpload parentType={parentType} parentId={parentId} />
-      {attachments.length === 0 ? (
-        <p className="text-sm text-stone-500">No attachments.</p>
-      ) : (
-        <div className="divide-y divide-stone-100">
+      {attachments.length === 0 ? null : (
+        <div className="divide-y divide-[#EEF1EC]">
           {attachments.map((attachment) => (
             <a
               key={attachment.id}
@@ -286,7 +287,7 @@ function AttachmentsPanel({
               className="block py-2 text-sm font-medium text-stone-800 transition hover:text-teal-700"
             >
               {attachment.filename}
-              <span className="ml-2 text-xs font-normal text-stone-500">
+              <span className="ml-2 text-xs font-normal text-[#9AA096]">
                 {attachment.mime} / {formatBytes(attachment.size)}
               </span>
             </a>
@@ -304,17 +305,29 @@ export function MilestonesPanel({
   projectId: string;
   milestones: MilestoneItem[];
 }) {
+  const completed = milestones.filter(
+    (milestone) => milestone.status === "completed",
+  ).length;
+  const total = milestones.length;
+
   return (
-    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div className="space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-stone-800">Milestones</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Milestones{" "}
+          {total > 0 ? (
+            <span className="font-medium text-[#B0ACA2]">
+              {completed} of {total}
+            </span>
+          ) : null}
+        </h2>
         <details className="relative">
-          <summary className="inline-flex h-8 cursor-pointer list-none items-center justify-center rounded-md border border-stone-300 bg-white px-2 text-sm font-medium text-stone-700 transition hover:border-stone-400 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
             Add
           </summary>
           <form
             action={addMilestone}
-            className="absolute right-0 z-10 mt-2 flex w-80 max-w-[calc(100vw-2rem)] gap-2 rounded-md border border-stone-200 bg-white p-2 shadow-lg"
+            className="absolute right-0 z-10 mt-2 flex w-80 max-w-[calc(100vw-2rem)] gap-2 rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
           >
             <input type="hidden" name="projectId" value={projectId} />
             <label className="sr-only" htmlFor="milestone-title">
@@ -324,31 +337,48 @@ export function MilestonesPanel({
               id="milestone-title"
               name="title"
               required
-              className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="h-10 min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
             />
-            <button className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800">
+            <button className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800">
               Add
             </button>
           </form>
         </details>
       </div>
-      <div className="divide-y divide-stone-100">
+      {milestones.length === 0 ? null : (
+      <div className="divide-y divide-[#EEF1EC]">
         {milestones.map((milestone) => (
-          <div key={milestone.id} className="flex items-center gap-2 py-2">
+          <div key={milestone.id} className="flex items-center gap-2.5 py-2">
             <form action={completeMilestone}>
               <input type="hidden" name="milestoneId" value={milestone.id} />
               <button
-                className="h-7 rounded-md border border-stone-300 px-2 text-xs text-stone-700 transition hover:border-teal-500"
+                title={milestone.status === "completed" ? "Completed" : "Complete milestone"}
+                aria-label={
+                  milestone.status === "completed"
+                    ? "Completed"
+                    : "Complete milestone"
+                }
+                className={
+                  milestone.status === "completed"
+                    ? "grid h-7 w-7 place-items-center rounded-full bg-[#F0F5F1] text-teal-700"
+                    : "grid h-7 w-7 place-items-center rounded-full border border-[#E2E6DF] text-transparent transition hover:border-teal-700/50 hover:text-teal-700"
+                }
                 disabled={milestone.status === "completed"}
               >
-                {milestone.status === "completed" ? "Done" : "Complete"}
+                <Check size={13} />
               </button>
             </form>
-            <p className="min-w-0 flex-1 text-sm font-medium text-stone-800">
+            <p
+              className={`min-w-0 flex-1 text-sm ${
+                milestone.status === "completed"
+                  ? "text-stone-500"
+                  : "font-medium text-stone-900"
+              }`}
+            >
               {milestone.title}
             </p>
             {milestone.status === "open" ? (
-              <div className="flex gap-1">
+              <div className="flex gap-0.5">
                 <MoveButton milestoneId={milestone.id} direction="up" label="Up" />
                 <MoveButton
                   milestoneId={milestone.id}
@@ -359,7 +389,8 @@ export function MilestonesPanel({
             ) : null}
           </div>
         ))}
-        </div>
+      </div>
+      )}
     </div>
   );
 }
@@ -377,8 +408,12 @@ function MoveButton({
     <form action={moveMilestone}>
       <input type="hidden" name="milestoneId" value={milestoneId} />
       <input type="hidden" name="direction" value={direction} />
-      <button className="h-7 rounded-md border border-stone-300 px-2 text-xs text-stone-700 transition hover:border-stone-400">
-        {label}
+      <button
+        title={label}
+        aria-label={`Move ${direction}`}
+        className="grid h-7 w-7 place-items-center rounded-full text-[#B0ACA2] transition hover:bg-[#F7F9F5] hover:text-stone-700"
+      >
+        {direction === "up" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
     </form>
   );

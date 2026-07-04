@@ -64,11 +64,11 @@ export function AttachmentUpload({
 
   return (
     <div className="space-y-2">
-      <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700">
+      <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700">
         {pending ? "Uploading" : "Upload file"}
         <input type="file" className="sr-only" onChange={upload} />
       </label>
-      {message ? <p className="text-sm text-stone-600">{message}</p> : null}
+      {message ? <p className="text-[13px] text-[#6B7268]">{message}</p> : null}
     </div>
   );
 }
