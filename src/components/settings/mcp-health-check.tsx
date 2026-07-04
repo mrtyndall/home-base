@@ -16,14 +16,19 @@ export function McpHealthCheck() {
     setChecking(true);
     const startedAt = performance.now();
     try {
-      const response = await fetch("/api/settings/mcp-health", { cache: "no-store" });
+      const response = await fetch("/api/settings/mcp-health", {
+        cache: "no-store",
+      });
       const body = (await response.json()) as {
         ok: boolean;
         unreachable?: boolean;
         httpStatus?: number;
       };
       if (body.ok) {
-        setResult({ kind: "ok", latencyMs: Math.round(performance.now() - startedAt) });
+        setResult({
+          kind: "ok",
+          latencyMs: Math.round(performance.now() - startedAt),
+        });
       } else if (body.unreachable) {
         setResult({ kind: "unreachable" });
       } else {
@@ -54,20 +59,29 @@ export function McpHealthCheck() {
 function describe(result: HealthResult) {
   switch (result.kind) {
     case "ok":
-      return <span className="text-teal-700">MCP server is healthy ({result.latencyMs}ms).</span>;
+      return (
+        <span className="text-teal-700">
+          MCP server is healthy ({result.latencyMs}ms).
+        </span>
+      );
     case "unhealthy":
       return (
         <span className="text-amber-800">
-          MCP server responded{result.httpStatus ? ` with HTTP ${result.httpStatus}` : ""} but is not healthy.
+          MCP server responded
+          {result.httpStatus ? ` with HTTP ${result.httpStatus}` : ""} but is
+          not healthy.
         </span>
       );
     case "unreachable":
       return (
         <span className="text-stone-600">
-          MCP server is not reachable from this app server. It runs beside the local runtime, not on Railway.
+          MCP server is not reachable from this app server. It runs beside the
+          local runtime, not on Railway.
         </span>
       );
     case "error":
-      return <span className="text-amber-800">Health check request failed.</span>;
+      return (
+        <span className="text-amber-800">Health check request failed.</span>
+      );
   }
 }

@@ -1,12 +1,18 @@
 "use client";
 
 import { useActionState } from "react";
-import { sendPushoverTest, type SettingsActionResult } from "@/app/settings/actions";
+import {
+  sendPushoverTest,
+  type SettingsActionResult,
+} from "@/app/settings/actions";
 
 const idleState: SettingsActionResult = { status: "idle", message: "" };
 
 export function PushoverTestButton() {
-  const [state, formAction, pending] = useActionState(sendPushoverTest, idleState);
+  const [state, formAction, pending] = useActionState(
+    sendPushoverTest,
+    idleState,
+  );
 
   return (
     <form action={formAction} className="space-y-2">

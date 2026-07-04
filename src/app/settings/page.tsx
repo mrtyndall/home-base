@@ -35,12 +35,15 @@ export default async function SettingsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { calendarSync, calendarConnected, apiKeys, lastReminderSentAt } = result;
+  const { calendarSync, calendarConnected, apiKeys, lastReminderSentAt } =
+    result;
   const googleMissing = GOOGLE_ENV_VARS.filter((name) => !process.env[name]);
-  const pushoverMissing = PUSHOVER_ENV_VARS.filter((name) => !process.env[name]);
+  const pushoverMissing = PUSHOVER_ENV_VARS.filter(
+    (name) => !process.env[name],
+  );
   const redirectUriMismatch = Boolean(
     process.env.GOOGLE_REDIRECT_URI &&
-      process.env.GOOGLE_REDIRECT_URI !== REQUIRED_REDIRECT_URI,
+    process.env.GOOGLE_REDIRECT_URI !== REQUIRED_REDIRECT_URI,
   );
   const google = describeGoogleStatus({
     missingCount: googleMissing.length,
@@ -71,8 +74,8 @@ export default async function SettingsPage() {
             <p className="text-[13px] text-stone-600">{google.detail}</p>
             {calendarSync?.lastSyncedAt ? (
               <p className="text-[13px] text-stone-600">
-                Last sync attempt {formatShortDate(calendarSync.lastSyncedAt)} at{" "}
-                {formatTime(calendarSync.lastSyncedAt)}.
+                Last sync attempt {formatShortDate(calendarSync.lastSyncedAt)}{" "}
+                at {formatTime(calendarSync.lastSyncedAt)}.
               </p>
             ) : null}
             {calendarSync?.status === "failed" && calendarSync.error ? (
@@ -88,7 +91,8 @@ export default async function SettingsPage() {
               <CopyLine value={REQUIRED_REDIRECT_URI} />
               {redirectUriMismatch ? (
                 <p className="text-xs text-amber-800">
-                  GOOGLE_REDIRECT_URI is set to a different value than the URI above.
+                  GOOGLE_REDIRECT_URI is set to a different value than the URI
+                  above.
                 </p>
               ) : null}
             </div>
@@ -104,7 +108,9 @@ export default async function SettingsPage() {
 
           <IntegrationCard
             title="Pushover"
-            status={pushoverMissing.length === 0 ? "Configured" : "Missing variables"}
+            status={
+              pushoverMissing.length === 0 ? "Configured" : "Missing variables"
+            }
             tone={pushoverMissing.length === 0 ? "good" : "attention"}
           >
             {pushoverMissing.length === 0 ? (
@@ -120,8 +126,9 @@ export default async function SettingsPage() {
             ) : (
               <>
                 <p className="text-[13px] text-stone-600">
-                  Add the missing variables to Railway variables (or the local env) to
-                  enable reminder delivery. Values live in 1Password, never in the repo.
+                  Add the missing variables to Railway variables (or the local
+                  env) to enable reminder delivery. Values live in 1Password,
+                  never in the repo.
                 </p>
                 <MissingVariables names={pushoverMissing} />
               </>
@@ -150,24 +157,29 @@ export default async function SettingsPage() {
                         ) : null}
                       </p>
                       <p className="text-xs text-[#9AA096]">
-                        {normalizeScopes(key.scopes).join(", ") || "no scopes"} ·{" "}
-                        {key.rateLimit}/hr writes ·{" "}
+                        {normalizeScopes(key.scopes).join(", ") || "no scopes"}{" "}
+                        · {key.rateLimit}/hr writes ·{" "}
                         {key.lastUsedAt
                           ? `last used ${formatShortDate(key.lastUsedAt)} at ${formatTime(key.lastUsedAt)}`
                           : "never used"}
                       </p>
                     </div>
-                    {!key.revokedAt ? <ApiKeyRevokeButton keyId={key.id} /> : null}
+                    {!key.revokedAt ? (
+                      <ApiKeyRevokeButton keyId={key.id} />
+                    ) : null}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[13px] text-stone-600">No API keys are registered.</p>
+              <p className="text-[13px] text-stone-600">
+                No API keys are registered.
+              </p>
             )}
             <div className="space-y-1 border-t border-[#EEF1EC] pt-3">
               <p className="text-[13px] text-stone-600">
-                New keys are created from the command line so the token itself never
-                passes through this page. Set <code className="font-mono text-xs">HOME_BASE_API_TOKEN</code>{" "}
+                New keys are created from the command line so the token itself
+                never passes through this page. Set{" "}
+                <code className="font-mono text-xs">HOME_BASE_API_TOKEN</code>{" "}
                 from 1Password, then run:
               </p>
               <CopyLine value="npm run api:key:register -- <label> read,write,capture [rateLimit]" />
@@ -183,8 +195,8 @@ export default async function SettingsPage() {
             tone="neutral"
           >
             <p className="text-[13px] text-stone-600">
-              The MCP server wraps the REST API over streamable HTTP and runs beside
-              the local runtime, separate from the web app.
+              The MCP server wraps the REST API over streamable HTTP and runs
+              beside the local runtime, separate from the web app.
             </p>
             <dl className="space-y-1.5">
               <McpRoute label="Local" value="http://127.0.0.1:8081/api/mcp" />
@@ -229,7 +241,9 @@ function IntegrationCard({
     <article className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[15px] font-medium text-stone-950">{title}</h3>
-        <p className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${toneText}`}>
+        <p
+          className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${toneText}`}
+        >
           <span className={`inline-block ${toneDot}`} aria-hidden="true" />
           {status}
         </p>
@@ -291,7 +305,8 @@ function describeGoogleStatus({
     return {
       status: "Ready to connect",
       tone: "neutral",
-      detail: "Credentials are present. Connect the Google account to start sync.",
+      detail:
+        "Credentials are present. Connect the Google account to start sync.",
     };
   }
 
@@ -329,18 +344,26 @@ function describeGoogleStatus({
 
 async function loadSettings() {
   try {
-    const [calendarSync, calendarToken, apiKeys, lastReminder] = await Promise.all([
-      prisma.calendarSyncState.findUnique({ where: { id: "google-primary" } }),
-      prisma.calendarOAuthToken.findUnique({ where: { id: "google-primary" } }),
-      prisma.apiKey.findMany({
-        orderBy: [{ revokedAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
-      }),
-      prisma.reminderDelivery.findFirst({
-        where: { deliveryStatus: "sent" },
-        orderBy: { sentAt: "desc" },
-        select: { sentAt: true },
-      }),
-    ]);
+    const [calendarSync, calendarToken, apiKeys, lastReminder] =
+      await Promise.all([
+        prisma.calendarSyncState.findUnique({
+          where: { id: "google-primary" },
+        }),
+        prisma.calendarOAuthToken.findUnique({
+          where: { id: "google-primary" },
+        }),
+        prisma.apiKey.findMany({
+          orderBy: [
+            { revokedAt: { sort: "asc", nulls: "first" } },
+            { createdAt: "desc" },
+          ],
+        }),
+        prisma.reminderDelivery.findFirst({
+          where: { deliveryStatus: "sent" },
+          orderBy: { sentAt: "desc" },
+          select: { sentAt: true },
+        }),
+      ]);
 
     return {
       ok: true as const,
