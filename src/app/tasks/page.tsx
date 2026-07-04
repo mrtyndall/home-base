@@ -130,12 +130,16 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   return (
     <div className="space-y-5">
-      <header>
+      <header className="space-y-3 lg:flex lg:items-start lg:justify-between lg:gap-5 lg:space-y-0">
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Tasks
         </h1>
+        <TaskQuickAdd
+          areaGroups={areaGroups}
+          projects={projectOptions}
+          className="lg:w-[400px] lg:shrink-0"
+        />
       </header>
-      <TaskQuickAdd areaGroups={areaGroups} projects={projectOptions} />
       <div className="flex flex-wrap items-center gap-2">
         <ViewControl
           selectedView={selectedView}
@@ -154,23 +158,24 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           starredOnly={starredOnly}
           view={selectedView}
         />
+        {selectedView === "schedule" ? (
+          <SectionJumps
+            className="lg:ml-auto"
+            selectedDomainIds={selectedDomainIds}
+            selectedProjectIds={selectedProjectIds}
+            selectedSection={selectedSection}
+            starredOnly={starredOnly}
+            todayCount={sections.today.length}
+            tomorrowCount={sections.tomorrow.length}
+            upcomingCount={sections.upcoming.reduce(
+              (total, group) => total + group.tasks.length,
+              0,
+            )}
+            somedayCount={sections.someday.length}
+            unscheduledCount={sections.noDate.length}
+          />
+        ) : null}
       </div>
-      {selectedView === "schedule" ? (
-        <SectionJumps
-          selectedDomainIds={selectedDomainIds}
-          selectedProjectIds={selectedProjectIds}
-          selectedSection={selectedSection}
-          starredOnly={starredOnly}
-          todayCount={sections.today.length}
-          tomorrowCount={sections.tomorrow.length}
-          upcomingCount={sections.upcoming.reduce(
-            (total, group) => total + group.tasks.length,
-            0,
-          )}
-          somedayCount={sections.someday.length}
-          unscheduledCount={sections.noDate.length}
-        />
-      ) : null}
       {selectedView === "open" || selectedView === "all" ? (
         <AllOpenSection
           tasks={visibleTasks}
@@ -191,35 +196,37 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       {selectedView === "routines" ? (
         <RoutinesView routines={routines} />
       ) : null}
-      {selectedView === "schedule" &&
-      (selectedSection === "all" || selectedSection === "today") ? (
-        <TaskSection
-          title="Today"
-          empty="No tasks due today."
-          anchor="today"
-          targetDate={today}
-          tasks={sections.today}
-          today={today}
-          tomorrow={tomorrow}
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          slipDays={slipDays}
-        />
-      ) : null}
-      {selectedView === "schedule" &&
-      (selectedSection === "all" || selectedSection === "tomorrow") ? (
-        <TaskSection
-          title="Tomorrow"
-          empty="No tasks due tomorrow."
-          anchor="tomorrow"
-          targetDate={tomorrow}
-          tasks={sections.tomorrow}
-          today={today}
-          tomorrow={tomorrow}
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          slipDays={slipDays}
-        />
+      {selectedView === "schedule" ? (
+        <div className="grid gap-7 lg:grid-cols-2">
+          {selectedSection === "all" || selectedSection === "today" ? (
+            <TaskSection
+              title="Today"
+              empty="No tasks due today."
+              anchor="today"
+              targetDate={today}
+              tasks={sections.today}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projectOptions}
+              slipDays={slipDays}
+            />
+          ) : null}
+          {selectedSection === "all" || selectedSection === "tomorrow" ? (
+            <TaskSection
+              title="Tomorrow"
+              empty="No tasks due tomorrow."
+              anchor="tomorrow"
+              targetDate={tomorrow}
+              tasks={sections.tomorrow}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projectOptions}
+              slipDays={slipDays}
+            />
+          ) : null}
+        </div>
       ) : null}
       {selectedView === "schedule" &&
       (selectedSection === "all" || selectedSection === "upcoming") ? (
@@ -267,6 +274,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 }
 
 function SectionJumps({
+  className = "",
   selectedDomainIds,
   selectedProjectIds,
   selectedSection,
@@ -277,6 +285,7 @@ function SectionJumps({
   somedayCount,
   unscheduledCount,
 }: {
+  className?: string;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
@@ -316,7 +325,7 @@ function SectionJumps({
   return (
     <nav
       aria-label="Task sections"
-      className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 text-sm"
+      className={`flex flex-wrap items-baseline gap-x-4 gap-y-1.5 text-sm ${className}`}
     >
       {[allLink, ...links].map((item) => {
         const { href, label, count, hasItems } = item;

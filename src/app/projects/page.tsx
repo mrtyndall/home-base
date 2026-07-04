@@ -89,7 +89,7 @@ function ProjectShelf({
       {projects.length === 0 ? (
         <p className="text-sm text-[#6B7268]">{empty}</p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}

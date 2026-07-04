@@ -28,9 +28,11 @@ export type QuickAddAreaGroup = {
 export function TaskQuickAdd({
   areaGroups = [],
   projects = [],
+  className = "",
 }: {
   areaGroups?: QuickAddAreaGroup[];
   projects?: QuickAddProject[];
+  className?: string;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -85,7 +87,7 @@ export function TaskQuickAdd({
   }
 
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 ${className}`}>
       <form
         action={createQuickTask}
         onSubmit={handleSubmit}

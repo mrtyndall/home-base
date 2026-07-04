@@ -66,7 +66,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-2xl space-y-6">
       <header className="space-y-3.5">
         <Link
           href="/tasks"

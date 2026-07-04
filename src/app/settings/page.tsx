@@ -54,7 +54,7 @@ export default async function SettingsPage() {
   const activeKeys = apiKeys.filter((key) => !key.revokedAt);
 
   return (
-    <div className="space-y-5">
+    <div className="max-w-2xl space-y-5">
       <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Settings

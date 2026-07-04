@@ -64,112 +64,61 @@ export default async function TodayPage() {
             </section>
           ) : null}
 
-          <TodayRoutinesLine routines={data.routinesDueToday} />
-
-          <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-2.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <SectionHeader title="Today's calendar" />
-                <CalendarSyncMeta data={data.calendarSync} />
-              </div>
-              {data.todayEvents.length === 0 ? (
-                <EmptyLine text="No calendar events today." />
-              ) : (
-                <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-                  {data.todayEvents.map((event) => {
-                    const hasPassed =
-                      event.end.getTime() <= data.generatedAt.getTime();
-                    const quietClass = hasPassed
-                      ? "text-stone-400 line-through"
-                      : "text-stone-500";
-                    return (
-                      <div
-                        key={event.id}
-                        className="flex items-baseline gap-3 px-4 py-3"
-                      >
-                        <p className={`min-w-14 text-sm ${quietClass}`}>
-                          {formatTime(event.start)}
-                        </p>
-                        <div className="min-w-0">
-                          <h3
-                            className={`text-[15px] font-medium ${
-                              hasPassed ? "text-stone-400 line-through" : ""
-                            }`}
-                          >
-                            {event.title}
-                          </h3>
-                          {event.location ? (
-                            <p className={`mt-0.5 text-sm ${quietClass}`}>
-                              {event.location}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
+          <section className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+            <div className="space-y-7">
+              <div className="space-y-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <SectionHeader title="Today's calendar" />
+                  <CalendarSyncMeta data={data.calendarSync} />
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-2.5">
-              <SectionHeader title="Due today" />
-              <TaskDropZone
-                targetDate={data.today}
-                label="Today"
-                isEmpty={data.dueToday.length === 0}
-                emptyText="No tasks due today."
-              >
-                {data.dueToday.map((task) => (
-                  <TodayTaskRow
-                    key={task.id}
-                    task={task}
-                    today={data.today}
-                    tomorrow={data.tomorrow}
-                  />
-                ))}
-              </TaskDropZone>
-            </div>
-          </section>
-
-          <RecentCapturesStrip
-            captures={data.recentCaptures}
-            domains={data.domains}
-          />
-
-          <section className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2.5">
-              <SectionHeader title="Tomorrow" />
-              <div className="space-y-2">
-                {data.tomorrowEvents.length > 0 ? (
+                {data.todayEvents.length === 0 ? (
+                  <EmptyLine text="No calendar events today." />
+                ) : (
                   <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-                    {data.tomorrowEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-baseline gap-3 px-4 py-3"
-                      >
-                        <p className="min-w-14 text-sm text-stone-500">
-                          {formatTime(event.start)}
-                        </p>
-                        <div className="min-w-0">
-                          <h3 className="text-[15px] font-medium">
-                            {event.title}
-                          </h3>
+                    {data.todayEvents.map((event) => {
+                      const hasPassed =
+                        event.end.getTime() <= data.generatedAt.getTime();
+                      const quietClass = hasPassed
+                        ? "text-stone-400 line-through"
+                        : "text-stone-500";
+                      return (
+                        <div
+                          key={event.id}
+                          className="flex items-baseline gap-3 px-4 py-3"
+                        >
+                          <p className={`min-w-14 text-sm ${quietClass}`}>
+                            {formatTime(event.start)}
+                          </p>
+                          <div className="min-w-0">
+                            <h3
+                              className={`text-[15px] font-medium ${
+                                hasPassed ? "text-stone-400 line-through" : ""
+                              }`}
+                            >
+                              {event.title}
+                            </h3>
+                            {event.location ? (
+                              <p className={`mt-0.5 text-sm ${quietClass}`}>
+                                {event.location}
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                ) : null}
+                )}
+              </div>
+
+              <div className="space-y-2.5">
+                <SectionHeader title="Due today" />
                 <TaskDropZone
-                  targetDate={data.tomorrow}
-                  label="Tomorrow"
-                  isEmpty={data.dueTomorrow.length === 0}
-                  emptyText={
-                    data.tomorrowEvents.length === 0
-                      ? "Nothing due tomorrow."
-                      : "No tasks due tomorrow."
-                  }
+                  targetDate={data.today}
+                  label="Today"
+                  isEmpty={data.dueToday.length === 0}
+                  emptyText="No tasks due today."
                 >
-                  {data.dueTomorrow.map((task) => (
+                  {data.dueToday.map((task) => (
                     <TodayTaskRow
                       key={task.id}
                       task={task}
@@ -178,32 +127,82 @@ export default async function TodayPage() {
                     />
                   ))}
                 </TaskDropZone>
+              </div>
+
+              <div className="space-y-2.5">
+                <SectionHeader title="Tomorrow" />
+                <div className="space-y-2">
+                  {data.tomorrowEvents.length > 0 ? (
+                    <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+                      {data.tomorrowEvents.map((event) => (
+                        <div
+                          key={event.id}
+                          className="flex items-baseline gap-3 px-4 py-3"
+                        >
+                          <p className="min-w-14 text-sm text-stone-500">
+                            {formatTime(event.start)}
+                          </p>
+                          <div className="min-w-0">
+                            <h3 className="text-[15px] font-medium">
+                              {event.title}
+                            </h3>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <TaskDropZone
+                    targetDate={data.tomorrow}
+                    label="Tomorrow"
+                    isEmpty={data.dueTomorrow.length === 0}
+                    emptyText={
+                      data.tomorrowEvents.length === 0
+                        ? "Nothing due tomorrow."
+                        : "No tasks due tomorrow."
+                    }
+                  >
+                    {data.dueTomorrow.map((task) => (
+                      <TodayTaskRow
+                        key={task.id}
+                        task={task}
+                        today={data.today}
+                        tomorrow={data.tomorrow}
+                      />
+                    ))}
+                  </TaskDropZone>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2.5">
-              <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
-                <SectionHeader title="Task inbox" />
-                <TaskDropZone
-                  targetDate={null}
-                  label="Task inbox"
-                  isEmpty={data.taskInbox.length === 0}
-                  emptyText="No unscheduled tasks."
-                >
-                  {data.taskInbox.map((task) => (
-                    <TodayTaskRow
-                      key={task.id}
-                      task={task}
-                      today={data.today}
-                      tomorrow={data.tomorrow}
-                    />
-                  ))}
-                </TaskDropZone>
+            <div className="space-y-7">
+              <TodayRoutinesLine routines={data.routinesDueToday} />
+              <RecentCapturesStrip
+                captures={data.recentCaptures}
+                domains={data.domains}
+              />
+              <div className="space-y-2.5">
+                <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
+                  <SectionHeader title="Task inbox" />
+                  <TaskDropZone
+                    targetDate={null}
+                    label="Task inbox"
+                    isEmpty={data.taskInbox.length === 0}
+                    emptyText="No unscheduled tasks."
+                  >
+                    {data.taskInbox.map((task) => (
+                      <TodayTaskRow
+                        key={task.id}
+                        task={task}
+                        today={data.today}
+                        tomorrow={data.tomorrow}
+                      />
+                    ))}
+                  </TaskDropZone>
+                </div>
               </div>
+              <ResurfacedMemory item={data.resurfacedItem} />
             </div>
           </section>
-
-          <ResurfacedMemory item={data.resurfacedItem} />
         </>
       )}
     </div>

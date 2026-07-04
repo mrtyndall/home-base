@@ -49,9 +49,11 @@ export default async function AreaPage({ params }: AreaPageProps) {
 
   const { area, pendingCaptures, reviews, domains } = result;
 
+  const latestCheckIn = area.checkIns[0] ?? null;
+
   return (
     <div className="space-y-6">
-      <header className="space-y-3">
+      <header className="space-y-3 lg:border-b lg:border-[#DDE2DA] lg:pb-5">
         <Link
           href="/projects"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
@@ -67,85 +69,112 @@ export default async function AreaPage({ params }: AreaPageProps) {
             >
               {area.domain.name}
             </Link>
-            <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950">
+            <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950 lg:text-[32px]">
               {area.name}
             </h1>
             <p className="mt-1.5 text-[13px] text-stone-500">
               {area.status.charAt(0).toUpperCase() + area.status.slice(1)}
               {area.tendingCadence ? ` · tend ${area.tendingCadence}` : ""}
             </p>
+            {latestCheckIn ? (
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-stone-700">
+                {checkInSnippet(latestCheckIn.bodyMd, 160)}
+              </p>
+            ) : null}
           </div>
           <AreaOverflowMenu areaId={area.id} status={area.status} />
         </div>
       </header>
 
       {area.id === "area_inbox" ? (
-        <NeedsReviewPanel reviews={reviews} domains={domains} />
-      ) : null}
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+          <div className="space-y-6">
+            <NeedsReviewPanel reviews={reviews} domains={domains} />
+            <PendingCapturesPanel
+              captures={pendingCaptures}
+              domains={domains}
+            />
+          </div>
+          <div className="space-y-6">
+            <CheckInFeed
+              parentType="area"
+              parentId={area.id}
+              checkIns={area.checkIns}
+            />
+            <EntityDepth
+              parentType="area"
+              parentId={area.id}
+              notes={area.notes}
+              docs={area.docs}
+              attachments={area.attachments}
+              variant="project"
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+          <div className="space-y-6">
+            <CheckInFeed
+              parentType="area"
+              parentId={area.id}
+              checkIns={area.checkIns}
+            />
+            <Panel title="Standing tasks">
+              {area.tasks.map((task) => (
+                <Link
+                  key={task.id}
+                  href={`/tasks/${task.id}`}
+                  className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
+                >
+                  {task.title}
+                </Link>
+              ))}
+            </Panel>
+          </div>
+          <div className="space-y-6">
+            <Panel title="Projects">
+              {area.projects.map((project) => (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
+                >
+                  <p className="text-sm font-medium text-stone-800">
+                    {project.name}
+                  </p>
+                  {project.latestCheckIn ? (
+                    <p className="mt-0.5 text-xs text-[#9AA096]">
+                      {checkInSnippet(project.latestCheckIn.bodyMd, 100)} ·{" "}
+                      {formatShortDate(project.latestCheckIn.createdAt)}
+                    </p>
+                  ) : null}
+                </Link>
+              ))}
+            </Panel>
 
-      <CheckInFeed
-        parentType="area"
-        parentId={area.id}
-        checkIns={area.checkIns}
-      />
+            <Panel title="Linked ideas">
+              {area.ideas.map((idea) => (
+                <Link
+                  key={idea.id}
+                  href="/ideas"
+                  className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
+                >
+                  {idea.title}
+                </Link>
+              ))}
+            </Panel>
 
-      {area.id === "area_inbox" ? (
-        <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
-      ) : null}
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Standing tasks">
-          {area.tasks.map((task) => (
-            <Link
-              key={task.id}
-              href={`/tasks/${task.id}`}
-              className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
-            >
-              {task.title}
-            </Link>
-          ))}
-        </Panel>
-
-        <Panel title="Projects">
-          {area.projects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
-            >
-              <p className="text-sm font-medium text-stone-800">
-                {project.name}
-              </p>
-              {project.latestCheckIn ? (
-                <p className="mt-0.5 text-xs text-[#9AA096]">
-                  {checkInSnippet(project.latestCheckIn.bodyMd, 100)} ·{" "}
-                  {formatShortDate(project.latestCheckIn.createdAt)}
-                </p>
-              ) : null}
-            </Link>
-          ))}
-        </Panel>
-
-        <Panel title="Linked ideas">
-          {area.ideas.map((idea) => (
-            <Link
-              key={idea.id}
-              href="/ideas"
-              className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
-            >
-              {idea.title}
-            </Link>
-          ))}
-        </Panel>
-      </section>
-
-      <EntityDepth
-        parentType="area"
-        parentId={area.id}
-        notes={area.notes}
-        docs={area.docs}
-        attachments={area.attachments}
-      />
+            <EntityDepth
+              parentType="area"
+              parentId={area.id}
+              notes={area.notes}
+              docs={area.docs}
+              attachments={area.attachments}
+              variant="project"
+            />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

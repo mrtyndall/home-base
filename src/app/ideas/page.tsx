@@ -25,89 +25,106 @@ export default async function LibraryPage() {
           Library
         </h1>
       </header>
-      <JournalSection entries={journalEntries} />
-      <PeopleSection people={people} />
-      <section className="space-y-2.5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          Ideas
-        </h2>
-        {ideas.length === 0 ? (
-          <p className="text-sm text-[#6B7268]">No active ideas.</p>
-        ) : (
-          ideas.map((idea) => (
-            <details
-              key={idea.id}
-              className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
-            >
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                      {idea.project?.area.domain.name ??
-                        idea.area?.domain.name ??
-                        "Inbox"}
-                      {" / "}
-                      {idea.project?.name ?? idea.area?.name ?? idea.status}
-                    </p>
-                    <h2 className="mt-1 text-[16px] font-medium leading-snug text-stone-950">
-                      {idea.title}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-[#9AA096]">
-                    {formatShortDate(idea.updatedAt)}
+      <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">
+        <JournalSection entries={journalEntries} />
+        <div className="space-y-8">
+          <PeopleSection people={people} />
+          <IdeasSection ideas={ideas} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type IdeaListItem =
+  Awaited<ReturnType<typeof loadIdeas>> extends infer Result
+    ? Result extends { ok: true; ideas: Array<infer Idea> }
+      ? Idea
+      : never
+    : never;
+
+function IdeasSection({ ideas }: { ideas: IdeaListItem[] }) {
+  return (
+    <section className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Ideas
+      </h2>
+      {ideas.length === 0 ? (
+        <p className="text-sm text-[#6B7268]">No active ideas.</p>
+      ) : (
+        ideas.map((idea) => (
+          <details
+            key={idea.id}
+            className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+          >
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                    {idea.project?.area.domain.name ??
+                      idea.area?.domain.name ??
+                      "Inbox"}
+                    {" / "}
+                    {idea.project?.name ?? idea.area?.name ?? idea.status}
                   </p>
+                  <h2 className="mt-1 text-[16px] font-medium leading-snug text-stone-950">
+                    {idea.title}
+                  </h2>
                 </div>
-                {idea.body ? (
-                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-600">
+                <p className="text-xs text-[#9AA096]">
+                  {formatShortDate(idea.updatedAt)}
+                </p>
+              </div>
+              {idea.body ? (
+                <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-600">
+                  {idea.body}
+                </p>
+              ) : null}
+            </summary>
+
+            <div className="mt-3.5 space-y-3.5 border-t border-[#EEF1EC] pt-3.5">
+              {idea.body ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                    Body
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">
                     {idea.body}
                   </p>
-                ) : null}
-              </summary>
-
-              <div className="mt-3.5 space-y-3.5 border-t border-[#EEF1EC] pt-3.5">
-                {idea.body ? (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                      Body
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">
-                      {idea.body}
-                    </p>
-                  </div>
-                ) : null}
-                {idea.notes.length > 0 ? (
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                      Notes
-                    </p>
-                    <div className="mt-2 divide-y divide-[#EEF1EC]">
-                      {idea.notes.map((note) => (
-                        <div key={note.id} className="py-2">
-                          <p className="whitespace-pre-wrap text-sm text-stone-800">
-                            {note.body}
-                          </p>
-                          <p className="mt-1 text-xs text-[#9AA096]">
-                            {formatShortDate(note.createdAt)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#9AA096]">
-                  <span>{idea.status}</span>
-                  <span>Created {formatShortDate(idea.createdAt)}</span>
-                  {idea.captureId ? <span>Linked capture</span> : null}
-                  {idea.tags.length > 0 ? (
-                    <span>{idea.tags.join(", ")}</span>
-                  ) : null}
                 </div>
+              ) : null}
+              {idea.notes.length > 0 ? (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                    Notes
+                  </p>
+                  <div className="mt-2 divide-y divide-[#EEF1EC]">
+                    {idea.notes.map((note) => (
+                      <div key={note.id} className="py-2">
+                        <p className="whitespace-pre-wrap text-sm text-stone-800">
+                          {note.body}
+                        </p>
+                        <p className="mt-1 text-xs text-[#9AA096]">
+                          {formatShortDate(note.createdAt)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#9AA096]">
+                <span>{idea.status}</span>
+                <span>Created {formatShortDate(idea.createdAt)}</span>
+                {idea.captureId ? <span>Linked capture</span> : null}
+                {idea.tags.length > 0 ? (
+                  <span>{idea.tags.join(", ")}</span>
+                ) : null}
               </div>
-            </details>
-          ))
-        )}
-      </section>
-    </div>
+            </div>
+          </details>
+        ))
+      )}
+    </section>
   );
 }
 

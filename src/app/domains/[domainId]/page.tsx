@@ -98,7 +98,7 @@ export default async function DomainPage({ params }: DomainPageProps) {
         {areas.length === 0 ? (
           <p className="text-sm text-[#6B7268]">No areas in this domain.</p>
         ) : (
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
             {areas.map((area) => (
               <Link
                 key={area.id}

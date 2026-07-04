@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Archive, ArrowRight, CheckCircle2, Repeat } from "lucide-react";
 import { SetupNotice } from "@/components/setup-notice";
-import { HomeRoutineCheck, HomeTaskActions } from "@/components/home-action-buttons";
+import {
+  HomeRoutineCheck,
+  HomeTaskActions,
+} from "@/components/home-action-buttons";
 import { CaptureFileActions } from "@/components/capture-file-actions";
 import { prisma } from "@/lib/db";
 import {
@@ -58,25 +61,29 @@ export default async function HomePage() {
         slippingProjectCount={homeData.slippingProjectCount}
       />
 
-      {todayData.topTasks.length > 0 ? (
-        <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
-          <SectionHeader title="Top tasks" href="/tasks?starred=1" />
+      <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+        <div className="space-y-5 lg:order-2">
+          {todayData.topTasks.length > 0 ? (
+            <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+              <SectionHeader title="Top tasks" href="/tasks?starred=1" />
+              <div className="mt-3 divide-y divide-[#EEF1EC]">
+                {todayData.topTasks.slice(0, 3).map((task) => (
+                  <TaskReceiptRow key={task.id} task={task} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <RoutinesLine routines={todayData.routinesDueToday} />
+        </div>
+
+        <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4 lg:order-1">
+          <SectionHeader title="Today" href="/today" />
           <div className="mt-3 divide-y divide-[#EEF1EC]">
-            {todayData.topTasks.slice(0, 3).map((task) => (
-              <TaskReceiptRow key={task.id} task={task} />
-            ))}
+            <TodayRows data={todayData} />
           </div>
         </section>
-      ) : null}
-
-      <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
-        <SectionHeader title="Today" href="/today" />
-        <div className="mt-3 divide-y divide-[#EEF1EC]">
-          <TodayRows data={todayData} />
-        </div>
-      </section>
-
-      <RoutinesLine routines={todayData.routinesDueToday} />
+      </div>
 
       <PulseRow
         freshCheckInCount={homeData.freshCheckInCount}
@@ -85,12 +92,14 @@ export default async function HomePage() {
         reviewDueCount={homeData.reviewDueCount}
       />
 
-      <RecentCaptures
-        captures={todayData.recentCaptures}
-        domains={todayData.domains}
-      />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <RecentCaptures
+          captures={todayData.recentCaptures}
+          domains={todayData.domains}
+        />
 
-      <MemoryCard item={todayData.resurfacedItem} />
+        <MemoryCard item={todayData.resurfacedItem} />
+      </div>
     </div>
   );
 }
@@ -157,7 +166,9 @@ function TodayRows({ data }: { data: ReadyToday }) {
           href="/today"
           className="block py-3 transition hover:text-teal-700"
         >
-          <p className="text-[15px] font-medium text-stone-950">{event.title}</p>
+          <p className="text-[15px] font-medium text-stone-950">
+            {event.title}
+          </p>
           <p className="mt-0.5 text-[13px] text-[#6B7268]">
             {formatTime(event.start)}
           </p>
@@ -206,7 +217,11 @@ function TaskReceiptRow({ task }: { task: HomeTask }) {
       >
         <p className="text-[15px] font-medium text-stone-950">{task.title}</p>
         <p className="mt-0.5 text-[13px] text-[#6B7268]">
-          {[task.area.name, task.project?.name, task.dueDate ? formatDateOnly(task.dueDate) : null]
+          {[
+            task.area.name,
+            task.project?.name,
+            task.dueDate ? formatDateOnly(task.dueDate) : null,
+          ]
             .filter(Boolean)
             .join(" / ")}
         </p>
@@ -481,13 +496,14 @@ async function getHomeData() {
     }
 
     const slippingProjectCount = activeProjects.filter((project) => {
-      const latest = [
-        project.activity[0]?.createdAt,
-        checkInByProject.get(project.id),
-        taskActivityByProject.get(project.id),
-      ]
-        .filter((date): date is Date => Boolean(date))
-        .sort((left, right) => Number(right) - Number(left))[0] ?? null;
+      const latest =
+        [
+          project.activity[0]?.createdAt,
+          checkInByProject.get(project.id),
+          taskActivityByProject.get(project.id),
+        ]
+          .filter((date): date is Date => Boolean(date))
+          .sort((left, right) => Number(right) - Number(left))[0] ?? null;
       return Boolean(projectLastActivityFact(project, latest));
     }).length;
 
