@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import "./globals.css";
@@ -22,6 +22,13 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: "Home Base",
   description: "Personal operations system",
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#EFF2EE",
 };
 
 export default function RootLayout({
