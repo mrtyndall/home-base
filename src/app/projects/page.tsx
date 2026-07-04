@@ -28,9 +28,15 @@ export default async function ProjectsPage() {
   }
 
   const { projects } = result;
-  const activeProjects = projects.filter((project) => project.status === "active");
-  const somedayProjects = projects.filter((project) => project.status === "someday");
-  const parkedProjects = projects.filter((project) => project.status === "parked");
+  const activeProjects = projects.filter(
+    (project) => project.status === "active",
+  );
+  const somedayProjects = projects.filter(
+    (project) => project.status === "someday",
+  );
+  const parkedProjects = projects.filter(
+    (project) => project.status === "parked",
+  );
 
   return (
     <div className="space-y-7">
@@ -167,34 +173,34 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
         project.targetDate ||
         (project.milestoneCounts && project.milestoneCounts.total > 0) ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#9AA096]">
-          {lastTouched && !slipFact ? (
-            <span>Touched {formatShortDate(lastTouched)}</span>
-          ) : null}
-          {project.targetDate ? (
-            <span>Target {formatDateOnly(project.targetDate)}</span>
-          ) : null}
-          {project.milestoneCounts && project.milestoneCounts.total > 0 ? (
-            <span className="inline-flex items-center gap-1.5">
-              {project.milestoneCounts.completed} of{" "}
-              {project.milestoneCounts.total} milestones
-              {project.milestoneCounts.total <= 8 ? (
-                <span className="inline-flex gap-[3px]" aria-hidden="true">
-                  {Array.from({ length: project.milestoneCounts.total }).map(
-                    (_, index) => (
-                      <span
-                        key={index}
-                        className={`h-[3px] w-[13px] rounded-full ${
-                          index < (project.milestoneCounts?.completed ?? 0)
-                            ? "bg-teal-700"
-                            : "bg-[#E2E6DF]"
-                        }`}
-                      />
-                    ),
-                  )}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
+            {lastTouched && !slipFact ? (
+              <span>Touched {formatShortDate(lastTouched)}</span>
+            ) : null}
+            {project.targetDate ? (
+              <span>Target {formatDateOnly(project.targetDate)}</span>
+            ) : null}
+            {project.milestoneCounts && project.milestoneCounts.total > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                {project.milestoneCounts.completed} of{" "}
+                {project.milestoneCounts.total} milestones
+                {project.milestoneCounts.total <= 8 ? (
+                  <span className="inline-flex gap-[3px]" aria-hidden="true">
+                    {Array.from({ length: project.milestoneCounts.total }).map(
+                      (_, index) => (
+                        <span
+                          key={index}
+                          className={`h-[3px] w-[13px] rounded-full ${
+                            index < (project.milestoneCounts?.completed ?? 0)
+                              ? "bg-teal-700"
+                              : "bg-[#E2E6DF]"
+                          }`}
+                        />
+                      ),
+                    )}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </Link>
@@ -204,7 +210,9 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
 
 type ProjectListItem = Project & {
   area: Area & { domain: Domain };
-  tasks: Array<Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">>;
+  tasks: Array<
+    Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">
+  >;
   activity: Array<Pick<ProjectActivity, "createdAt">>;
   notes: Array<Pick<EntityNote, "bodyMd" | "createdAt">>;
   lastTaskActivity: Date | null;
@@ -234,7 +242,9 @@ function getFreshNote(project: ProjectListItem) {
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const note = project.notes.find((item) => Number(item.createdAt) >= cutoff);
   if (!note) return null;
-  return note.bodyMd.length > 140 ? `${note.bodyMd.slice(0, 137)}...` : note.bodyMd;
+  return note.bodyMd.length > 140
+    ? `${note.bodyMd.slice(0, 137)}...`
+    : note.bodyMd;
 }
 
 async function loadProjects() {
