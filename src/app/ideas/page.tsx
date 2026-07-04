@@ -1,5 +1,7 @@
 import type { JournalEntry, Person } from "@prisma/client";
 import Link from "next/link";
+import { JournalEntryEditor } from "@/components/journal-entry-editor";
+import { MarkdownPreview } from "@/components/markdown-preview";
 import { prisma } from "@/lib/db";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { SetupNotice } from "@/components/setup-notice";
@@ -182,9 +184,19 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
 
   return (
     <section className="space-y-3.5">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        Journal
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Journal
+        </h2>
+        {entries.length > 0 ? (
+          <a
+            href="/api/journal/export"
+            className="inline-flex h-8 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+          >
+            Download .md
+          </a>
+        ) : null}
+      </div>
       {entries.length === 0 ? (
         <p className="text-sm text-[#6B7268]">No journal entries yet.</p>
       ) : (
@@ -199,16 +211,27 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
               </h3>
               <div className="space-y-4">
                 {dateEntries.map((entry) => (
-                  <article key={entry.id}>
-                    <p className="mt-2 whitespace-pre-wrap font-serif text-[17px] leading-[1.65] text-stone-800">
-                      {entry.bodyMd}
-                    </p>
+                  <article key={entry.id} className="py-1">
+                    <MarkdownPreview
+                      body={entry.bodyMd}
+                      className="mt-2 font-serif text-[17px] leading-[1.65] text-stone-800"
+                    />
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#B0ACA2]">
                       <span>{entry.source}</span>
                       {entry.tags.length > 0 ? (
                         <span>{entry.tags.join(" · ")}</span>
                       ) : null}
+                      {entry.updatedAt.getTime() !==
+                      entry.createdAt.getTime() ? (
+                        <span>edited {formatShortDate(entry.updatedAt)}</span>
+                      ) : null}
                     </div>
+                    <JournalEntryEditor
+                      entryId={entry.id}
+                      entryDate={dateInputValue(entry.entryDate)}
+                      bodyMd={entry.bodyMd}
+                      tagsText={entry.tags.join(", ")}
+                    />
                   </article>
                 ))}
               </div>
@@ -218,6 +241,10 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
       )}
     </section>
   );
+}
+
+function dateInputValue(value: Date) {
+  return value.toISOString().slice(0, 10);
 }
 
 async function loadIdeas() {

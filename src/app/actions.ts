@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
+import { normalizeJournalUpdateInput } from "@/lib/journal";
 import { completeRoutineById, undoRoutineCompletionById } from "@/lib/routines";
 import {
   completeTaskById,
@@ -336,6 +337,38 @@ export async function setEntityNoteStarred(formData: FormData) {
   } else {
     revalidatePath(`/projects/${updated.parentId}`);
   }
+}
+
+export async function updateJournalEntry(formData: FormData) {
+  const entryId = getTrimmedString(formData, "entryId");
+  if (!entryId) return;
+
+  const normalized = normalizeJournalUpdateInput({
+    bodyMd: getTrimmedString(formData, "bodyMd"),
+    entryDate: getTrimmedString(formData, "entryDate"),
+    tagsText: getTrimmedString(formData, "tags"),
+  });
+  if (!normalized) return;
+
+  const entry = await prisma.journalEntry.update({
+    where: { id: entryId },
+    data: normalized,
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "journal_entry_updated",
+      title: "Journal entry updated",
+      body:
+        entry.bodyMd.length > 120
+          ? `${entry.bodyMd.slice(0, 117)}...`
+          : entry.bodyMd,
+      sourceRef: { type: "journal_entry", id: entry.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/ideas");
 }
 
 function getTrimmedString(formData: FormData, key: string) {

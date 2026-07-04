@@ -517,6 +517,7 @@ model JournalEntry {
   captureId       String?            @map("capture_id")
   status          JournalEntryStatus @default(active)
   createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
 
