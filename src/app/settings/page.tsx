@@ -20,7 +20,7 @@ const GOOGLE_ENV_VARS = [
   "GOOGLE_TOKEN_ENCRYPTION_KEY",
 ] as const;
 const PUSHOVER_ENV_VARS = ["PUSHOVER_APP_TOKEN", "PUSHOVER_USER_KEY"] as const;
-// Sync runs on a 15-minute cron; four missed windows means something is wrong.
+// Sync runs on a 15-minute cron; four skipped windows means something is wrong.
 const SYNC_STALE_AFTER_MS = 60 * 60_000;
 
 type StatusTone = "good" | "neutral" | "attention";

@@ -25,7 +25,7 @@ export default async function TodayPage() {
       </header>
 
       {!data.ready ? (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
+        <section className="rounded-[14px] border border-amber-300 bg-amber-50 p-4 text-amber-950">
           <div className="flex items-start gap-3">
             <Inbox className="mt-0.5 shrink-0" size={19} />
             <div>
