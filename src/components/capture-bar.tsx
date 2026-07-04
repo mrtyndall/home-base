@@ -164,19 +164,20 @@ export function CaptureBar() {
   }
 
   return (
-    <div className="border-t border-stone-200 bg-stone-50/95 px-4 py-3 shadow-[0_-12px_32px_rgba(30,41,59,0.08)] backdrop-blur">
-      <form
-        onSubmit={onSubmit}
-        className="mx-auto flex w-full max-w-4xl items-center gap-2"
-      >
+    <div className="rounded-[28px] border border-white/65 bg-[#FAFBF9]/60 p-2 shadow-[0_8px_28px_rgba(28,25,23,0.14)] backdrop-blur-xl backdrop-saturate-150">
+      <form onSubmit={onSubmit} className="flex w-full items-center gap-2">
         <button
           type="button"
           onClick={toggleMic}
           title={listening ? "Stop voice capture" : "Start voice capture"}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+          aria-label={listening ? "Stop voice capture" : "Start voice capture"}
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border transition ${
+            listening
+              ? "border-teal-700 bg-white text-teal-700"
+              : "border-[#E2E6DF] bg-white/80 text-stone-700 hover:border-teal-700/50 hover:text-teal-700"
+          }`}
         >
           {listening ? <Square size={18} /> : <Mic size={19} />}
-          {listening ? "Stop" : "Voice"}
         </button>
         <label className="sr-only" htmlFor="capture-text">
           Capture text
@@ -185,23 +186,30 @@ export function CaptureBar() {
           id="capture-text"
           value={rawText}
           onChange={(event) => setRawText(event.target.value)}
-          className="h-11 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          className={`h-11 min-w-0 flex-1 rounded-full border px-4 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:bg-white ${
+            listening
+              ? "border-teal-700 bg-white"
+              : "border-[#E2E6DF] bg-white/80"
+          }`}
         />
         <button
           type="submit"
           title="Send capture"
           disabled={status === "saving" || rawText.trim().length === 0}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-[#D6DBD3]"
         >
           <Send size={18} />
         </button>
       </form>
       {message ? (
-        <div className="mx-auto mt-2 flex max-w-4xl items-start gap-2 text-sm text-stone-700">
+        <div className="flex items-start gap-2 px-3 pb-1.5 pt-2 text-sm text-stone-700">
           {status === "error" ? (
-            <TriangleAlert className="mt-0.5 shrink-0 text-amber-700" size={16} />
+            <TriangleAlert
+              className="mt-0.5 shrink-0 text-amber-700"
+              size={15}
+            />
           ) : (
-            <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={16} />
+            <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={15} />
           )}
           <span>{message}</span>
         </div>

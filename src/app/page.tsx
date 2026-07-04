@@ -3,6 +3,7 @@ import {
   Archive,
   ArrowRight,
   Check,
+  CheckCircle2,
   Repeat,
 } from "lucide-react";
 import { SetupNotice } from "@/components/setup-notice";
@@ -35,11 +36,18 @@ export default async function HomePage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
+  const masthead = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/New_York",
+  }).format(new Date());
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-normal text-stone-950">
-          Home
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          {masthead}
         </h1>
       </header>
 
@@ -55,17 +63,17 @@ export default async function HomePage() {
         slippingProjectCount={homeData.slippingProjectCount}
       />
 
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
         <SectionHeader title="Today" href="/today" />
-        <div className="mt-3 divide-y divide-stone-100">
+        <div className="mt-3 divide-y divide-[#EEF1EC]">
           <TodayRows data={todayData} />
         </div>
       </section>
 
       {todayData.topTasks.length > 0 ? (
-        <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+        <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
           <SectionHeader title="Top tasks" href="/tasks?starred=1" />
-          <div className="mt-3 divide-y divide-stone-100">
+          <div className="mt-3 divide-y divide-[#EEF1EC]">
             {todayData.topTasks.slice(0, 3).map((task) => (
               <TaskReceiptRow key={task.id} task={task} />
             ))}
@@ -112,12 +120,31 @@ function StatusLine({
       : `${slippingProjectCount} project${slippingProjectCount === 1 ? "" : "s"} slipping.`;
 
   return (
-    <section className="rounded-lg border border-teal-300 bg-teal-50 px-5 py-6 text-teal-950 shadow-sm">
-      <p className="text-2xl font-semibold leading-snug tracking-normal sm:text-3xl">
-        {clearThroughTomorrow
-          ? `Nothing due through tomorrow. Next commitment: ${nextCommitment}. ${slippingText}`
-          : `${dueTodayCount} due today · next: ${nextCommitment} · ${slippingText}`}
-      </p>
+    <section className="py-9">
+      <div className="flex items-start gap-3">
+        {clearThroughTomorrow ? (
+          <CheckCircle2 className="mt-1 shrink-0 text-teal-700" size={22} />
+        ) : null}
+        <div className="min-w-0">
+          <p className="font-serif text-[27px] font-medium leading-[1.25] tracking-[-0.01em] text-stone-950">
+            {clearThroughTomorrow
+              ? "Nothing due through tomorrow."
+              : `${dueTodayCount} due today.`}
+          </p>
+          <p className="mt-2 text-[15px] leading-normal text-[#6B7268]">
+            {clearThroughTomorrow
+              ? `Next commitment: ${nextCommitment}. ${slippingText}`
+              : `Next: ${nextCommitment}. ${slippingText}`}
+          </p>
+          <Link
+            href="/today"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 underline-offset-4 transition hover:underline"
+          >
+            Open Today
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }
@@ -132,8 +159,8 @@ function TodayRows({ data }: { data: ReadyToday }) {
           href="/today"
           className="block py-3 transition hover:text-teal-700"
         >
-          <p className="text-sm font-medium text-stone-950">{event.title}</p>
-          <p className="mt-0.5 text-sm text-stone-500">
+          <p className="text-[15px] font-medium text-stone-950">{event.title}</p>
+          <p className="mt-0.5 text-[13px] text-[#6B7268]">
             {formatTime(event.start)}
           </p>
         </Link>
@@ -179,8 +206,8 @@ function TaskReceiptRow({ task }: { task: HomeTask }) {
         href={`/tasks/${task.id}`}
         className="min-w-0 flex-1 rounded-md transition hover:text-teal-700"
       >
-        <p className="text-sm font-medium text-stone-950">{task.title}</p>
-        <p className="mt-0.5 text-sm text-stone-500">
+        <p className="text-[15px] font-medium text-stone-950">{task.title}</p>
+        <p className="mt-0.5 text-[13px] text-[#6B7268]">
           {[task.area.name, task.project?.name, task.dueDate ? formatDateOnly(task.dueDate) : null]
             .filter(Boolean)
             .join(" / ")}
@@ -201,9 +228,9 @@ function RoutinesLine({
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm">
+    <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="mr-2 flex items-center gap-2 text-sm font-semibold text-stone-800">
+        <div className="mr-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           <Repeat size={16} className="text-teal-700" />
           <span>Routines</span>
         </div>
@@ -211,7 +238,7 @@ function RoutinesLine({
           routine.completedToday ? (
             <span
               key={routine.id}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 text-sm text-teal-800"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-teal-700/30 bg-white px-3 text-sm text-teal-800"
             >
               <Check size={14} />
               {routine.name}
@@ -258,7 +285,7 @@ function PulseRow({
   ].filter((item): item is { href: string; text: string } => Boolean(item));
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
+    <section className="flex flex-col gap-2 text-sm text-[#6B7268] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
       {items.map((item) => (
         <Link
           key={item.text}
@@ -278,9 +305,9 @@ function RecentCaptures({ captures }: { captures: ReadyToday["recentCaptures"] }
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm">
+    <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3">
       <SectionHeader title="Recently captured" href="/areas/area_inbox" />
-      <div className="mt-2 divide-y divide-stone-100">
+      <div className="mt-2 divide-y divide-[#EEF1EC]">
         {captures.slice(0, 5).map((capture) => (
           <Link
             key={capture.id}
@@ -288,7 +315,7 @@ function RecentCaptures({ captures }: { captures: ReadyToday["recentCaptures"] }
             className="grid gap-2 py-2 text-sm transition hover:text-teal-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
           >
             <span className="truncate text-stone-900">{capture.rawText}</span>
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-[#9AA096]">
               {formatCaptureOutcome(capture.createdItems) ??
                 capture.parseStatus ??
                 "saved"}
@@ -308,7 +335,7 @@ function MemoryCard({ item }: { item: ResurfacedItem | null }) {
   return (
     <Link
       href={item.itemType === "idea" ? "/ideas" : "/ideas"}
-      className="block rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm transition hover:border-teal-300"
+      className="block rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3 transition hover:border-teal-300"
     >
       <div className="mb-2 flex flex-wrap items-center gap-2 text-stone-800">
         <Archive size={16} className="text-teal-700" />
@@ -328,7 +355,9 @@ function MemoryCard({ item }: { item: ResurfacedItem | null }) {
 function SectionHeader({ title, href }: { title: string; href: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 className="text-base font-semibold text-stone-900">{title}</h2>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        {title}
+      </h2>
       <Link
         href={href}
         className="inline-flex items-center gap-1 text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-teal-700 hover:underline"
