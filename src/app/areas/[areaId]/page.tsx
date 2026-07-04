@@ -46,29 +46,29 @@ export default async function AreaPage({ params }: AreaPageProps) {
   const { area, pendingCaptures, reviews, domains } = result;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header className="space-y-3">
         <Link
           href="/projects"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Projects
         </Link>
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <Link
               href={`/domains/${area.domain.id}`}
-              className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700 underline-offset-4 hover:underline"
+              className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096] transition hover:text-teal-700"
             >
               {area.domain.name}
             </Link>
-            <h1 className="mt-1 text-3xl font-semibold tracking-normal">
+            <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950">
               {area.name}
             </h1>
-            <p className="mt-1 text-sm text-stone-500">
-              {area.status}
-              {area.tendingCadence ? ` / ${area.tendingCadence}` : ""}
+            <p className="mt-1.5 text-[13px] text-stone-500">
+              {area.status.charAt(0).toUpperCase() + area.status.slice(1)}
+              {area.tendingCadence ? ` · tend ${area.tendingCadence}` : ""}
             </p>
           </div>
           <AreaOverflowMenu areaId={area.id} status={area.status} />
@@ -90,28 +90,28 @@ export default async function AreaPage({ params }: AreaPageProps) {
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Standing tasks" empty="No open standing tasks.">
+        <Panel title="Standing tasks">
           {area.tasks.map((task) => (
             <Link
               key={task.id}
               href={`/tasks/${task.id}`}
-              className="block py-2 text-sm font-medium text-stone-800 transition hover:text-teal-700"
+              className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
             >
               {task.title}
             </Link>
           ))}
         </Panel>
 
-        <Panel title="Projects" empty="No projects in this area.">
+        <Panel title="Projects">
           {area.projects.map((project) => (
             <Link
               key={project.id}
               href={`/projects/${project.id}`}
-              className="block py-2 transition hover:text-teal-700"
+              className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
             >
               <p className="text-sm font-medium text-stone-800">{project.name}</p>
               {project.latestCheckIn ? (
-                <p className="mt-0.5 text-xs text-stone-500">
+                <p className="mt-0.5 text-xs text-[#9AA096]">
                   {checkInSnippet(project.latestCheckIn.bodyMd, 100)} ·{" "}
                   {formatShortDate(project.latestCheckIn.createdAt)}
                 </p>
@@ -120,12 +120,12 @@ export default async function AreaPage({ params }: AreaPageProps) {
           ))}
         </Panel>
 
-        <Panel title="Linked ideas" empty="No linked ideas.">
+        <Panel title="Linked ideas">
           {area.ideas.map((idea) => (
             <Link
               key={idea.id}
               href="/ideas"
-              className="block py-2 text-sm font-medium text-stone-800 transition hover:text-teal-700"
+              className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
             >
               {idea.title}
             </Link>
@@ -158,78 +158,60 @@ function NeedsReviewPanel({
   }
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">Needs review</h2>
-      <div className="space-y-3">
+    <section className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Needs review{" "}
+        <span className="font-medium text-[#B0ACA2]">{reviews.length}</span>
+      </h2>
+      <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {reviews.map((review) => (
-          <div
-            key={review.id}
-            className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-          >
-            <p className="max-h-48 overflow-y-auto rounded-md border border-stone-100 bg-stone-50 p-3 text-sm leading-6 text-stone-800">
+          <div key={review.id} className="p-4">
+            <p className="max-h-48 overflow-y-auto rounded-[10px] bg-[#F7F9F5] px-3 py-2.5 text-sm leading-relaxed text-stone-800">
               {review.capture.rawText}
             </p>
-            <p className="mt-2 text-xs text-stone-500">
+            <p className="mt-2 text-xs text-[#9AA096]">
               {review.reviewAt
                 ? `Review date ${formatDateOnly(review.reviewAt)}`
                 : `Waiting: ${review.conditionText}`}
             </p>
-            <div className="mt-3 flex flex-col gap-3 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <form
-                action={convertPendingCapture}
-                className="flex min-w-0 flex-wrap items-center gap-2"
-              >
-                <input type="hidden" name="captureId" value={review.captureId} />
-                <input type="hidden" name="reviewId" value={review.id} />
-                <label className="flex min-w-0 items-center gap-2 text-sm text-stone-600">
-                  <span className="shrink-0 font-medium text-stone-700">
-                    Area
-                  </span>
-                  <select
-                    name="areaId"
-                    defaultValue="area_inbox"
-                    className="h-9 min-w-0 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-                  >
-                    {domains.map((domain) => (
-                      <optgroup key={domain.id} label={domain.name}>
-                        {domain.areas.map((area) => (
-                          <option key={area.id} value={area.id}>
-                            {area.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </label>
-                <ConvertButton value="task" label="Task" />
-                <ConvertButton value="idea" label="Idea" />
-                <ConvertButton value="note" label="Note" />
-                <ConvertButton value="reference" label="Reference" />
-              </form>
-              <form action={snoozeReview} className="flex items-center gap-2">
-                <input type="hidden" name="reviewId" value={review.id} />
-                <label className="sr-only" htmlFor={`snooze-${review.id}`}>
-                  Snooze until
-                </label>
-                <input
-                  id={`snooze-${review.id}`}
-                  type="date"
-                  name="snoozeUntil"
-                  required
-                  className="h-9 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-                />
-                <button
-                  type="submit"
-                  className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <FileAsDisclosure
+                captureId={review.captureId}
+                reviewId={review.id}
+                domains={domains}
+              />
+              <details className="relative">
+                <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+                  Snooze…
+                </summary>
+                <form
+                  action={snoozeReview}
+                  className="absolute left-0 z-20 mt-2 flex w-max items-center gap-1.5 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
                 >
-                  Snooze
-                </button>
-              </form>
+                  <input type="hidden" name="reviewId" value={review.id} />
+                  <label className="sr-only" htmlFor={`snooze-${review.id}`}>
+                    Snooze until
+                  </label>
+                  <input
+                    id={`snooze-${review.id}`}
+                    type="date"
+                    name="snoozeUntil"
+                    required
+                    className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
+                  />
+                  <button
+                    type="submit"
+                    className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+                  >
+                    Snooze
+                  </button>
+                </form>
+              </details>
               <form action={markReviewDone}>
                 <input type="hidden" name="reviewId" value={review.id} />
                 <button
                   type="submit"
-                  className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+                  className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
                 >
                   Done
                 </button>
@@ -238,7 +220,7 @@ function NeedsReviewPanel({
                 <input type="hidden" name="reviewId" value={review.id} />
                 <button
                   type="submit"
-                  className="h-9 rounded-md px-3 text-sm font-medium text-stone-600 transition hover:text-stone-950"
+                  className="h-[30px] px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
                 >
                   Dismiss
                 </button>
@@ -263,53 +245,79 @@ function PendingCapturesPanel({
   }
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">Pending captures</h2>
-      <div className="space-y-3">
+    <section className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Pending captures{" "}
+        <span className="font-medium text-[#B0ACA2]">{captures.length}</span>
+      </h2>
+      <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {captures.map((capture) => (
-          <form
-            key={capture.id}
-            action={convertPendingCapture}
-            className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-          >
-            <input type="hidden" name="captureId" value={capture.id} />
-            <div className="space-y-3">
-              <p className="max-h-48 overflow-y-auto rounded-md border border-stone-100 bg-stone-50 p-3 text-sm leading-6 text-stone-800">
-                {capture.rawText}
-              </p>
-              <div className="flex flex-col gap-3 border-t border-stone-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                <label className="flex min-w-0 items-center gap-2 text-sm text-stone-600">
-                  <span className="shrink-0 font-medium text-stone-700">
-                    Area
-                  </span>
-                  <select
-                    name="areaId"
-                    defaultValue="area_inbox"
-                    className="h-9 min-w-0 rounded-md border border-stone-300 bg-white px-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-                  >
-                    {domains.map((domain) => (
-                      <optgroup key={domain.id} label={domain.name}>
-                        {domain.areas.map((area) => (
-                          <option key={area.id} value={area.id}>
-                            {area.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <ConvertButton value="task" label="Task" />
-                  <ConvertButton value="idea" label="Idea" />
-                  <ConvertButton value="note" label="Note" />
-                  <ConvertButton value="reference" label="Reference" />
-                </div>
-              </div>
+          <div key={capture.id} className="p-4">
+            <p className="max-h-48 overflow-y-auto rounded-[10px] bg-[#F7F9F5] px-3 py-2.5 text-sm leading-relaxed text-stone-800">
+              {capture.rawText}
+            </p>
+            <div className="mt-2.5">
+              <FileAsDisclosure captureId={capture.id} domains={domains} />
             </div>
-          </form>
+          </div>
         ))}
       </div>
     </section>
+  );
+}
+
+function FileAsDisclosure({
+  captureId,
+  reviewId,
+  domains,
+}: {
+  captureId: string;
+  reviewId?: string;
+  domains: Array<Domain & { areas: Area[] }>;
+}) {
+  return (
+    <details className="relative">
+      <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-teal-700/40 bg-white px-3 text-[13px] font-medium text-teal-800 transition hover:border-teal-700 [&::-webkit-details-marker]:hidden">
+        File as…
+      </summary>
+      <form
+        action={convertPendingCapture}
+        className="absolute left-0 z-20 mt-2 w-[270px] rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-3 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
+      >
+        <input type="hidden" name="captureId" value={captureId} />
+        {reviewId ? <input type="hidden" name="reviewId" value={reviewId} /> : null}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          File as
+        </p>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <ConvertButton value="task" label="Task" />
+          <ConvertButton value="idea" label="Idea" />
+          <ConvertButton value="note" label="Note" />
+          <ConvertButton value="reference" label="Reference" />
+        </div>
+        <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Into
+        </p>
+        <label className="mt-1.5 block">
+          <span className="sr-only">Area</span>
+          <select
+            name="areaId"
+            defaultValue="area_inbox"
+            className="h-[30px] min-w-0 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
+          >
+            {domains.map((domain) => (
+              <optgroup key={domain.id} label={domain.name}>
+                {domain.areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </form>
+    </details>
   );
 }
 
@@ -319,7 +327,7 @@ function ConvertButton({ value, label }: { value: string; label: string }) {
       type="submit"
       name="targetType"
       value={value}
-      className="h-9 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+      className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
     >
       {label}
     </button>
@@ -341,11 +349,11 @@ function AreaOverflowMenu({
     <details className="relative">
       <summary
         title="Area actions"
-        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-950 [&::-webkit-details-marker]:hidden"
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-stone-500 transition hover:bg-white hover:text-stone-950 [&::-webkit-details-marker]:hidden"
       >
         <Ellipsis size={17} />
       </summary>
-      <div className="absolute right-0 z-10 mt-2 w-40 rounded-md border border-stone-200 bg-white p-1 shadow-lg">
+      <div className="absolute right-0 z-10 mt-2 w-40 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-1.5 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
         {status === "active" ? (
           <>
             <AreaMenuAction action={parkAreaById.bind(null, areaId)} label="Park" />
@@ -377,7 +385,7 @@ function AreaMenuAction({
     <form action={action}>
       <button
         type="submit"
-        className="flex h-9 w-full items-center rounded px-2 text-left text-sm text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+        className="flex h-10 w-full items-center rounded-[10px] px-2.5 text-left text-sm text-stone-700 transition hover:bg-white/85 hover:text-stone-950"
       >
         {label}
       </button>
@@ -387,20 +395,23 @@ function AreaMenuAction({
 
 function Panel({
   title,
-  empty,
   children,
 }: {
   title: string;
-  empty: string;
   children: ReactNode[];
 }) {
   return (
-    <div className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="text-base font-semibold text-stone-800">{title}</h2>
-      {children.length === 0 ? (
-        <p className="text-sm text-stone-500">{empty}</p>
-      ) : (
-        <div className="divide-y divide-stone-100">{children}</div>
+    <div className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        {title}{" "}
+        {children.length > 0 ? (
+          <span className="font-medium text-[#B0ACA2]">{children.length}</span>
+        ) : null}
+      </h2>
+      {children.length === 0 ? null : (
+        <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+          {children}
+        </div>
       )}
     </div>
   );
