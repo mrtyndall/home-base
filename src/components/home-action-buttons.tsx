@@ -32,7 +32,9 @@ export function HomeTaskActions({
   }
 
   return (
-    <div className={`flex shrink-0 items-center gap-1.5 ${pending ? "opacity-60" : ""}`}>
+    <div
+      className={`flex shrink-0 items-center gap-1.5 ${pending ? "opacity-60" : ""}`}
+    >
       <button
         type="button"
         title={starred ? "Unstar task" : "Star task"}
@@ -42,7 +44,7 @@ export function HomeTaskActions({
             body: JSON.stringify({ starred: !starred }),
           })
         }
-        className="grid h-8 w-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700 disabled:pointer-events-none"
+        className="grid h-8 w-8 place-items-center rounded-full border border-[#E2E6DF] bg-white text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 disabled:pointer-events-none"
       >
         <Star
           size={16}
@@ -54,7 +56,7 @@ export function HomeTaskActions({
         title="Complete task"
         disabled={pending}
         onClick={() => run(`/api/tasks/${taskId}/complete`)}
-        className="grid h-8 w-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700 disabled:pointer-events-none"
+        className="grid h-8 w-8 place-items-center rounded-full border border-[#E2E6DF] bg-white text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 disabled:pointer-events-none"
       >
         <Check size={16} />
       </button>
@@ -96,10 +98,10 @@ export function HomeRoutineCheck({
       title={completed ? `Uncheck ${name}` : `Complete ${name}`}
       disabled={pending}
       onClick={toggle}
-      className={`inline-flex h-8 items-center rounded-md border bg-white px-3 text-sm transition disabled:pointer-events-none disabled:opacity-60 ${
+      className={`inline-flex h-8 items-center rounded-full border bg-white px-3 text-sm transition disabled:pointer-events-none disabled:opacity-60 ${
         completed
           ? "border-teal-700/30 text-teal-800 hover:border-teal-700"
-          : "border-stone-300 text-stone-700 hover:border-teal-500 hover:text-teal-700"
+          : "border-[#E2E6DF] text-stone-700 hover:border-teal-700/50 hover:text-teal-700"
       }`}
     >
       {name}

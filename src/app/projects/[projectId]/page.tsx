@@ -219,7 +219,7 @@ function ProjectTasksSection({ project }: { project: LoadedProject }) {
 function TimeframeEditor({ project }: { project: LoadedProject }) {
   return (
     <details className="relative">
-      <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 px-1 text-[13px] font-medium text-stone-500 transition hover:text-stone-950 [&::-webkit-details-marker]:hidden">
         <CalendarDays size={13} />
         Timeframe
       </summary>

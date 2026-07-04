@@ -213,7 +213,7 @@ function TaskReceiptRow({ task }: { task: HomeTask }) {
     <div className="flex items-start justify-between gap-3 py-3">
       <Link
         href={`/tasks/${task.id}`}
-        className="min-w-0 flex-1 rounded-md transition hover:text-teal-700"
+        className="min-w-0 flex-1 rounded-[10px] transition hover:text-teal-700"
       >
         <p className="text-[15px] font-medium text-stone-950">{task.title}</p>
         <p className="mt-0.5 text-[13px] text-[#6B7268]">
