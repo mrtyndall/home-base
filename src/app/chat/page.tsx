@@ -10,8 +10,8 @@ export default function ChatPage() {
           Chat
         </h1>
         <p className="mt-1 text-[13px] text-stone-500">
-          Ask questions of your own data. Read-only — capture stays the door
-          for changes.
+          Ask questions of your own data. Read-only — capture stays the door for
+          changes.
         </p>
       </header>
       <ChatSurface />

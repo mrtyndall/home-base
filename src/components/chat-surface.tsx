@@ -70,7 +70,9 @@ export function ChatSurface() {
         {pending ? (
           <p className="pl-1 text-[13px] text-[#9AA096]">Looking that up…</p>
         ) : null}
-        {error ? <p className="pl-1 text-[13px] text-amber-800">{error}</p> : null}
+        {error ? (
+          <p className="pl-1 text-[13px] text-amber-800">{error}</p>
+        ) : null}
       </div>
       <form
         onSubmit={(event) => {

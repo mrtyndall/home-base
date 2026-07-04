@@ -47,14 +47,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         />
       </form>
       <section className="space-y-2.5">
-        {query.length === 0 ? (
-          null
-        ) : results?.length === 0 ? (
+        {query.length === 0 ? null : results?.length === 0 ? (
           <p className="text-sm text-[#6B7268]">No results.</p>
         ) : (
           <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
             {results?.map((result) => (
-              <article key={`${result.type}-${result.id}`} className="px-4 py-3">
+              <article
+                key={`${result.type}-${result.id}`}
+                className="px-4 py-3"
+              >
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
                   {result.type}
                 </p>
@@ -62,7 +63,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                   {result.title}
                 </h2>
                 {result.detail ? (
-                  <p className="mt-0.5 text-xs text-[#9AA096]">{result.detail}</p>
+                  <p className="mt-0.5 text-xs text-[#9AA096]">
+                    {result.detail}
+                  </p>
                 ) : null}
               </article>
             ))}
@@ -75,8 +78,19 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
 async function runSearch(query: string) {
   try {
-    const [captures, tasks, projects, ideas, references, entityNotes, entityDocs, checkIns, journalEntries, people, personFacts] =
-      await Promise.all([
+    const [
+      captures,
+      tasks,
+      projects,
+      ideas,
+      references,
+      entityNotes,
+      entityDocs,
+      checkIns,
+      journalEntries,
+      people,
+      personFacts,
+    ] = await Promise.all([
       prisma.capture.findMany({
         where: { rawText: { contains: query, mode: "insensitive" } },
         orderBy: { createdAt: "desc" },
