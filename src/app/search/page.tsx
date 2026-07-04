@@ -33,41 +33,40 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-3xl font-semibold tracking-normal">Search</h1>
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          Search
+        </h1>
       </header>
-      <form className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white p-2">
-        <SearchIcon className="ml-2 text-stone-500" size={18} />
+      <form className="flex h-11 items-center gap-2.5 rounded-full border border-[#E2E6DF] bg-white px-4 transition focus-within:border-teal-700">
+        <SearchIcon className="shrink-0 text-[#9AA096]" size={16} />
         <input
           name="q"
           defaultValue={query}
           placeholder="Search everything"
-          className="h-10 min-w-0 flex-1 bg-transparent px-2 text-base outline-none"
+          className="h-full min-w-0 flex-1 bg-transparent text-base outline-none"
         />
       </form>
-      <section className="space-y-2">
+      <section className="space-y-2.5">
         {query.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-            Enter a search term.
-          </div>
+          null
         ) : results?.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-            No results.
-          </div>
+          <p className="text-sm text-[#6B7268]">No results.</p>
         ) : (
-          results?.map((result) => (
-            <article
-              key={`${result.type}-${result.id}`}
-              className="rounded-lg border border-stone-200 bg-white p-4"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
-                {result.type}
-              </p>
-              <h2 className="mt-1 line-clamp-2 font-medium">{result.title}</h2>
-              {result.detail ? (
-                <p className="mt-1 text-sm text-stone-500">{result.detail}</p>
-              ) : null}
-            </article>
-          ))
+          <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+            {results?.map((result) => (
+              <article key={`${result.type}-${result.id}`} className="px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                  {result.type}
+                </p>
+                <h2 className="mt-0.5 line-clamp-2 text-sm font-medium text-stone-950">
+                  {result.title}
+                </h2>
+                {result.detail ? (
+                  <p className="mt-0.5 text-xs text-[#9AA096]">{result.detail}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
         )}
       </section>
     </div>

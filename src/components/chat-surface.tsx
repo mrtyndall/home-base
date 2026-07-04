@@ -54,30 +54,30 @@ export function ChatSurface() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {messages.map((message, index) => (
           <div
             key={index}
             className={
               message.role === "user"
-                ? "ml-auto max-w-[85%] rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950"
-                : "max-w-[85%] rounded-lg border border-stone-200 bg-white p-3 text-sm text-stone-800"
+                ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-[#E3EAE3] px-3.5 py-2.5 text-sm text-stone-950"
+                : "max-w-[88%] rounded-2xl rounded-bl-md border border-[#E2E6DF] bg-white px-[15px] py-3 text-sm text-stone-800"
             }
           >
             <MessageBody content={message.content} />
           </div>
         ))}
         {pending ? (
-          <p className="text-sm text-stone-500">Looking that up…</p>
+          <p className="pl-1 text-[13px] text-[#9AA096]">Looking that up…</p>
         ) : null}
-        {error ? <p className="text-sm text-stone-600">{error}</p> : null}
+        {error ? <p className="pl-1 text-[13px] text-amber-800">{error}</p> : null}
       </div>
       <form
         onSubmit={(event) => {
           event.preventDefault();
           ask();
         }}
-        className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white p-2"
+        className="flex items-center gap-2 rounded-full border border-[#E2E6DF] bg-white p-1.5 pl-4 transition focus-within:border-teal-700"
       >
         <label className="sr-only" htmlFor="chat-question">
           Question
@@ -86,13 +86,13 @@ export function ChatSurface() {
           id="chat-question"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          className="h-10 min-w-0 flex-1 bg-transparent px-2 text-base outline-none"
+          className="h-10 min-w-0 flex-1 bg-transparent text-base outline-none"
         />
         <button
           type="submit"
           title="Ask"
           disabled={pending || input.trim().length === 0}
-          className="grid h-10 w-10 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:opacity-50"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-700 text-white transition hover:bg-teal-800 disabled:opacity-50"
         >
           <SendHorizonal size={16} />
         </button>
