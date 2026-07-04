@@ -50,7 +50,8 @@ export default async function DomainPage({ params }: DomainPageProps) {
             </p>
           ) : null}
           <p className="mt-3 text-sm text-[#6B7268]">
-            {taskPulse.openTasks} open task{taskPulse.openTasks === 1 ? "" : "s"}
+            {taskPulse.openTasks} open task
+            {taskPulse.openTasks === 1 ? "" : "s"}
             {" · "}
             {taskPulse.dueToday} due today
             {" · "}
@@ -105,7 +106,9 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3.5 transition hover:border-teal-700/50"
               >
                 <div className="flex items-baseline justify-between gap-2.5">
-                  <p className="text-[15px] font-medium text-stone-950">{area.name}</p>
+                  <p className="text-[15px] font-medium text-stone-950">
+                    {area.name}
+                  </p>
                   <p className="shrink-0 text-xs text-[#9AA096]">
                     {area.openTaskCount > 0
                       ? `${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`
@@ -141,7 +144,9 @@ export default async function DomainPage({ params }: DomainPageProps) {
                 <p className="text-sm font-medium text-stone-950">
                   {project.name}
                 </p>
-                <p className="mt-0.5 text-[13px] text-stone-600">{project.fact}</p>
+                <p className="mt-0.5 text-[13px] text-stone-600">
+                  {project.fact}
+                </p>
               </Link>
             ))}
           </div>
