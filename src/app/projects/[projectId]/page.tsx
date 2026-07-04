@@ -115,16 +115,14 @@ export default async function ProjectDetailPage({
         </div>
       </header>
 
-      <div className="lg:grid lg:grid-cols-[1.35fr_1fr] lg:gap-8">
+      <CheckInFeed
+        parentType="project"
+        parentId={project.id}
+        checkIns={project.checkIns}
+      />
+
+      <div className="lg:grid lg:grid-cols-[1.15fr_1fr] lg:gap-8">
         <div className="space-y-6">
-          <CheckInFeed
-            parentType="project"
-            parentId={project.id}
-            checkIns={project.checkIns}
-          />
-          <ProjectTasksSection project={project} />
-        </div>
-        <div className="mt-6 space-y-6 lg:mt-0">
           <MilestonesPanel
             projectId={project.id}
             milestones={project.milestones}
@@ -137,6 +135,9 @@ export default async function ProjectDetailPage({
             attachments={project.attachments}
             variant="project"
           />
+        </div>
+        <div className="mt-6 space-y-6 lg:mt-0">
+          <ProjectTasksSection project={project} />
           <div className="flex flex-wrap items-start gap-2">
             <TimeframeEditor project={project} />
             {project.docs.length === 0 ? (
