@@ -18,7 +18,7 @@ export function TaskStarButton({
       >
         <Star
           size={16}
-          className={starred ? "fill-teal-600 text-teal-600" : undefined}
+          className={starred ? "fill-teal-700 text-teal-700" : undefined}
         />
       </button>
     </form>

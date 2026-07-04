@@ -39,7 +39,7 @@ export default async function TodayPage() {
           <StatusLine data={data} />
 
           {data.topTasks.length > 0 ? (
-            <section className="space-y-3">
+            <section className="space-y-2.5">
               <SectionHeader title="Top tasks" />
               <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
                 {data.topTasks.map((task) => (
@@ -67,7 +67,7 @@ export default async function TodayPage() {
           <TodayRoutinesLine routines={data.routinesDueToday} />
 
           <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="flex items-baseline justify-between gap-3">
                 <SectionHeader title="Today's calendar" />
                 <CalendarSyncMeta data={data.calendarSync} />
@@ -111,7 +111,7 @@ export default async function TodayPage() {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <SectionHeader title="Due today" />
               <TaskDropZone
                 targetDate={data.today}
@@ -137,7 +137,7 @@ export default async function TodayPage() {
           />
 
           <section className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <SectionHeader title="Tomorrow" />
               <div className="space-y-2">
                 {data.tomorrowEvents.length > 0 ? (
@@ -181,7 +181,7 @@ export default async function TodayPage() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
                 <SectionHeader title="Task inbox" />
                 <TaskDropZone
@@ -274,14 +274,8 @@ function RecentCapturesStrip({
     <section className="space-y-2.5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          Recently captured
+          Recent captures
         </h2>
-        <Link
-          href="/areas/area_inbox"
-          className="text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-teal-700 hover:underline"
-        >
-          Open
-        </Link>
       </div>
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {captures.slice(0, 5).map((capture) => {
@@ -315,7 +309,7 @@ function RecentCapturesStrip({
               ) : (
                 <Link
                   href={href}
-                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
+                  className="inline-flex h-[30px] shrink-0 items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
                 >
                   Open
                 </Link>
@@ -388,13 +382,13 @@ function StatusLine({
         : "No upcoming dated commitments.";
 
     return (
-      <section className="flex items-start gap-2.5 text-sm">
-        <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={16} />
+      <section className="flex items-start gap-2.5">
+        <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={17} />
         <div>
-          <p className="font-medium text-stone-950">
-            Today and tomorrow are clear.
-          </p>
-          <p className="mt-0.5 text-[#6B7268]">
+          <h2 className="text-[15px] font-medium text-stone-950">
+            Nothing due through tomorrow.
+          </h2>
+          <p className="mt-0.5 text-sm text-[#6B7268]">
             {nextCommitment} Nothing slipping.
           </p>
         </div>
@@ -403,13 +397,13 @@ function StatusLine({
   }
 
   return (
-    <section className="text-sm">
-      <p className="font-medium text-stone-950">
+    <section>
+      <h2 className="text-[15px] font-medium text-stone-950">
         {data.todayEvents.length} calendar event
         {data.todayEvents.length === 1 ? "" : "s"} and {data.dueToday.length}{" "}
         task{data.dueToday.length === 1 ? "" : "s"} due today.
-      </p>
-      <p className="mt-0.5 text-[#6B7268]">Nothing slipping.</p>
+      </h2>
+      <p className="mt-0.5 text-sm text-[#6B7268]">Nothing slipping.</p>
     </section>
   );
 }

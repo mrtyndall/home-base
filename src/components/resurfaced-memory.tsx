@@ -1,4 +1,3 @@
-import { Archive } from "lucide-react";
 import {
   annotateResurfacedItem,
   boostResurfacedItem,
@@ -13,28 +12,32 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
   }
 
   return (
-    <section className="rounded-lg border border-stone-200 bg-white px-4 py-3">
-      <div className="mb-2 flex items-center gap-2 text-stone-800">
-        <Archive size={16} />
-        <h2 className="text-sm font-semibold">
+    <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-[18px] py-4">
+      <div className="flex items-baseline gap-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          {item.itemType === "idea" ? "An idea" : "From your journal"}
+        </h2>
+        <span className="text-xs text-stone-400">
           {/* Journal entryDate is date-only (UTC midnight) — format in UTC
               or the card shows the previous day. */}
-        {item.itemType === "idea"
-          ? `An idea from ${formatShortDate(item.itemDate)}`
-          : `A journal entry from ${formatDateOnly(item.itemDate)}`}
-        </h2>
+          {item.itemType === "idea"
+            ? formatShortDate(item.itemDate)
+            : formatDateOnly(item.itemDate)}
+          {" · "}
+          {item.ageDays} days ago
+        </span>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-6 text-stone-800">
+      <p className="mt-2.5 whitespace-pre-wrap font-serif text-[17px] leading-[1.55] text-stone-800">
         {item.body}
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2">
         <details className="relative">
-          <summary className="inline-flex h-8 cursor-pointer list-none items-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex h-8 cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
             Add a thought
           </summary>
           <form
             action={annotateResurfacedItem}
-            className="absolute left-0 z-10 mt-2 flex w-80 max-w-[calc(100vw-2rem)] gap-2 rounded-md border border-stone-200 bg-white p-2 shadow-lg"
+            className="absolute left-0 z-10 mt-2 flex w-80 max-w-[calc(100vw-2rem)] gap-2 rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
           >
             <input type="hidden" name="seenId" value={item.seenId} />
             <label className="sr-only" htmlFor="resurface-thought">
@@ -44,11 +47,11 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
               id="resurface-thought"
               name="thought"
               required
-              className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="h-9 min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
             />
             <button
               type="submit"
-              className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
+              className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-3.5 text-sm font-medium text-white transition hover:bg-teal-800"
             >
               Add
             </button>
@@ -58,7 +61,7 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
           <input type="hidden" name="seenId" value={item.seenId} />
           <button
             type="submit"
-            className="inline-flex h-8 items-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700"
+            className="inline-flex h-8 items-center rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
           >
             Boost
           </button>
@@ -67,7 +70,7 @@ export function ResurfacedMemory({ item }: { item: ResurfacedItem | null }) {
           <input type="hidden" name="seenId" value={item.seenId} />
           <button
             type="submit"
-            className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-stone-600 transition hover:text-stone-950"
+            className="inline-flex h-8 items-center rounded-full px-3.5 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
           >
             Dismiss
           </button>

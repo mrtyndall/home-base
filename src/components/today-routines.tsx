@@ -31,9 +31,9 @@ export function TodayRoutinesLine({
               <button
                 type="submit"
                 title={`Uncheck ${routine.name}`}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-teal-700/30 bg-white px-3 text-sm text-teal-800 transition hover:border-teal-700"
+                className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm text-teal-700 transition hover:border-teal-700/50"
               >
-                <Check size={14} />
+                <Check size={13} />
                 {routine.name}
               </button>
             </form>
@@ -43,11 +43,11 @@ export function TodayRoutinesLine({
               <button
                 type="submit"
                 title={`Complete ${routine.name}`}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
+                className="inline-flex h-[34px] items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
               >
                 {routine.name}
                 {routine.timeWindow !== "anytime" ? (
-                  <span className="text-xs text-stone-500">
+                  <span className="text-xs text-[#9AA096]">
                     {routine.timeWindow}
                   </span>
                 ) : null}
