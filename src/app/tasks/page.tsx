@@ -1,7 +1,11 @@
 import type { Area, Domain, Project, Task } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { addDaysToDateString, formatDateOnly, localDateString } from "@/lib/dates";
+import {
+  addDaysToDateString,
+  formatDateOnly,
+  localDateString,
+} from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
 import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
@@ -120,28 +124,29 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-3xl font-semibold tracking-normal">Tasks</h1>
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          Tasks
+        </h1>
       </header>
-      <TaskQuickAdd
-        areaGroups={areaGroups}
-        projects={projectOptions}
-      />
-      <ViewControl
-        selectedView={selectedView}
-        selectedDomainIds={selectedDomainIds}
-        selectedProjectIds={selectedProjectIds}
-        selectedSection={selectedSection}
-        starredOnly={starredOnly}
-      />
-      <TaskFilters
-        domains={domains}
-        projects={projects}
-        selectedDomainIds={selectedDomainIds}
-        selectedProjectIds={selectedProjectIds}
-        selectedSection={selectedSection}
-        starredOnly={starredOnly}
-        view={selectedView}
-      />
+      <TaskQuickAdd areaGroups={areaGroups} projects={projectOptions} />
+      <div className="flex flex-wrap items-center gap-2">
+        <ViewControl
+          selectedView={selectedView}
+          selectedDomainIds={selectedDomainIds}
+          selectedProjectIds={selectedProjectIds}
+          selectedSection={selectedSection}
+          starredOnly={starredOnly}
+        />
+        <TaskFilters
+          domains={domains}
+          projects={projects}
+          selectedDomainIds={selectedDomainIds}
+          selectedProjectIds={selectedProjectIds}
+          selectedSection={selectedSection}
+          starredOnly={starredOnly}
+          view={selectedView}
+        />
+      </div>
       {selectedView === "schedule" ? (
         <SectionJumps
           selectedDomainIds={selectedDomainIds}
@@ -297,7 +302,7 @@ function SectionJumps({
   return (
     <nav
       aria-label="Task sections"
-      className="grid gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-3 lg:grid-cols-6"
+      className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 text-sm"
     >
       {[allLink, ...links].map((item) => {
         const { href, label, count, hasItems } = item;
@@ -317,18 +322,20 @@ function SectionJumps({
           <Link
             key={label}
             href={filterHref}
-            className={`rounded-lg border px-3 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-teal-100 ${
+            className={`inline-flex items-baseline gap-1 transition ${
               isActive
-                ? "border-teal-700 bg-teal-100 text-teal-950 shadow-sm"
+                ? "font-medium text-teal-800"
                 : hasItems
-                  ? "border-teal-600 bg-teal-50 text-teal-900 shadow-sm hover:border-teal-700"
-                  : "border-stone-200 bg-stone-50/70 text-stone-500 hover:border-stone-300 hover:bg-white"
+                  ? "text-stone-700 hover:text-teal-700"
+                  : "text-stone-400 hover:text-stone-600"
             }`}
           >
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em]">
-              {label}
-            </span>
-            <span className="mt-1 block text-xl font-semibold tabular-nums leading-none">
+            {label}
+            <span
+              className={`text-xs tabular-nums ${
+                isActive ? "text-teal-700" : "text-[#9AA096]"
+              }`}
+            >
               {count}
             </span>
           </Link>
@@ -360,7 +367,10 @@ function ViewControl({
   ];
 
   return (
-    <nav aria-label="Task views" className="flex flex-wrap gap-2">
+    <nav
+      aria-label="Task views"
+      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-[#E2E6DF] bg-white p-1"
+    >
       {views.map((view) => (
         <Link
           key={view.value}
@@ -371,10 +381,10 @@ function ViewControl({
             starred: starredOnly,
             view: view.value,
           })}
-          className={`rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+          className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
             selectedView === view.value
-              ? "border-teal-600 bg-teal-50 text-teal-800"
-              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+              ? "bg-[#EFF2EE] font-semibold text-stone-950"
+              : "text-stone-500 hover:text-stone-950"
           }`}
         >
           {view.label}
@@ -383,6 +393,11 @@ function ViewControl({
     </nav>
   );
 }
+
+const filterChipOn =
+  "rounded-full border border-teal-700/40 bg-white/85 px-3 py-1.5 text-[13px] font-medium text-teal-800 transition";
+const filterChipOff =
+  "rounded-full border border-[#E2E6DF] bg-white/85 px-3 py-1.5 text-[13px] text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700";
 
 function DomainFilter({
   domains,
@@ -401,7 +416,7 @@ function DomainFilter({
 }) {
   const visibleDomains = domains.filter((domain) => !domain.isSystem);
   return (
-    <nav className="flex flex-wrap gap-2">
+    <nav className="flex flex-wrap gap-1.5">
       <Link
         href={buildTasksFilterHref({
           domains: [],
@@ -410,10 +425,10 @@ function DomainFilter({
           starred: starredOnly,
           view,
         })}
-        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+        className={`${
           selectedDomainIds.length === 0
-            ? "border-teal-600 bg-teal-50 text-teal-800"
-            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+            ? filterChipOn
+            : filterChipOff
         }`}
       >
         All
@@ -428,10 +443,10 @@ function DomainFilter({
             starred: starredOnly,
             view,
           })}
-          className={`rounded-md border px-3 py-1.5 text-sm transition ${
+          className={`${
             selectedDomainIds.includes(domain.id)
-              ? "border-teal-600 bg-teal-50 text-teal-800"
-              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+              ? filterChipOn
+              : filterChipOff
           }`}
         >
           {domain.name}
@@ -458,76 +473,82 @@ function TaskFilters({
   starredOnly: boolean;
   view: TaskViewFilter;
 }) {
+  const filtersActive =
+    selectedDomainIds.length > 0 || selectedProjectIds.length > 0 || starredOnly;
+
   return (
-    <section className="rounded-lg border border-stone-200 bg-white p-3">
-      <div className="grid gap-3">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Domain
-          </p>
-          <DomainFilter
-            domains={domains}
-            selectedDomainIds={selectedDomainIds}
-            selectedProjectIds={selectedProjectIds}
-            selectedSection={selectedSection}
-            starredOnly={starredOnly}
-            view={view}
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Project
-          </p>
-          <ProjectFilter
-            projects={projects}
-            selectedDomainIds={selectedDomainIds}
-            selectedProjectIds={selectedProjectIds}
-            selectedSection={selectedSection}
-            starredOnly={starredOnly}
-            view={view}
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Starred
-          </p>
-          <nav className="flex flex-wrap gap-2">
-            <Link
-              href={buildTasksFilterHref({
-                domains: selectedDomainIds,
-                projects: selectedProjectIds,
-                section: selectedSection,
-                starred: false,
-                view,
-              })}
-              className={`rounded-md border px-3 py-1.5 text-sm transition ${
-                !starredOnly
-                  ? "border-teal-600 bg-teal-50 text-teal-800"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
-              }`}
-            >
-              All
-            </Link>
-            <Link
-              href={buildTasksFilterHref({
-                domains: selectedDomainIds,
-                projects: selectedProjectIds,
-                section: selectedSection,
-                starred: true,
-                view,
-              })}
-              className={`rounded-md border px-3 py-1.5 text-sm transition ${
-                starredOnly
-                  ? "border-teal-600 bg-teal-50 text-teal-800"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
-              }`}
-            >
+    <details className="relative">
+      <summary
+        className={`inline-flex h-[38px] cursor-pointer list-none items-center rounded-full border bg-white px-4 text-[13px] font-medium transition [&::-webkit-details-marker]:hidden ${
+          filtersActive
+            ? "border-teal-700/40 text-teal-800"
+            : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
+        }`}
+      >
+        {filtersActive ? "Filter · on" : "Filter"}
+      </summary>
+      <section className="absolute left-0 z-30 mt-2 w-[min(calc(100vw-2.5rem),34rem)] rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-4 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
+        <div className="grid gap-3.5">
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+              Domain
+            </p>
+            <DomainFilter
+              domains={domains}
+              selectedDomainIds={selectedDomainIds}
+              selectedProjectIds={selectedProjectIds}
+              selectedSection={selectedSection}
+              starredOnly={starredOnly}
+              view={view}
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+              Project
+            </p>
+            <ProjectFilter
+              projects={projects}
+              selectedDomainIds={selectedDomainIds}
+              selectedProjectIds={selectedProjectIds}
+              selectedSection={selectedSection}
+              starredOnly={starredOnly}
+              view={view}
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               Starred
-            </Link>
-          </nav>
+            </p>
+            <nav className="flex flex-wrap gap-1.5">
+              <Link
+                href={buildTasksFilterHref({
+                  domains: selectedDomainIds,
+                  projects: selectedProjectIds,
+                  section: selectedSection,
+                  starred: false,
+                  view,
+                })}
+                className={!starredOnly ? filterChipOn : filterChipOff}
+              >
+                All
+              </Link>
+              <Link
+                href={buildTasksFilterHref({
+                  domains: selectedDomainIds,
+                  projects: selectedProjectIds,
+                  section: selectedSection,
+                  starred: true,
+                  view,
+                })}
+                className={starredOnly ? filterChipOn : filterChipOff}
+              >
+                Starred
+              </Link>
+            </nav>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </details>
   );
 }
 
@@ -553,7 +574,7 @@ function ProjectFilter({
   );
 
   return (
-    <nav className="flex max-h-24 flex-wrap gap-2 overflow-y-auto pr-1">
+    <nav className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
       <Link
         href={buildTasksFilterHref({
           domains: selectedDomainIds,
@@ -562,10 +583,10 @@ function ProjectFilter({
           starred: starredOnly,
           view,
         })}
-        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+        className={`${
           selectedProjectIds.length === 0
-            ? "border-teal-600 bg-teal-50 text-teal-800"
-            : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+            ? filterChipOn
+            : filterChipOff
         }`}
       >
         All
@@ -580,10 +601,10 @@ function ProjectFilter({
             starred: starredOnly,
             view,
           })}
-          className={`rounded-md border px-3 py-1.5 text-sm transition ${
+          className={`${
             selectedProjectIds.includes(project.id)
-              ? "border-teal-600 bg-teal-50 text-teal-800"
-              : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+              ? filterChipOn
+              : filterChipOff
           }`}
         >
           {project.name}
@@ -618,8 +639,8 @@ function TaskSection({
 }) {
   return (
     <section id={anchor} className="scroll-mt-4 space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
-        {title} <span className="font-normal text-stone-500">{tasks.length}</span>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        {title} <span className="font-medium text-[#B0ACA2]">{tasks.length}</span>
       </h2>
       <TaskDropZone
         targetDate={targetDate}
@@ -663,18 +684,16 @@ function UpcomingSection({
   const count = groups.reduce((total, group) => total + group.tasks.length, 0);
   return (
     <section id="upcoming" className="scroll-mt-4 space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
-        Upcoming <span className="font-normal text-stone-500">{count}</span>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Upcoming <span className="font-medium text-[#B0ACA2]">{count}</span>
       </h2>
       {groups.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          No upcoming dated tasks.
-        </div>
+        <p className="text-sm text-[#6B7268]">No upcoming dated tasks.</p>
       ) : (
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group.date} className="space-y-2">
-              <h3 className="text-sm font-medium text-stone-600">
+              <h3 className="text-[13px] font-medium text-stone-500">
                 {formatDateOnly(group.date)}
               </h3>
               <TaskDropZone
@@ -724,16 +743,14 @@ function AllOpenSection({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         All Open{" "}
-        <span className="font-normal text-stone-500">
+        <span className="font-medium text-[#B0ACA2]">
           {totalCount ?? tasks.length}
         </span>
       </h2>
       {tasks.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          No open tasks.
-        </div>
+        <p className="text-sm text-[#6B7268]">No open tasks.</p>
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
@@ -768,26 +785,24 @@ function DoneSection({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Done{" "}
-        <span className="font-normal text-stone-500">
+        <span className="font-medium text-[#B0ACA2]">
           {totalCount ?? tasks.length}
         </span>
       </h2>
       {tasks.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          No completed tasks yet.
-        </div>
+        <p className="text-sm text-[#6B7268]">No completed tasks yet.</p>
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
             <article
               key={task.id}
-              className="rounded-lg border border-stone-200 bg-white p-4"
+              className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
             >
               <Link
                 href={`/tasks/${task.id}`}
-                className="-m-1 block rounded-md p-1 transition hover:bg-stone-50"
+                className="-m-1 block rounded-[10px] p-1 transition hover:bg-[#F7F9F5]"
               >
                 <p className="text-sm font-medium text-stone-800">
                   {task.title}
@@ -835,7 +850,7 @@ function TaskCard({
   slipDays: number;
 }) {
   return (
-    <article className="rounded-lg border border-stone-200 bg-white p-4">
+    <article className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <DraggableTaskLink
           taskId={task.id}
@@ -884,7 +899,7 @@ function SubtaskList({
   }
 
   return (
-    <div className="mt-3 divide-y divide-stone-100 border-t border-stone-100 pt-2">
+    <div className="mt-3 divide-y divide-[#EEF1EC] border-t border-[#EEF1EC] pt-2">
       {subtasks.map((subtask) => (
         <div key={subtask.id} className="flex items-center justify-between gap-3 py-2">
           <DraggableTaskLink

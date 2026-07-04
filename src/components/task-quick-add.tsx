@@ -84,11 +84,11 @@ export function TaskQuickAdd({
       <form
         action={createQuickTask}
         onSubmit={handleSubmit}
-        className="rounded-lg border border-stone-200 bg-white p-2 shadow-sm"
+        className="rounded-[14px] border border-[#E2E6DF] bg-white p-2"
       >
         <div className="flex items-center gap-2">
           <label className="min-w-0 flex-1">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               Quick add task
             </span>
             <input
@@ -103,10 +103,10 @@ export function TaskQuickAdd({
           </label>
           <label
             title="Set due date"
-            className={`relative grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-md border bg-white transition hover:border-teal-500 hover:text-teal-700 ${
+            className={`relative grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border bg-white transition hover:border-teal-700/50 hover:text-teal-700 ${
               dueDate
-                ? "border-teal-500 text-teal-700"
-                : "border-stone-300 text-stone-600"
+                ? "border-teal-700 text-teal-700"
+                : "border-[#E2E6DF] text-stone-600"
             }`}
           >
             <span className="sr-only">Set due date</span>
@@ -129,7 +129,7 @@ export function TaskQuickAdd({
                 setAreaId(event.target.value);
                 setProjectId("");
               }}
-              className="h-10 max-w-32 shrink rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100 sm:max-w-40"
+              className="h-10 max-w-32 shrink rounded-full border border-[#E2E6DF] bg-white px-3 text-sm text-stone-700 outline-none focus:border-teal-700 sm:max-w-40"
             >
               <option value="">Inbox</option>
               {areaGroups.map((group) => (
@@ -147,25 +147,25 @@ export function TaskQuickAdd({
             type="submit"
             disabled={pending || title.trim().length === 0}
             title={pending ? "Saving task" : "Add task"}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-[#D6DBD3]"
           >
             <Plus size={18} />
           </button>
         </div>
         {projects.length > 0 ? (
-          <div className="mt-2 flex flex-col gap-2 border-t border-stone-100 pt-2 sm:flex-row sm:items-start">
+          <div className="mt-2 flex flex-col gap-2 border-t border-[#EEF1EC] pt-2 sm:flex-row sm:items-start">
             <input type="hidden" name="projectId" value={projectId} />
-            <span className="shrink-0 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <span className="shrink-0 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               Project
             </span>
             <div className="flex max-h-20 flex-1 flex-wrap gap-2 overflow-y-auto pr-1">
               <button
                 type="button"
                 onClick={() => setProjectId("")}
-                className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                className={`rounded-full border px-3 py-1.5 text-sm transition ${
                   !projectId
-                    ? "border-teal-600 bg-teal-50 text-teal-800"
-                    : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+                    ? "border-teal-700/40 bg-white font-medium text-teal-800"
+                    : "border-[#E2E6DF] bg-white text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
                 }`}
               >
                 No project
@@ -175,10 +175,10 @@ export function TaskQuickAdd({
                   key={project.id}
                   type="button"
                   onClick={() => setProjectId(project.id)}
-                  className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
                     projectId === project.id
-                      ? "border-teal-600 bg-teal-50 text-teal-800"
-                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-400"
+                      ? "border-teal-700/40 bg-white font-medium text-teal-800"
+                      : "border-[#E2E6DF] bg-white text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
                   }`}
                 >
                   {project.name}
@@ -191,7 +191,7 @@ export function TaskQuickAdd({
       {savedTask ? (
         <Link
           href={`/tasks/${savedTask.id}`}
-          className="block rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-950 transition hover:border-teal-400"
+          className="block rounded-full border border-teal-700/40 bg-white px-4 py-2 text-sm text-teal-800 transition hover:border-teal-700"
         >
           Saved: {savedTask.title} / {savedTask.areaName}
           {savedTask.projectName ? ` / ${savedTask.projectName}` : ""}

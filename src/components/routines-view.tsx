@@ -24,16 +24,14 @@ export function RoutinesView({ routines }: { routines: RoutineWithState[] }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Routines{" "}
-        <span className="font-normal text-stone-500">{active.length}</span>
+        <span className="font-medium text-[#B0ACA2]">{active.length}</span>
       </h2>
       {active.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          No routines yet.
-        </div>
+        <p className="text-sm text-[#6B7268]">No routines yet.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
           {active.map((routine) => (
             <RoutineCard key={routine.id} routine={routine} />
           ))}
@@ -58,11 +56,13 @@ function RoutineGroup({
 }) {
   return (
     <details className="space-y-2">
-      <summary className="cursor-pointer list-none text-sm font-semibold text-stone-600 [&::-webkit-details-marker]:hidden">
+      <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096] [&::-webkit-details-marker]:hidden">
         {title}{" "}
-        <span className="font-normal text-stone-500">{routines.length}</span>
+        <span className="font-medium normal-case text-[#B0ACA2]">
+          {routines.length}
+        </span>
       </summary>
-      <div className="space-y-2">
+      <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {routines.map((routine) => (
           <RoutineCard key={routine.id} routine={routine} />
         ))}
@@ -73,7 +73,7 @@ function RoutineGroup({
 
 function RoutineCard({ routine }: { routine: RoutineWithState }) {
   return (
-    <details className="rounded-lg border border-stone-200 bg-white p-4">
+    <details className="p-4">
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -86,7 +86,7 @@ function RoutineCard({ routine }: { routine: RoutineWithState }) {
           </div>
           {routine.status === "active" && routine.dueToday ? (
             routine.satisfied ? (
-              <span className="inline-flex items-center gap-1.5 text-sm text-teal-800">
+              <span className="inline-flex items-center gap-1.5 text-sm text-teal-700">
                 <Check size={15} />
                 {routine.completedToday ? "Done today" : "Done this week"}
               </span>
@@ -96,7 +96,7 @@ function RoutineCard({ routine }: { routine: RoutineWithState }) {
           ) : null}
         </div>
       </summary>
-      <div className="mt-3 space-y-2 border-t border-stone-100 pt-3">
+      <div className="mt-3 space-y-2 border-t border-[#EEF1EC] pt-3">
         {routine.description ? (
           <p className="text-sm text-stone-700">{routine.description}</p>
         ) : null}
@@ -117,7 +117,7 @@ function RoutineCard({ routine }: { routine: RoutineWithState }) {
         </div>
         {routine.completions.length > 0 ? (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               History
             </p>
             <p className="mt-1 text-sm text-stone-600">
@@ -140,7 +140,7 @@ export function RoutineCompleteButton({ routineId }: { routineId: string }) {
       <button
         type="submit"
         title="Complete routine"
-        className="grid h-8 w-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
+        className="grid h-9 w-9 place-items-center rounded-full border border-[#E2E6DF] bg-white text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
       >
         <Check size={16} />
       </button>
