@@ -9,7 +9,11 @@ import {
   retireAreaById,
   unparkAreaById,
 } from "@/app/actions";
-import { dismissReview, markReviewDone, snoozeReview } from "@/app/review-actions";
+import {
+  dismissReview,
+  markReviewDone,
+  snoozeReview,
+} from "@/app/review-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { CheckInFeed } from "@/components/check-in-feed";
 import { EntityDepth } from "@/components/entity-depth";
@@ -109,7 +113,9 @@ export default async function AreaPage({ params }: AreaPageProps) {
               href={`/projects/${project.id}`}
               className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
             >
-              <p className="text-sm font-medium text-stone-800">{project.name}</p>
+              <p className="text-sm font-medium text-stone-800">
+                {project.name}
+              </p>
               {project.latestCheckIn ? (
                 <p className="mt-0.5 text-xs text-[#9AA096]">
                   {checkInSnippet(project.latestCheckIn.bodyMd, 100)} ·{" "}
@@ -285,7 +291,9 @@ function FileAsDisclosure({
         className="absolute left-0 z-20 mt-2 w-[270px] rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-3 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
       >
         <input type="hidden" name="captureId" value={captureId} />
-        {reviewId ? <input type="hidden" name="reviewId" value={reviewId} /> : null}
+        {reviewId ? (
+          <input type="hidden" name="reviewId" value={reviewId} />
+        ) : null}
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           File as
         </p>
@@ -356,7 +364,10 @@ function AreaOverflowMenu({
       <div className="absolute right-0 z-10 mt-2 w-40 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-1.5 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
         {status === "active" ? (
           <>
-            <AreaMenuAction action={parkAreaById.bind(null, areaId)} label="Park" />
+            <AreaMenuAction
+              action={parkAreaById.bind(null, areaId)}
+              label="Park"
+            />
             <AreaMenuAction
               action={retireAreaById.bind(null, areaId)}
               label="Retire"
@@ -393,13 +404,7 @@ function AreaMenuAction({
   );
 }
 
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode[];
-}) {
+function Panel({ title, children }: { title: string; children: ReactNode[] }) {
   return (
     <div className="space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -421,25 +426,25 @@ async function loadArea(areaId: string) {
   try {
     const [area, domains] = await Promise.all([
       prisma.area.findUnique({
-      where: { id: areaId },
-      include: {
-        domain: true,
-        tasks: {
-          where: { status: "open", projectId: null },
-          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-          take: 20,
+        where: { id: areaId },
+        include: {
+          domain: true,
+          tasks: {
+            where: { status: "open", projectId: null },
+            orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+            take: 20,
+          },
+          projects: {
+            where: { status: { in: ["active", "someday", "parked"] } },
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+            take: 20,
+          },
+          ideas: {
+            where: { status: { in: ["seed", "developing"] } },
+            orderBy: { updatedAt: "desc" },
+            take: 12,
+          },
         },
-        projects: {
-          where: { status: { in: ["active", "someday", "parked"] } },
-          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-          take: 20,
-        },
-        ideas: {
-          where: { status: { in: ["seed", "developing"] } },
-          orderBy: { updatedAt: "desc" },
-          take: 12,
-        },
-      },
       }),
       prisma.domain.findMany({
         where: { active: true },
@@ -454,7 +459,15 @@ async function loadArea(areaId: string) {
     ]);
 
     const today = dateOnlyFromString(localDateString());
-    const [notes, docs, attachments, checkIns, latestProjectCheckIns, pendingCaptures, reviews] = area
+    const [
+      notes,
+      docs,
+      attachments,
+      checkIns,
+      latestProjectCheckIns,
+      pendingCaptures,
+      reviews,
+    ] = area
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
@@ -504,7 +517,15 @@ async function loadArea(areaId: string) {
               })
             : Promise.resolve([]),
         ])
-      : [[], [], [], [], new Map<string, { bodyMd: string; createdAt: Date }>(), [], []];
+      : [
+          [],
+          [],
+          [],
+          [],
+          new Map<string, { bodyMd: string; createdAt: Date }>(),
+          [],
+          [],
+        ];
 
     return {
       ok: true as const,
