@@ -283,12 +283,16 @@ function getTitle(filePath: string, body: string) {
 }
 
 function extractSection(body: string, title: string) {
-  const pattern = new RegExp(
-    `^## ${escapeRegExp(title)}\\s*\\n([\\s\\S]*?)(?=^## |$)`,
-    "m",
-  );
-  const match = body.match(pattern)?.[1]?.trim() ?? "";
-  return stripObsidianBlocks(match);
+  const headingPattern = new RegExp(`^## ${escapeRegExp(title)}\\s*$`, "m");
+  const heading = body.match(headingPattern);
+  if (!heading || heading.index === undefined) return "";
+
+  const start = heading.index + heading[0].length;
+  const rest = body.slice(start);
+  const nextHeading = rest.search(/^##\s+/m);
+  const section = nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+
+  return stripObsidianBlocks(section.trim());
 }
 
 function extractPersonBody(body: string) {
@@ -297,7 +301,7 @@ function extractPersonBody(body: string) {
 
 function stripObsidianBlocks(value: string) {
   return value
-    .replace(/```(?:button|base)[\s\S]*?```/g, "")
+    .replace(/```(?:button|base)[\s\S]*?(?:```|$)/g, "")
     .replace(/!\[\[[^\]]+\]\]/g, "")
     .trim();
 }

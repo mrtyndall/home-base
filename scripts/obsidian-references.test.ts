@@ -40,6 +40,64 @@ assert.equal(book?.metadata.status, "finished");
 assert.equal(book?.metadata.pages, 433);
 assert.equal(book?.body, "A book about making things.\n\nKeep it close.");
 
+const bookWithButtonBlock = parseObsidianReferenceNote(
+  "/vault/References/Button Book.md",
+  `---
+categories:
+  - "[[Books]]"
+type: book
+---
+
+# Button Book
+
+## Summary
+
+Keep the useful words.
+
+\`\`\`button
+name Add
+type command
+`,
+);
+
+assert.equal(bookWithButtonBlock?.body, "Keep the useful words.");
+
+const bookWithNotesControls = parseObsidianReferenceNote(
+  "/vault/References/Controls Book.md",
+  `---
+categories:
+  - "[[Books]]"
+type: book
+---
+
+# Controls Book
+
+## Summary
+
+Only this should stay.
+
+## Notes
+
+\`\`\`button
+name New Note
+type note(Note - Controls Book, split) template
+action Book Note Template
+\`\`\`
+
+\`\`\`base
+views:
+  - type: table
+\`\`\`
+
+## Quotes
+\`\`\`button
+name New Quote
+\`\`\`
+`,
+);
+
+assert.equal(bookWithNotesControls?.body, "Only this should stay.");
+
 const movie = parseObsidianReferenceNote(
   "/vault/References/Fargo.md",
   `---
