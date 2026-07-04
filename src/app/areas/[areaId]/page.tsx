@@ -501,7 +501,7 @@ async function loadArea(areaId: string) {
           prisma.entityNote.findMany({
             where: { parentType: "area", parentId: area.id },
             orderBy: { createdAt: "desc" },
-            take: 12,
+            take: 80,
           }),
           prisma.entityDoc.findMany({
             where: { parentType: "area", parentId: area.id, status: "active" },

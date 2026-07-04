@@ -9,12 +9,14 @@ import {
   updateEntityDoc,
 } from "@/app/actions";
 import { AttachmentUpload } from "@/components/attachment-upload";
+import { NoteStarButton } from "@/components/note-star-button";
 import { formatShortDate } from "@/lib/dates";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 type EntityNoteItem = {
   id: string;
   bodyMd: string;
+  starredAt: Date | null;
   createdAt: Date;
 };
 
@@ -96,81 +98,136 @@ function NotesPanel({
   notes: EntityNoteItem[];
   variant?: "boxed" | "paper";
 }) {
+  const starredNotes = notes
+    .filter((note) => note.starredAt)
+    .sort((left, right) => Number(right.starredAt) - Number(left.starredAt));
+  const regularNotes = notes.filter((note) => !note.starredAt);
+
   const wrapperClass =
     variant === "paper"
       ? "space-y-2.5"
       : "space-y-2.5 rounded-[14px] border border-[#E2E6DF] bg-white p-4";
 
   return (
-    <div className={wrapperClass}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          Notes
-        </h2>
-        <details className="relative">
-          <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
-            Add
-          </summary>
-          <form
-            action={addEntityNote}
-            className="absolute right-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-2 rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
-          >
-            <input type="hidden" name="parentType" value={parentType} />
-            <input type="hidden" name="parentId" value={parentId} />
-            <label
-              className="sr-only"
-              htmlFor={`${parentType}-${parentId}-note`}
+    <div className="space-y-5">
+      <ImportantNotesPanel notes={starredNotes} variant={variant} />
+      <div className={wrapperClass}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            Notes
+          </h2>
+          <details className="relative">
+            <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+              Add
+            </summary>
+            <form
+              action={addEntityNote}
+              className="absolute right-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-2 rounded-[20px] border border-white/65 bg-[#FAFBF9]/75 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
             >
-              Note
-            </label>
-            <textarea
-              id={`${parentType}-${parentId}-note`}
-              name="bodyMd"
-              required
-              rows={3}
-              className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-700"
-            />
-            <button className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800">
-              Save
-            </button>
-          </form>
-        </details>
+              <input type="hidden" name="parentType" value={parentType} />
+              <input type="hidden" name="parentId" value={parentId} />
+              <label
+                className="sr-only"
+                htmlFor={`${parentType}-${parentId}-note`}
+              >
+                Note
+              </label>
+              <textarea
+                id={`${parentType}-${parentId}-note`}
+                name="bodyMd"
+                required
+                rows={3}
+                className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-700"
+              />
+              <button className="inline-flex h-9 items-center justify-center rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800">
+                Save
+              </button>
+            </form>
+          </details>
+        </div>
+        {regularNotes.length === 0 ? null : (
+          <div
+            className={
+              variant === "paper" ? "space-y-3" : "divide-y divide-[#EEF1EC]"
+            }
+          >
+            {regularNotes.map((note) => (
+              <NoteRow key={note.id} note={note} variant={variant} />
+            ))}
+          </div>
+        )}
       </div>
-      {notes.length === 0 ? null : (
+    </div>
+  );
+}
+
+function ImportantNotesPanel({
+  notes,
+  variant,
+}: {
+  notes: EntityNoteItem[];
+  variant: "boxed" | "paper";
+}) {
+  if (notes.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Important notes
+      </h2>
+      <div
+        className={
+          variant === "paper"
+            ? "space-y-3"
+            : "divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+        }
+      >
+        {notes.map((note) => (
+          <NoteRow key={note.id} note={note} variant={variant} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NoteRow({
+  note,
+  variant,
+}: {
+  note: EntityNoteItem;
+  variant: "boxed" | "paper";
+}) {
+  return (
+    <div
+      className={
+        variant === "paper"
+          ? "relative rounded-[8px] bg-[linear-gradient(315deg,transparent_13px,#FBF7EA_0)] p-4 shadow-[0_2px_5px_rgba(28,25,23,0.10)] odd:-rotate-[0.5deg] even:rotate-[0.6deg]"
+          : "py-3"
+      }
+    >
+      {variant === "paper" ? (
+        <span
+          aria-hidden="true"
+          className="absolute bottom-0 right-0 h-[13px] w-[13px] bg-[linear-gradient(to_top_left,transparent_50%,#EAE2C9_50%)]"
+        />
+      ) : null}
+      <div className="flex items-start justify-between gap-3">
         <div
           className={
-            variant === "paper" ? "space-y-3" : "divide-y divide-[#EEF1EC]"
+            variant === "paper"
+              ? "min-w-0 flex-1 italic text-stone-700"
+              : "min-w-0 flex-1"
           }
         >
-          {notes.map((note) => (
-            <div
-              key={note.id}
-              className={
-                variant === "paper"
-                  ? "relative rounded-[8px] bg-[linear-gradient(315deg,transparent_13px,#FBF7EA_0)] p-4 shadow-[0_2px_5px_rgba(28,25,23,0.10)] odd:-rotate-[0.5deg] even:rotate-[0.6deg]"
-                  : "py-3"
-              }
-            >
-              {variant === "paper" ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute bottom-0 right-0 h-[13px] w-[13px] bg-[linear-gradient(to_top_left,transparent_50%,#EAE2C9_50%)]"
-                />
-              ) : null}
-              <div
-                className={
-                  variant === "paper" ? "italic text-stone-700" : undefined
-                }
-              >
-                <MarkdownPreview body={note.bodyMd} />
-              </div>
-              <p className="mt-2 text-xs not-italic text-[#B0ACA2]">
-                {formatShortDate(note.createdAt)}
-              </p>
-            </div>
-          ))}
+          <MarkdownPreview body={note.bodyMd} />
+          <p className="mt-2 text-xs not-italic text-[#B0ACA2]">
+            {formatShortDate(note.createdAt)}
+          </p>
         </div>
-      )}
+        <NoteStarButton noteId={note.id} starred={Boolean(note.starredAt)} />
+      </div>
     </div>
   );
 }

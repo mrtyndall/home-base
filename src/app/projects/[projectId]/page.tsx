@@ -337,7 +337,7 @@ async function loadProject(projectId: string) {
           prisma.entityNote.findMany({
             where: { parentType: "project", parentId: project.id },
             orderBy: { createdAt: "desc" },
-            take: 12,
+            take: 80,
           }),
           prisma.entityDoc.findMany({
             where: {
