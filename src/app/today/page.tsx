@@ -1,17 +1,15 @@
 import { CheckCircle2, Inbox } from "lucide-react";
-import type { Capture } from "@prisma/client";
+import type { Area, Capture, Domain } from "@prisma/client";
 import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
 import { TaskCompleteButton } from "@/components/task-complete-button";
 import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
-import {
-  getRecentCaptureAction,
-  getRecentCaptureHref,
-} from "@/lib/today-capture-actions";
+import { getRecentCaptureHref } from "@/lib/today-capture-actions";
 import { ResurfacedMemory } from "@/components/resurfaced-memory";
 import { TodayRoutinesLine } from "@/components/today-routines";
+import { CaptureFileActions } from "@/components/capture-file-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -78,26 +76,37 @@ export default async function TodayPage() {
                 <EmptyLine text="No calendar events today." />
               ) : (
                 <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-                  {data.todayEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-baseline gap-3 px-4 py-3"
-                    >
-                      <p className="min-w-14 text-sm text-stone-500">
-                        {formatTime(event.start)}
-                      </p>
-                      <div className="min-w-0">
-                        <h3 className="text-[15px] font-medium">
-                          {event.title}
-                        </h3>
-                        {event.location ? (
-                          <p className="mt-0.5 text-sm text-stone-500">
-                            {event.location}
-                          </p>
-                        ) : null}
+                  {data.todayEvents.map((event) => {
+                    const hasPassed =
+                      event.end.getTime() <= data.generatedAt.getTime();
+                    const quietClass = hasPassed
+                      ? "text-stone-400 line-through"
+                      : "text-stone-500";
+                    return (
+                      <div
+                        key={event.id}
+                        className="flex items-baseline gap-3 px-4 py-3"
+                      >
+                        <p className={`min-w-14 text-sm ${quietClass}`}>
+                          {formatTime(event.start)}
+                        </p>
+                        <div className="min-w-0">
+                          <h3
+                            className={`text-[15px] font-medium ${
+                              hasPassed ? "text-stone-400 line-through" : ""
+                            }`}
+                          >
+                            {event.title}
+                          </h3>
+                          {event.location ? (
+                            <p className={`mt-0.5 text-sm ${quietClass}`}>
+                              {event.location}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -122,7 +131,10 @@ export default async function TodayPage() {
             </div>
           </section>
 
-          <RecentCapturesStrip captures={data.recentCaptures} />
+          <RecentCapturesStrip
+            captures={data.recentCaptures}
+            domains={data.domains}
+          />
 
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
@@ -170,22 +182,24 @@ export default async function TodayPage() {
             </div>
 
             <div className="space-y-3">
-              <SectionHeader title="Task inbox" />
-              <TaskDropZone
-                targetDate={null}
-                label="Task inbox"
-                isEmpty={data.taskInbox.length === 0}
-                emptyText="No unscheduled tasks."
-              >
-                {data.taskInbox.map((task) => (
-                  <TodayTaskRow
-                    key={task.id}
-                    task={task}
-                    today={data.today}
-                    tomorrow={data.tomorrow}
-                  />
-                ))}
-              </TaskDropZone>
+              <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
+                <SectionHeader title="Task inbox" />
+                <TaskDropZone
+                  targetDate={null}
+                  label="Task inbox"
+                  isEmpty={data.taskInbox.length === 0}
+                  emptyText="No unscheduled tasks."
+                >
+                  {data.taskInbox.map((task) => (
+                    <TodayTaskRow
+                      key={task.id}
+                      task={task}
+                      today={data.today}
+                      tomorrow={data.tomorrow}
+                    />
+                  ))}
+                </TaskDropZone>
+              </div>
             </div>
           </section>
 
@@ -245,7 +259,13 @@ function TodayTaskRow({
 
 type RecentCapture = Capture;
 
-function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
+function RecentCapturesStrip({
+  captures,
+  domains,
+}: {
+  captures: RecentCapture[];
+  domains: Array<Domain & { areas: Area[] }>;
+}) {
   if (captures.length === 0) {
     return null;
   }
@@ -270,33 +290,37 @@ function RecentCapturesStrip({ captures }: { captures: RecentCapture[] }) {
             capture.parseStatus ??
             "saved";
           const href = getRecentCaptureHref(capture);
-          const action = getRecentCaptureAction(
-            capture.createdItems,
-            capture.parseStatus,
-          );
+          const pending = isPendingCapture(capture);
 
           return (
-            <Link
+            <div
               key={capture.id}
-              href={href}
               className="grid gap-3 px-4 py-3 transition hover:bg-[#F7F9F5] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-stone-900">
+                <Link
+                  href={href}
+                  className="block truncate text-sm font-medium text-stone-900 transition hover:text-teal-700"
+                >
                   {capture.rawText}
-                </p>
+                </Link>
                 <p className="mt-0.5 text-xs text-[#9AA096]">{outcome}</p>
               </div>
-              <span
-                className={`inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-sm font-medium ${
-                  action.tone === "primary"
-                    ? "border-teal-700/40 bg-white text-teal-800"
-                    : "border-[#E2E6DF] bg-white text-stone-700"
-                }`}
-              >
-                {action.label}
-              </span>
-            </Link>
+              {pending ? (
+                <CaptureFileActions
+                  captureId={capture.id}
+                  domains={domains}
+                  align="right"
+                />
+              ) : (
+                <Link
+                  href={href}
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
+                >
+                  Open
+                </Link>
+              )}
+            </div>
           );
         })}
       </div>
@@ -440,4 +464,15 @@ function isCreatedItem(
     "label" in item &&
     typeof item.label === "string"
   );
+}
+
+function isPendingCapture(capture: RecentCapture) {
+  if (capture.parseStatus === "ambiguous" || capture.parseStatus === "failed") {
+    return true;
+  }
+  return Array.isArray(capture.createdItems)
+    ? capture.createdItems.some(
+        (item) => isCreatedItem(item) && item.type === "pending_capture",
+      )
+    : false;
 }

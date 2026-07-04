@@ -467,6 +467,7 @@ model RoutineCompletion {
   id          String   @id @default(uuid())
   routineId   String   @map("routine_id")
   completedAt DateTime @default(now()) @map("completed_at")
+  undoneAt    DateTime? @map("undone_at")
   value       String?
 
   routine Routine @relation(fields: [routineId], references: [id])

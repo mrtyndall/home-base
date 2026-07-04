@@ -70,11 +70,15 @@ export function isScheduledOn(schedule: RoutineSchedule, dateStr: string) {
   return true;
 }
 
-export function completionDateStrings(completions: Array<Pick<RoutineCompletion, "completedAt">>) {
+export function completionDateStrings(
+  completions: Array<Pick<RoutineCompletion, "completedAt" | "undoneAt">>,
+) {
   return new Set(
-    completions.map((completion) =>
-      formatInTimeZone(completion.completedAt, APP_TIMEZONE, "yyyy-MM-dd"),
-    ),
+    completions
+      .filter((completion) => !completion.undoneAt)
+      .map((completion) =>
+        formatInTimeZone(completion.completedAt, APP_TIMEZONE, "yyyy-MM-dd"),
+      ),
   );
 }
 
@@ -148,7 +152,7 @@ export function isCompletedThisWeek(
  */
 export function computeRunLength(
   routine: Pick<Routine, "schedule" | "graceWindow" | "startDate" | "endDate">,
-  completions: Array<Pick<RoutineCompletion, "completedAt">>,
+  completions: Array<Pick<RoutineCompletion, "completedAt" | "undoneAt">>,
   todayStr = localDateString(),
 ) {
   const schedule = parseRoutineSchedule(routine.schedule);
@@ -265,7 +269,7 @@ export async function completeRoutineById(
   // One completion per day; a second tap is a no-op, never an error state.
   const todayStr = localDateString();
   const latest = await prisma.routineCompletion.findFirst({
-    where: { routineId },
+    where: { routineId, undoneAt: null },
     orderBy: { completedAt: "desc" },
   });
   if (latest && completionDateStrings([latest]).has(todayStr)) {
@@ -291,6 +295,49 @@ export async function completeRoutineById(
   });
 
   return { routine, completion, repeated: false as const };
+}
+
+export async function undoRoutineCompletionById(
+  routineId: string,
+  actor: { source: "manual" | "capture" | "api"; label?: string },
+) {
+  const routine = await prisma.routine.findUnique({
+    where: { id: routineId },
+    select: { id: true, name: true, status: true },
+  });
+  if (!routine || routine.status !== "active") {
+    throw new Error("Routine not found or not active.");
+  }
+
+  const todayStr = localDateString();
+  const completion = await prisma.routineCompletion.findFirst({
+    where: { routineId, undoneAt: null },
+    orderBy: { completedAt: "desc" },
+  });
+  if (!completion || !completionDateStrings([completion]).has(todayStr)) {
+    return { routine, completion: null };
+  }
+
+  const updated = await prisma.routineCompletion.update({
+    where: { id: completion.id },
+    data: { undoneAt: new Date() },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "routine_unchecked",
+      title: "Routine unchecked",
+      body: routine.name,
+      sourceRef: {
+        type: "routine",
+        id: routine.id,
+        source: actor.source,
+        actor: actor.label ?? null,
+      },
+    },
+  });
+
+  return { routine, completion: updated };
 }
 
 export async function completeRoutineByMatch(

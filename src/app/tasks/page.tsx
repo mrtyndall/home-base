@@ -35,11 +35,13 @@ type TasksPageProps = {
     section?: string | string[];
     starred?: string | string[];
     view?: string | string[];
+    projectSearch?: string | string[];
   }>;
 };
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
-  const { domain, project, section, starred, view } = await searchParams;
+  const { domain, project, section, starred, view, projectSearch } =
+    await searchParams;
 
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
@@ -69,6 +71,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
   const selectedSection = normalizeTaskSection(section);
   const starredOnly = normalizeStarredFilter(starred);
+  const projectSearchText = Array.isArray(projectSearch)
+    ? (projectSearch[0] ?? "")
+    : (projectSearch ?? "");
   const filtersActive =
     selectedDomainIds.length > 0 || selectedProjectIds.length > 0 || starredOnly;
   const visibleTasks = tasks.filter((task) => {
@@ -142,6 +147,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           projects={projects}
           selectedDomainIds={selectedDomainIds}
           selectedProjectIds={selectedProjectIds}
+          projectSearch={projectSearchText}
           selectedSection={selectedSection}
           starredOnly={starredOnly}
           view={selectedView}
@@ -461,6 +467,7 @@ function TaskFilters({
   projects,
   selectedDomainIds,
   selectedProjectIds,
+  projectSearch,
   selectedSection,
   starredOnly,
   view,
@@ -469,6 +476,7 @@ function TaskFilters({
   projects: Array<Project & { area: Area & { domain: Domain } }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
+  projectSearch: string;
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
   view: TaskViewFilter;
@@ -510,6 +518,7 @@ function TaskFilters({
               projects={projects}
               selectedDomainIds={selectedDomainIds}
               selectedProjectIds={selectedProjectIds}
+              projectSearch={projectSearch}
               selectedSection={selectedSection}
               starredOnly={starredOnly}
               view={view}
@@ -556,6 +565,7 @@ function ProjectFilter({
   projects,
   selectedDomainIds,
   selectedProjectIds,
+  projectSearch,
   selectedSection,
   starredOnly,
   view,
@@ -563,18 +573,53 @@ function ProjectFilter({
   projects: Array<Project & { area: Area & { domain: Domain } }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
+  projectSearch: string;
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
   view: TaskViewFilter;
 }) {
-  const visibleProjects = projects.filter(
-    (project) =>
+  const normalizedSearch = projectSearch.trim().toLowerCase();
+  const visibleProjects = projects.filter((project) => {
+    const inDomain =
       selectedDomainIds.length === 0 ||
-      selectedDomainIds.includes(project.area.domainId),
-  );
+      selectedDomainIds.includes(project.area.domainId);
+    if (!inDomain) return false;
+    if (!normalizedSearch) return true;
+    return [project.name, project.area.name, project.area.domain.name]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedSearch);
+  });
 
   return (
-    <nav className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
+    <div className="space-y-2">
+      <form className="flex items-center gap-2">
+        {selectedDomainIds.map((domainId) => (
+          <input key={domainId} type="hidden" name="domain" value={domainId} />
+        ))}
+        {selectedProjectIds.map((projectId) => (
+          <input key={projectId} type="hidden" name="project" value={projectId} />
+        ))}
+        <input type="hidden" name="section" value={selectedSection} />
+        <input type="hidden" name="view" value={view} />
+        {starredOnly ? <input type="hidden" name="starred" value="1" /> : null}
+        <label className="sr-only" htmlFor="project-filter-search">
+          Search projects
+        </label>
+        <input
+          id="project-filter-search"
+          name="projectSearch"
+          defaultValue={projectSearch}
+          className="h-9 min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] outline-none transition focus:border-teal-700"
+        />
+        <button
+          type="submit"
+          className="h-9 rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+        >
+          Search
+        </button>
+      </form>
+      <nav className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
       <Link
         href={buildTasksFilterHref({
           domains: selectedDomainIds,
@@ -610,7 +655,8 @@ function ProjectFilter({
           {project.name}
         </Link>
       ))}
-    </nav>
+      </nav>
+    </div>
   );
 }
 

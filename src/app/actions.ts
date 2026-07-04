@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
-import { completeRoutineById } from "@/lib/routines";
+import { completeRoutineById, undoRoutineCompletionById } from "@/lib/routines";
 import {
   completeTaskById,
   createTaskWithAudit,
@@ -25,6 +25,24 @@ export async function completeRoutine(formData: FormData) {
     return;
   }
 
+  revalidatePath("/today");
+  revalidatePath("/tasks");
+  revalidatePath("/");
+}
+
+export async function undoRoutineCompletion(formData: FormData) {
+  const routineId = formData.get("routineId");
+  if (typeof routineId !== "string" || routineId.length === 0) {
+    return;
+  }
+
+  try {
+    await undoRoutineCompletionById(routineId, { source: "manual" });
+  } catch {
+    return;
+  }
+
+  revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/tasks");
 }

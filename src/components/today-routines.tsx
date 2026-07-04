@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { completeRoutine } from "@/app/actions";
+import { completeRoutine, undoRoutineCompletion } from "@/app/actions";
 import type { RoutineTimeWindow } from "@/lib/routines";
 
 export type TodayRoutineItem = {
@@ -26,13 +26,17 @@ export function TodayRoutinesLine({
       <div className="flex flex-wrap gap-2">
         {routines.map((routine) =>
           routine.completedToday ? (
-            <span
-              key={routine.id}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-teal-700/30 bg-white px-3 text-sm text-teal-800"
-            >
-              <Check size={14} />
-              {routine.name}
-            </span>
+            <form key={routine.id} action={undoRoutineCompletion}>
+              <input type="hidden" name="routineId" value={routine.id} />
+              <button
+                type="submit"
+                title={`Uncheck ${routine.name}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-teal-700/30 bg-white px-3 text-sm text-teal-800 transition hover:border-teal-700"
+              >
+                <Check size={14} />
+                {routine.name}
+              </button>
+            </form>
           ) : (
             <form key={routine.id} action={completeRoutine}>
               <input type="hidden" name="routineId" value={routine.id} />

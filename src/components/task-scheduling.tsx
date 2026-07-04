@@ -465,6 +465,7 @@ function ScheduleMenu({
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState(currentAreaId);
   const [selectedProjectId, setSelectedProjectId] = useState(currentProjectId ?? "");
   const [pending, setPending] = useState(false);
@@ -537,11 +538,26 @@ function ScheduleMenu({
           <MenuButton disabled={pending} onClick={() => schedule(tomorrow)}>
             Tomorrow
           </MenuButton>
-          <MenuButton disabled={pending} onClick={() => setPicking(!picking)}>
+          <MenuButton
+            disabled={pending}
+            onClick={() => {
+              setPicking(true);
+              window.setTimeout(() => {
+                const input = dateInputRef.current;
+                input?.focus();
+                if (input && "showPicker" in input) {
+                  (
+                    input as HTMLInputElement & { showPicker: () => void }
+                  ).showPicker();
+                }
+              }, 0);
+            }}
+          >
             Pick date
           </MenuButton>
           {picking ? (
             <input
+              ref={dateInputRef}
               type="date"
               className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
               onChange={(event) => {

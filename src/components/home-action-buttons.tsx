@@ -65,18 +65,21 @@ export function HomeTaskActions({
 export function HomeRoutineCheck({
   routineId,
   name,
+  completed = false,
 }: {
   routineId: string;
   name: string;
+  completed?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
 
-  async function complete() {
+  async function toggle() {
     setPending(true);
     try {
-      const response = await fetch(`/api/routines/${routineId}/complete`, {
+      const action = completed ? "undo" : "complete";
+      const response = await fetch(`/api/routines/${routineId}/${action}`, {
         method: "POST",
       });
       if (response.ok) {
@@ -90,10 +93,14 @@ export function HomeRoutineCheck({
   return (
     <button
       type="button"
-      title={`Complete ${name}`}
+      title={completed ? `Uncheck ${name}` : `Complete ${name}`}
       disabled={pending}
-      onClick={complete}
-      className="inline-flex h-8 items-center rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-700 transition hover:border-teal-500 hover:text-teal-700 disabled:pointer-events-none disabled:opacity-60"
+      onClick={toggle}
+      className={`inline-flex h-8 items-center rounded-md border bg-white px-3 text-sm transition disabled:pointer-events-none disabled:opacity-60 ${
+        completed
+          ? "border-teal-700/30 text-teal-800 hover:border-teal-700"
+          : "border-stone-300 text-stone-700 hover:border-teal-500 hover:text-teal-700"
+      }`}
     >
       {name}
     </button>

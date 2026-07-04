@@ -1,13 +1,8 @@
 import Link from "next/link";
-import {
-  Archive,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  Repeat,
-} from "lucide-react";
+import { Archive, ArrowRight, CheckCircle2, Repeat } from "lucide-react";
 import { SetupNotice } from "@/components/setup-notice";
 import { HomeRoutineCheck, HomeTaskActions } from "@/components/home-action-buttons";
+import { CaptureFileActions } from "@/components/capture-file-actions";
 import { prisma } from "@/lib/db";
 import {
   formatDateOnly,
@@ -63,13 +58,6 @@ export default async function HomePage() {
         slippingProjectCount={homeData.slippingProjectCount}
       />
 
-      <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
-        <SectionHeader title="Today" href="/today" />
-        <div className="mt-3 divide-y divide-[#EEF1EC]">
-          <TodayRows data={todayData} />
-        </div>
-      </section>
-
       {todayData.topTasks.length > 0 ? (
         <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
           <SectionHeader title="Top tasks" href="/tasks?starred=1" />
@@ -81,6 +69,13 @@ export default async function HomePage() {
         </section>
       ) : null}
 
+      <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+        <SectionHeader title="Today" href="/today" />
+        <div className="mt-3 divide-y divide-[#EEF1EC]">
+          <TodayRows data={todayData} />
+        </div>
+      </section>
+
       <RoutinesLine routines={todayData.routinesDueToday} />
 
       <PulseRow
@@ -90,7 +85,10 @@ export default async function HomePage() {
         reviewDueCount={homeData.reviewDueCount}
       />
 
-      <RecentCaptures captures={todayData.recentCaptures} />
+      <RecentCaptures
+        captures={todayData.recentCaptures}
+        domains={todayData.domains}
+      />
 
       <MemoryCard item={todayData.resurfacedItem} />
     </div>
@@ -236,13 +234,12 @@ function RoutinesLine({
         </div>
         {routines.map((routine) =>
           routine.completedToday ? (
-            <span
+            <HomeRoutineCheck
               key={routine.id}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-teal-700/30 bg-white px-3 text-sm text-teal-800"
-            >
-              <Check size={14} />
-              {routine.name}
-            </span>
+              routineId={routine.id}
+              name={routine.name}
+              completed
+            />
           ) : (
             <HomeRoutineCheck
               key={routine.id}
@@ -270,16 +267,16 @@ function PulseRow({
   const items = [
     {
       href: "/projects",
-      text: `${freshCheckInCount} fresh check-in${freshCheckInCount === 1 ? "" : "s"} · ${slippingProjectCount} slipping → Projects`,
+      text: `Projects: ${freshCheckInCount} fresh check-in${freshCheckInCount === 1 ? "" : "s"} · ${slippingProjectCount} slipping → Projects`,
     },
     {
       href: "/areas/area_inbox",
-      text: `${pendingCaptureCount} capture${pendingCaptureCount === 1 ? "" : "s"} to sort → Inbox`,
+      text: `Inbox: ${pendingCaptureCount} capture${pendingCaptureCount === 1 ? "" : "s"} to sort → Inbox`,
     },
     reviewDueCount > 0
       ? {
           href: "/areas/area_inbox",
-          text: `${reviewDueCount} waiting → Inbox`,
+          text: `Reviews: ${reviewDueCount} waiting → Inbox`,
         }
       : null,
   ].filter((item): item is { href: string; text: string } => Boolean(item));
@@ -299,7 +296,13 @@ function PulseRow({
   );
 }
 
-function RecentCaptures({ captures }: { captures: ReadyToday["recentCaptures"] }) {
+function RecentCaptures({
+  captures,
+  domains,
+}: {
+  captures: ReadyToday["recentCaptures"];
+  domains: ReadyToday["domains"];
+}) {
   if (captures.length === 0) {
     return null;
   }
@@ -308,20 +311,35 @@ function RecentCaptures({ captures }: { captures: ReadyToday["recentCaptures"] }
     <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3">
       <SectionHeader title="Recently captured" href="/areas/area_inbox" />
       <div className="mt-2 divide-y divide-[#EEF1EC]">
-        {captures.slice(0, 5).map((capture) => (
-          <Link
-            key={capture.id}
-            href={getCaptureHref(capture)}
-            className="grid gap-2 py-2 text-sm transition hover:text-teal-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-          >
-            <span className="truncate text-stone-900">{capture.rawText}</span>
-            <span className="text-xs text-[#9AA096]">
-              {formatCaptureOutcome(capture.createdItems) ??
-                capture.parseStatus ??
-                "saved"}
-            </span>
-          </Link>
-        ))}
+        {captures.slice(0, 5).map((capture) => {
+          const pending = isPendingCapture(capture);
+          return (
+            <div
+              key={capture.id}
+              className="grid gap-2 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+            >
+              <Link
+                href={getCaptureHref(capture)}
+                className="truncate text-stone-900 transition hover:text-teal-700"
+              >
+                {capture.rawText}
+              </Link>
+              {pending ? (
+                <CaptureFileActions
+                  captureId={capture.id}
+                  domains={domains}
+                  align="right"
+                />
+              ) : (
+                <span className="text-xs text-[#9AA096]">
+                  {formatCaptureOutcome(capture.createdItems) ??
+                    capture.parseStatus ??
+                    "saved"}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -536,4 +554,15 @@ function isCaptureItem(item: unknown): item is CaptureItem {
     "label" in item &&
     typeof item.label === "string"
   );
+}
+
+function isPendingCapture(capture: ReadyToday["recentCaptures"][number]) {
+  if (capture.parseStatus === "ambiguous" || capture.parseStatus === "failed") {
+    return true;
+  }
+  return Array.isArray(capture.createdItems)
+    ? capture.createdItems.some(
+        (item) => isCaptureItem(item) && item.type === "pending_capture",
+      )
+    : false;
 }

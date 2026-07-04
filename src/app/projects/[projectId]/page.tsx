@@ -82,6 +82,57 @@ export default async function ProjectDetailPage({
         </div>
       </header>
 
+      <EntityDepth
+        parentType="project"
+        parentId={project.id}
+        notes={project.notes}
+        docs={project.docs}
+        attachments={project.attachments}
+      />
+
+      <MilestonesPanel projectId={project.id} milestones={project.milestones} />
+
+      <details className="relative">
+        <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+          <CalendarDays size={13} />
+          Timeframe
+        </summary>
+        <form
+          action={updateProjectTimeframe}
+          className="mt-2.5 grid gap-3 rounded-[14px] border border-[#E2E6DF] bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
+        >
+          <input type="hidden" name="projectId" value={project.id} />
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="block text-[13px] font-medium text-stone-600">
+              <span>Target date</span>
+              <input
+                type="date"
+                name="targetDate"
+                defaultValue={
+                  project.targetDate?.toISOString().slice(0, 10) ?? ""
+                }
+                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
+              />
+            </label>
+            <label className="flex h-10 items-center gap-2 text-[13px] font-medium text-stone-600">
+              <input
+                type="checkbox"
+                name="openEnded"
+                defaultChecked={!project.targetDate}
+                className="h-4 w-4 rounded border-[#E2E6DF] text-teal-700"
+              />
+              Open ended
+            </label>
+          </div>
+          <button
+            type="submit"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
+          >
+            Save timeframe
+          </button>
+        </form>
+      </details>
+
       <CheckInFeed
         parentType="project"
         parentId={project.id}
@@ -143,57 +194,6 @@ export default async function ProjectDetailPage({
           </div>
         )}
       </section>
-
-      <MilestonesPanel projectId={project.id} milestones={project.milestones} />
-
-      <details className="relative">
-        <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
-          <CalendarDays size={13} />
-          Timeframe
-        </summary>
-        <form
-          action={updateProjectTimeframe}
-          className="mt-2.5 grid gap-3 rounded-[14px] border border-[#E2E6DF] bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto]"
-        >
-          <input type="hidden" name="projectId" value={project.id} />
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <label className="block text-[13px] font-medium text-stone-600">
-              <span>Target date</span>
-              <input
-                type="date"
-                name="targetDate"
-                defaultValue={
-                  project.targetDate?.toISOString().slice(0, 10) ?? ""
-                }
-                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
-              />
-            </label>
-            <label className="flex h-10 items-center gap-2 text-[13px] font-medium text-stone-600">
-              <input
-                type="checkbox"
-                name="openEnded"
-                defaultChecked={!project.targetDate}
-                className="h-4 w-4 rounded border-[#E2E6DF] text-teal-700"
-              />
-              Open ended
-            </label>
-          </div>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
-          >
-            Save timeframe
-          </button>
-        </form>
-      </details>
-
-      <EntityDepth
-        parentType="project"
-        parentId={project.id}
-        notes={project.notes}
-        docs={project.docs}
-        attachments={project.attachments}
-      />
 
       <section className="space-y-2.5">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
