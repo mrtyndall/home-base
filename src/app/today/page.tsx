@@ -364,13 +364,13 @@ function StatusLine({
         : "No upcoming dated commitments.";
 
     return (
-      <section className="flex items-start gap-2.5">
-        <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={17} />
+      <section className="flex items-start gap-2.5 text-sm">
+        <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={16} />
         <div>
-          <h2 className="text-[15px] font-medium text-stone-950">
-            Nothing due through tomorrow.
-          </h2>
-          <p className="mt-0.5 text-sm text-[#6B7268]">
+          <p className="font-medium text-stone-950">
+            Today and tomorrow are clear.
+          </p>
+          <p className="mt-0.5 text-[#6B7268]">
             {nextCommitment} Nothing slipping.
           </p>
         </div>
@@ -379,13 +379,13 @@ function StatusLine({
   }
 
   return (
-    <section>
-      <h2 className="text-[15px] font-medium text-stone-950">
+    <section className="text-sm">
+      <p className="font-medium text-stone-950">
         {data.todayEvents.length} calendar event
         {data.todayEvents.length === 1 ? "" : "s"} and {data.dueToday.length}{" "}
         task{data.dueToday.length === 1 ? "" : "s"} due today.
-      </h2>
-      <p className="mt-0.5 text-sm text-[#6B7268]">Nothing slipping.</p>
+      </p>
+      <p className="mt-0.5 text-[#6B7268]">Nothing slipping.</p>
     </section>
   );
 }
