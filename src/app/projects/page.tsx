@@ -33,17 +33,19 @@ export default async function ProjectsPage() {
   const parkedProjects = projects.filter((project) => project.status === "parked");
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-normal">Projects</h1>
+    <div className="space-y-7">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          Projects
+        </h1>
+        <Link
+          href="/projects/new"
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
+        >
+          <Plus size={14} />
+          New project
+        </Link>
       </header>
-      <Link
-        href="/projects/new"
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-      >
-        <Plus size={16} />
-        New project
-      </Link>
       <ProjectShelf
         title="Active"
         empty="No active projects."
@@ -72,35 +74,18 @@ function ProjectShelf({
   empty: string;
   projects: ProjectListItem[];
 }) {
-  const groups = groupProjectsByDomain(projects);
   return (
     <section className="space-y-3">
-      <h2 className="text-base font-semibold text-stone-800">
-        {title} <span className="font-normal text-stone-500">{projects.length}</span>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        {title}{" "}
+        <span className="font-medium text-[#B0ACA2]">{projects.length}</span>
       </h2>
       {projects.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-          {empty}
-        </div>
+        <p className="text-sm text-[#6B7268]">{empty}</p>
       ) : (
-        <div className="space-y-3">
-          {groups.map((group) => (
-            <details key={group.domain.id} open className="space-y-2">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-stone-700 [&::-webkit-details-marker]:hidden">
-                {group.domain.name}{" "}
-                <Link
-                  href={`/domains/${group.domain.id}`}
-                  className="ml-1 text-xs font-medium text-teal-700 underline-offset-4 hover:underline"
-                >
-                  Open
-                </Link>
-              </summary>
-              <div className="grid gap-3 md:grid-cols-2">
-                {group.projects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
-                ))}
-              </div>
-            </details>
+        <div className="grid gap-3 md:grid-cols-2">
+          {projects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
           ))}
         </div>
       )}
@@ -114,48 +99,74 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
   const lastTouched = getLastTouched(project);
   const freshNote = getFreshNote(project);
   const slipFact = projectLastActivityFact(project, lastTouched);
+  const settled = project.status !== "active";
 
   return (
-    <article className="rounded-lg border border-stone-200 bg-white p-4">
+    <article
+      className={`rounded-[14px] border border-[#E2E6DF] p-4 ${
+        settled ? "bg-white/55" : "bg-white"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <Link
           href={`/projects/${project.id}`}
-          className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+          className="-m-1 min-w-0 flex-1 rounded-[10px] p-1 transition hover:bg-[#F7F9F5]"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">
-            {project.area.domain.name} / {project.area.name}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            {project.area.name}
           </p>
-          <h2 className="mt-1 text-lg font-semibold leading-snug">
+          <h2
+            className={`mt-1 text-[17px] font-medium leading-[1.3] ${
+              settled ? "text-stone-700" : "text-stone-950"
+            }`}
+          >
             {project.name}
           </h2>
         </Link>
-        <ProjectOverflowMenu projectId={project.id} status={project.status} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            href={`/domains/${project.area.domain.id}`}
+            className="inline-flex h-6 items-center rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+          >
+            {project.area.domain.name}
+          </Link>
+          <ProjectOverflowMenu projectId={project.id} status={project.status} />
+        </div>
       </div>
-      <Link href={`/projects/${project.id}`} className="mt-3 block space-y-3">
+      <Link href={`/projects/${project.id}`} className="mt-2.5 block space-y-2">
         {nextDatedTask?.dueDate ? (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-              Next dated task
-            </p>
-            <p className="mt-1 text-sm font-medium text-stone-900">
-              {nextDatedTask.title}
-            </p>
-            <p className="mt-0.5 text-sm text-stone-500">
-              {formatDateOnly(nextDatedTask.dueDate)}
-            </p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
-              Open tasks
-            </p>
-            <p className="mt-1 text-sm font-medium text-stone-900">
-              {openTasks.length}
-            </p>
-          </div>
-        )}
+          <p className="text-sm text-stone-700">
+            <span className="text-[#9AA096]">Next:</span> {nextDatedTask.title}{" "}
+            · {formatDateOnly(nextDatedTask.dueDate)}
+          </p>
+        ) : openTasks.length > 0 ? (
+          <p className="text-sm text-stone-700">
+            <span className="text-[#9AA096]">Next:</span> {openTasks.length}{" "}
+            open task{openTasks.length === 1 ? "" : "s"}
+          </p>
+        ) : null}
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+        {project.latestCheckIn ? (
+          <p className="text-sm leading-relaxed text-stone-800">
+            {checkInSnippet(project.latestCheckIn.bodyMd)}{" "}
+            <span className="text-[#9AA096]">
+              · {formatShortDate(project.latestCheckIn.createdAt)}
+            </span>
+          </p>
+        ) : null}
+
+        {slipFact ? (
+          <p className="text-[13px] text-stone-600">{slipFact}</p>
+        ) : null}
+
+        {freshNote ? (
+          <p className="text-[13px] italic text-stone-500">{freshNote}</p>
+        ) : null}
+
+        {(lastTouched && !slipFact) ||
+        project.targetDate ||
+        (project.milestoneCounts && project.milestoneCounts.total > 0) ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#9AA096]">
           {lastTouched && !slipFact ? (
             <span>Touched {formatShortDate(lastTouched)}</span>
           ) : null}
@@ -163,27 +174,28 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
             <span>Target {formatDateOnly(project.targetDate)}</span>
           ) : null}
           {project.milestoneCounts && project.milestoneCounts.total > 0 ? (
-            <span>
+            <span className="inline-flex items-center gap-1.5">
               {project.milestoneCounts.completed} of{" "}
               {project.milestoneCounts.total} milestones
+              {project.milestoneCounts.total <= 8 ? (
+                <span className="inline-flex gap-[3px]" aria-hidden="true">
+                  {Array.from({ length: project.milestoneCounts.total }).map(
+                    (_, index) => (
+                      <span
+                        key={index}
+                        className={`h-[3px] w-[13px] rounded-full ${
+                          index < (project.milestoneCounts?.completed ?? 0)
+                            ? "bg-teal-700"
+                            : "bg-[#E2E6DF]"
+                        }`}
+                      />
+                    ),
+                  )}
+                </span>
+              ) : null}
             </span>
           ) : null}
-        </div>
-
-        {slipFact ? <p className="text-sm text-stone-600">{slipFact}</p> : null}
-
-        {project.latestCheckIn ? (
-          <p className="text-sm text-stone-700">
-            {checkInSnippet(project.latestCheckIn.bodyMd)}{" "}
-            <span className="text-stone-500">
-              · {formatShortDate(project.latestCheckIn.createdAt)}
-            </span>
-          </p>
-        ) : null}
-        {freshNote ? (
-          <p className="border-l-2 border-stone-200 pl-3 text-sm text-stone-600">
-            {freshNote}
-          </p>
+          </div>
         ) : null}
       </Link>
     </article>
@@ -223,24 +235,6 @@ function getFreshNote(project: ProjectListItem) {
   const note = project.notes.find((item) => Number(item.createdAt) >= cutoff);
   if (!note) return null;
   return note.bodyMd.length > 140 ? `${note.bodyMd.slice(0, 137)}...` : note.bodyMd;
-}
-
-function groupProjectsByDomain(projects: ProjectListItem[]) {
-  const groups = new Map<string, { domain: Domain; projects: ProjectListItem[] }>();
-  for (const project of projects) {
-    const existing = groups.get(project.area.domain.id) ?? {
-      domain: project.area.domain,
-      projects: [],
-    };
-    existing.projects.push(project);
-    groups.set(project.area.domain.id, existing);
-  }
-
-  return Array.from(groups.values()).sort((left, right) =>
-    left.domain.sortOrder === right.domain.sortOrder
-      ? left.domain.name.localeCompare(right.domain.name)
-      : left.domain.sortOrder - right.domain.sortOrder,
-  );
 }
 
 async function loadProjects() {
