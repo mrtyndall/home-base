@@ -99,9 +99,11 @@ The Railway app service is deployed with Google OAuth completed (2026-07-03, "Pr
 
 ## Hierarchy And Containers
 
-Domains are organization headers only. Areas are ongoing responsibilities with `active`, `parked`, and `retired` statuses. Projects are finishable containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic.
+Domains are organization headers only. Areas are ongoing responsibilities and information canvases with `active`, `parked`, and `retired` statuses. They are the default holder for durable context: notes, references, docs, check-ins, standing tasks, and child projects. Projects are finishable or time-gated containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic.
 
-Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export. Area/project state fields are optional and are shown only when the system already has real data; list cards favor derived task, activity, and note signals.
+Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). `entity_notes.starred_at` supports manually starred important notes; nothing auto-stars notes. Check-ins render at the top of both area and project pages as the living timeline, while the generated activity log remains a quieter audit trail. Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export. Area/project state fields are optional and are shown only when the system already has real data; list cards favor derived task, activity, and note signals.
+
+Future idea bucket: the system may later suggest notes that could be starred based on repeated references, links to active tasks/projects, or resurfacing frequency. Suggestions must never auto-star notes and must never appear as nags or urgency.
 
 ## Current Components
 
@@ -129,6 +131,10 @@ Areas and projects share container tables for markdown notes (`entity_notes`), m
 - `src/app/api/settings/mcp-health/route.ts`: read-only probe of the MCP server `/health` endpoint (`MCP_HEALTH_URL` override, defaults to the local port).
 
 ## Changelog
+
+### 2026-07-04
+
+- Reweighted Areas as the primary information canvas. The Projects route now surfaces domain-grouped area cards before project shelves; Area pages lead with check-ins, then important notes/knowledge containers, then standing tasks and child projects. Project pages keep check-ins as the heartbeat, with milestones and important notes before task execution. Added manual starred shared notes through `entity_notes.starred_at`; system-suggested important notes are documented as a future idea only.
 
 ### 2026-07-03
 

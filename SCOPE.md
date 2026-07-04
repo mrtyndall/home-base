@@ -33,16 +33,16 @@ Three consequences flow from this purpose and govern every design decision:
 
 These are non-negotiable and should be treated as acceptance criteria for every feature.
 
-| Principle | Meaning in practice |
-|---|---|
-| Nothing is ever lost | Every capture is written to a raw, append-only ledger before parsing. Parsing failures, misfiles, and ambiguity never destroy the original input. Search must be able to find any capture ever made. Search failure equals data loss. |
-| One-strike accuracy | A single instance of wrong or stale information kills trust. Completed means gone from active views instantly. Counts match reality. Calendar reflects Google within its sync window and displays last-synced time. |
-| Speed is trust | Usage is dozens of 15 to 30 second glances per day, competing with Messages and Mail for thumb access. Cold open to usable Today screen must be fast. Capture must be near-instant: open, type or speak, send, confirmed. |
-| Plain visibility, no guilt | Neglected items stay visible in their normal place. No badges, no age labels, no red counters, no "you haven't touched this in 14 days" callouts. Matt will notice. Dormant is not failure. |
-| Confirmation builds trust | Every capture returns a visible confirmation of what was created and where it landed. The Today screen shows a "recently captured" strip as ongoing proof of catch. |
-| Surfaces never ask | Derived beats declared. No resting screen, card, or list renders an empty input, placeholder, or prompt soliciting information. Optional empty fields render as nothing. Card/list facts are computed from existing data such as tasks, activity, notes, and timestamps instead of demanded from Matt. A view that asks every time it is seen creates mental load and is a trust violation on par with guilt mechanics. |
-| Designed, not utilitarian | The app should look and feel intentionally designed. Matt cares about visual quality. No admin-panel defaults. Visual direction is a build-time conversation, but the bar is "something you'd want to look at." |
-| Event-driven attention | Push notifications fire on exactly two triggers (Section 8). Never on a schedule. No daily digests. The app's presence on the home screen is the primary pull. |
+| Principle                  | Meaning in practice                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nothing is ever lost       | Every capture is written to a raw, append-only ledger before parsing. Parsing failures, misfiles, and ambiguity never destroy the original input. Search must be able to find any capture ever made. Search failure equals data loss.                                                                                                                                                                                   |
+| One-strike accuracy        | A single instance of wrong or stale information kills trust. Completed means gone from active views instantly. Counts match reality. Calendar reflects Google within its sync window and displays last-synced time.                                                                                                                                                                                                     |
+| Speed is trust             | Usage is dozens of 15 to 30 second glances per day, competing with Messages and Mail for thumb access. Cold open to usable Today screen must be fast. Capture must be near-instant: open, type or speak, send, confirmed.                                                                                                                                                                                               |
+| Plain visibility, no guilt | Neglected items stay visible in their normal place. No badges, no age labels, no red counters, no "you haven't touched this in 14 days" callouts. Matt will notice. Dormant is not failure.                                                                                                                                                                                                                             |
+| Confirmation builds trust  | Every capture returns a visible confirmation of what was created and where it landed. The Today screen shows a "recently captured" strip as ongoing proof of catch.                                                                                                                                                                                                                                                     |
+| Surfaces never ask         | Derived beats declared. No resting screen, card, or list renders an empty input, placeholder, or prompt soliciting information. Optional empty fields render as nothing. Card/list facts are computed from existing data such as tasks, activity, notes, and timestamps instead of demanded from Matt. A view that asks every time it is seen creates mental load and is a trust violation on par with guilt mechanics. |
+| Designed, not utilitarian  | The app should look and feel intentionally designed. Matt cares about visual quality. No admin-panel defaults. Visual direction is a build-time conversation, but the bar is "something you'd want to look at."                                                                                                                                                                                                         |
+| Event-driven attention     | Push notifications fire on exactly two triggers (Section 8). Never on a schedule. No daily digests. The app's presence on the home screen is the primary pull.                                                                                                                                                                                                                                                          |
 
 ## Section 4: The Three Pillars
 
@@ -53,6 +53,7 @@ These are non-negotiable and should be treated as acceptance criteria for every 
 This is where the mental load lives and where the system succeeds or dies. It is built first and specified deepest, and the Today screen serves it above all else.
 
 **Tasks:**
+
 - Title, notes, status, due date, optional due time, priority
 - Area assignment, required, defaulting to the Inbox system area
 - Optional project assignment; a project implies its area
@@ -64,11 +65,13 @@ This is where the mental load lives and where the system succeeds or dies. It is
 - Completion is instant and absolute: completed tasks disappear from active views immediately and remain searchable forever
 
 **Calendar:**
+
 - Two-way Google Calendar sync on a 15-minute cron (never on page load, per the original guide's rate-limit lesson)
 - Last-synced timestamp visible on the Today screen
 - Events creatable via capture ("dinner with Lauren Friday 7pm")
 
 **The Today screen:**
+
 - Time horizon: today plus tomorrow. Not now/next, not the week.
 - Contents, in order: all-clear or attention status line, today's calendar, tasks due today/overdue, tomorrow preview, recently captured strip
 - The all-clear state renders prominently when nothing is due and nothing is slipping, stating the facts positively including the next upcoming commitment
@@ -80,23 +83,31 @@ This is where the mental load lives and where the system succeeds or dies. It is
 Personal areas and projects (ham radio, car upkeep, homelab builds, solar research, hobby threads) die from expensive re-entry, not lost interest. After weeks away, reconstructing "where was I?" costs more than the next step itself. This pillar makes re-entry a ten-second read.
 
 **Every area and project can carry living state:**
+
 - `current_state`: one or two sentences, describing exactly where things stand when the system has real state to record
 - `next_step`: the single next physical action, when one has been captured or explicitly set
 - Both are optional, never prompted for on resting views, and updated through the capture door or an explicit edit action: "log on the Proxmox build: motherboard arrived, next step is rack rails" updates both fields and appends to the activity log
 - Activity logs preserve full history of state changes and log entries
 
-**Areas are ongoing responsibilities:**
+**Areas are ongoing responsibilities and information canvases:**
+
 - Areas are fuzzy, durable responsibilities with no finish line. Examples: Ham Radio under Hobbies, Car Upkeep under Home.
-- Areas hold tasks, projects, notes, docs, file attachments, linked ideas, current_state, next_step, and activity.
+- Areas are the default holder for durable context: notes, references, docs, details, check-ins, file attachments, standing tasks, linked ideas, and child projects.
+- Check-ins are the living timeline and heartbeat of an area. They render directly below the header and capture narrative state in human language.
+- Manually starred area notes render near the top as important notes. Starred notes are context anchors, not tasks, and are never auto-promoted.
 - Lifecycle is `active`, `parked`, or `retired`. These are statuses, never deletes.
 - Areas have no target date, no completed state, no milestones, and never appear in slipping logic.
 - Optional tending cadence surfaces as plain fact only, never as a nag.
 
-**Projects are finishable:**
+**Projects are finishable or time-gated:**
+
 - Every project belongs to exactly one area.
+- A project exists only when there is a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort.
+- Projects are temporary workrooms pulled out of an area, not the default holder for loose information.
 - Projects hold tasks, notes, docs, file attachments, linked ideas, current_state, next_step, activity, optional milestones, target_date, completion, slipping logic, and idea lineage.
 
 **Project status model:**
+
 - `someday` — wanted, not committed. A full container that can incubate ideas, docs, and tasks indefinitely. No target date required. Excluded from slipping.
 - `active` — currently being worked.
 - `parked` — started, consciously set down. Parked is a normal, healthy state, not a warning. Excluded from slipping.
@@ -104,6 +115,7 @@ Personal areas and projects (ham radio, car upkeep, homelab builds, solar resear
 - Status flow enforcement in UI: "start now" versus "someday" is offered at creation; park appears only on active projects. Never present someday and parked as a pick-one dropdown in the same moment. Any status is correctable later from the project detail view.
 
 **Views:**
+
 - A projects shelf grouped into Active, Someday, and Parked. Cards surface derived facts: name, domain/area, next dated task or open-task count, last touched, and fresh note snippets. Optional current_state renders only when it exists.
 - Area re-entry view: open an area and immediately see optional state, standing tasks, child projects, notes, docs, attachments, linked ideas, and recent activity without being prompted to fill anything in.
 - Project re-entry view: open a project and immediately see optional state, tasks, notes, docs, attachments, linked ideas, milestones when present, and recent activity without being prompted to fill anything in.
@@ -125,6 +137,7 @@ Ideas get a home and a conversion path: capture, hold, convert. Deliberately lea
 One door, every source, nothing lost.
 
 **Flow:**
+
 1. Input arrives: in-app text field (default focus), in-app mic (Web Speech API), or mobile shortcut POST to `/api/capture`
 2. Raw input is written to the `captures` ledger immediately, before any parsing. This write is the sacred step. If everything downstream fails, the capture survives.
 3. Backend calls the Claude API with the parser system prompt (Section 10) and current context
@@ -158,9 +171,9 @@ Nesting is capped here permanently. There are no sub-areas and no sub-projects; 
 
 **Domains are pure organization.** They hold no tasks, no projects, no notes, no state, and no lifecycle. They exist only to group areas in navigation and pickers. Domains are never parked, completed, or killed. Target 4 to 7, such as Home, Family, Health, Hobbies, and Creative. Work is deliberately absent; work lives in Production Hub.
 
-**Areas are ongoing responsibilities.** Areas are PARA-style responsibilities with no finish line. Examples: Ham Radio under Hobbies, Car Upkeep under Home. Areas hold tasks, projects, notes, docs, file attachments, linked ideas, current_state, next_step, and activity. Area lifecycle is `active`, `parked`, and `retired`; all are statuses, never deletes. Areas have no target_date, no completed state, no milestones, and never appear in slipping logic. Optional tending_cadence surfaces as plain fact only, never as a nag.
+**Areas are ongoing responsibilities and information canvases.** Areas are PARA-style responsibilities with no finish line. Examples: Ham Radio under Hobbies, Car Upkeep under Home. Areas hold tasks, projects, notes, references, docs, file attachments, linked ideas, current_state, next_step, and check-ins. Area check-ins are the living timeline. Manual starred notes are stable context anchors and render near the top as important notes. Area lifecycle is `active`, `parked`, and `retired`; all are statuses, never deletes. Areas have no target_date, no completed state, no milestones, and never appear in slipping logic. Optional tending_cadence surfaces as plain fact only, never as a nag.
 
-**Projects are finishable.** Every project belongs to exactly one area. Projects hold tasks, notes, docs, file attachments, linked ideas, current_state, next_step, activity log, target_date, optional milestones, completion, slipping logic, and idea lineage.
+**Projects are finishable or time-gated.** Every project belongs to exactly one area. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Projects hold tasks, notes, docs, file attachments, linked ideas, current_state, next_step, check-ins, target_date, optional milestones, completion, slipping logic, and idea lineage.
 
 **Project statuses:** `someday`, `active`, `parked`, `completed`, and `killed`.
 
@@ -173,7 +186,7 @@ Nesting is capped here permanently. There are no sub-areas and no sub-projects; 
 
 **Inbox is a system area** under a hidden system domain. Quick-add and unrouted captures land there. Inbox remains visible and first-class, never a hidden queue and never a guilt pile. It is the only catch-all; do not auto-create "General" areas per domain.
 
-**Litmus test for UI copy, agents, and the parser prompt:** if it can be finished, it is a project. If Matt would still be responsible for it a year from now regardless, it is an area. If it is just a category of life, it is a domain. Someday means wanted, not committed; parked means started, set down.
+**Litmus test for UI copy, agents, and the parser prompt:** if it has a clear finish line, deliverable, deadline, time gate, milestone path, or temporary focused effort, it can be a project. If it is ongoing context or Matt would still be responsible for it a year from now regardless, it belongs to an area. If it is just a category of life, it is a domain. Someday means wanted, not committed; parked means started, set down. Facts, details, references, and reusable context default to area notes or references, not projects.
 
 **Markdown is canonical.** All text-bearing content (notes, docs, idea bodies, state fields) is stored as plain markdown, rendered in-app, and edited as markdown with a simple editor plus preview. No proprietary rich-text format anywhere. This preserves portability, full-text search, agent-friendliness, and a future Obsidian export path as a plain file write.
 
@@ -184,6 +197,7 @@ Nesting is capped here permanently. There are no sub-areas and no sub-projects; 
 **In-app:** a notifications feed logging every system action (audit trail, undo where feasible). Reminders for tasks with reminder offsets.
 
 **Push (Pushover), exactly two triggers:**
+
 1. **Clustering** — several related captures have piled up around the same theme. Requires the parser to tag captures with topical embeddings or theme labels and a nightly job to detect clusters. Threshold tunable; start conservative.
 2. **Time-sensitive capture becoming actionable** — something captured with a temporal condition has reached its window ("when the RT-EV pilot billing cycle starts...", "before the July trip...").
 
@@ -198,6 +212,7 @@ Minor convenience, read-only. When a work item spawns a personal project ("I wan
 Adapted from the original guide's Section 7. The parser receives raw input plus context and returns a JSON array of actions.
 
 **Context per request (rebuilt fresh every request, never cached as content):**
+
 - Current date/time, America/New_York
 - Active domains and areas as a tree (IDs, names, status)
 - Active, someday, and parked projects (IDs, names, area, current_state)
@@ -205,6 +220,7 @@ Adapted from the original guide's Section 7. The parser receives raw input plus 
 - Capture source
 
 **Action types:**
+
 - `create_task` { area_match?, project_match?, title, due_date?, due_time?, priority?, parent_task_match?, reminder_offsets?, someday? }
 - `complete_task` { task_match }
 - `create_area` { name, domain_match }
@@ -220,6 +236,7 @@ Adapted from the original guide's Section 7. The parser receives raw input plus 
 - `create_entity_doc` { parent_type: area|project, area_match?, project_match?, title, body_md }
 
 **Rules (kept and adapted from the guide):**
+
 - Return only valid JSON, array of actions, multiple actions per utterance common
 - Fuzzy matching on names
 - Ambiguity returns `{ needs_disambiguation: true, candidates: [...] }` → Inbox
@@ -235,17 +252,17 @@ Adapted from the original guide's Section 7. The parser receives raw input plus 
 
 Kept from the original guide except where noted.
 
-| Layer | Choice | Deviation from guide |
-|---|---|---|
-| Frontend | Next.js (App Router) PWA, mobile-first, bottom tabs | Same |
-| Backend | Node.js (Fastify or Hono) | Same |
-| Database | PostgreSQL on Railway | **Changed from Supabase.** Matt already runs Production Hub on Railway. One platform, one deploy habit, saves $25/month. |
-| Object storage | Railway volume or Cloudflare R2 (photos/attachments, light use) | Changed from Supabase Storage |
-| Auth | Single-user: strong password + long-lived session, optional TOTP. Simple middleware, no auth SaaS. | Changed from Supabase Auth |
-| AI | Anthropic API, Sonnet + Haiku, prompt caching | Same |
-| Push | Pushover | Same (was optional in guide, required here) |
-| Hosting | Railway | Confirmed |
-| Calendar | Google Calendar API, OAuth via Google Cloud Console, 15-min cron sync | Same |
+| Layer          | Choice                                                                                             | Deviation from guide                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Frontend       | Next.js (App Router) PWA, mobile-first, bottom tabs                                                | Same                                                                                                                     |
+| Backend        | Node.js (Fastify or Hono)                                                                          | Same                                                                                                                     |
+| Database       | PostgreSQL on Railway                                                                              | **Changed from Supabase.** Matt already runs Production Hub on Railway. One platform, one deploy habit, saves $25/month. |
+| Object storage | Railway volume or Cloudflare R2 (photos/attachments, light use)                                    | Changed from Supabase Storage                                                                                            |
+| Auth           | Single-user: strong password + long-lived session, optional TOTP. Simple middleware, no auth SaaS. | Changed from Supabase Auth                                                                                               |
+| AI             | Anthropic API, Sonnet + Haiku, prompt caching                                                      | Same                                                                                                                     |
+| Push           | Pushover                                                                                           | Same (was optional in guide, required here)                                                                              |
+| Hosting        | Railway                                                                                            | Confirmed                                                                                                                |
+| Calendar       | Google Calendar API, OAuth via Google Cloud Console, 15-min cron sync                              | Same                                                                                                                     |
 
 **Tabs:** Home · Today · Tasks · Projects · Ideas. Search is a consistent utility action outside the tab bar. Persistent capture affordance remains available on every primary surface.
 
@@ -307,7 +324,7 @@ references                — Links, recs, things people mention
 
 entity_notes              — Shared area/project notes
   id, parent_type (area/project), parent_id,
-  body_md, source?, capture_id?, created_at
+  body_md, source?, capture_id?, starred_at?, created_at
 
 entity_docs               — Shared area/project markdown docs
   id, parent_type (area/project), parent_id,
@@ -342,6 +359,7 @@ app_settings
 ```
 
 **Integrity rules:**
+
 - No hard deletes anywhere except capture_tokens revocation. "Killed" and "completed" are statuses.
 - Every AI-created row links back to its capture_id.
 - Postgres FTS indexes on captures.raw_text, tasks.title+notes, ideas, references, project_activity, entity_notes.body_md, and entity_docs.title+body_md.
@@ -370,13 +388,13 @@ Use the tool daily from step 4 onward. Tune against real use before adding steps
 
 ## Section 14: Costs
 
-| Item | Monthly |
-|---|---|
-| Railway (app + Postgres) | ~$10–20 |
-| Anthropic API (parsing + chat search) | ~$10–15 |
-| Pushover | $5 one-time |
-| Domain | ~$1 amortized |
-| **Total** | **~$21–36/month** |
+| Item                                  | Monthly           |
+| ------------------------------------- | ----------------- |
+| Railway (app + Postgres)              | ~$10–20           |
+| Anthropic API (parsing + chat search) | ~$10–15           |
+| Pushover                              | $5 one-time       |
+| Domain                                | ~$1 amortized     |
+| **Total**                             | **~$21–36/month** |
 
 Roughly $25–50/month cheaper than the original guide's stack, primarily from dropping Supabase Pro.
 
@@ -446,15 +464,19 @@ These four modules from the original guide stay in scope. The bias: none of them
 **Activation test, applied per module:** "I have concretely wished for this at least weekly for two weeks, and the core system could not serve the need." A vague "this would be nice" fails the test.
 
 ### Content Pipeline
+
 Tracks personal creative output (The Misc podcast, blog, doc projects) from idea → outline → production → published → derivatives. On publish, auto-spawns derivative tasks from per-channel templates. Tables: `content_items`, `content_templates` per the original guide. Likeliest first activation given the ideas-to-projects success metric.
 
 ### People CRM
+
 Light personal relationship memory: facts people mention (anniversaries, kids' names, follow-ups), surfaced ahead of relevant dates. Captured through the same door ("note for Chris: his daughter starts college in August"). Tables: `people`, `person_facts`, `person_interactions`. Nudges from this module use the existing time-sensitive trigger only; no new notification types.
 
 ### Email Integration
+
 Forward-to-capture address first; Gmail watcher with autonomous actions only after forward-to-capture has proven itself. Approval-first trust model on any autonomous action, per the original guide's security warning. Table: `email_rules`. The bias against this one is strongest: it is the only module that acts on Matt's behalf in external systems, and a wrong action there is a trust violation under the one-strike rule.
 
 ### Routines
+
 Recurring habits separate from tasks, with completion history. Explicitly excluded until activated: streaks, heatmaps, and any mechanic that manufactures guilt on a missed day. Tables: `routines`, `routine_completions`. Weakest activation candidate; recurrence on tasks may cover the need entirely.
 
 ---
@@ -477,4 +499,4 @@ These amendments were adopted with the M5 work order (`docs/M5-MASTER-WORK-ORDER
 
 ---
 
-*End of scope. When reality diverges from this document, update the document. It only stays useful if it stays true.*
+_End of scope. When reality diverges from this document, update the document. It only stays useful if it stays true._
