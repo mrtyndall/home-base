@@ -31,36 +31,44 @@ export default async function DomainPage({ params }: DomainPageProps) {
   const { domain, areas, projectFacts, taskPulse } = result;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header className="space-y-3">
         <Link
           href="/projects"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Projects
         </Link>
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-            Domain
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal">
+          <h1 className="font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950">
             {domain.name}
           </h1>
           {domain.description?.trim() ? (
-            <p className="mt-3 max-w-2xl whitespace-pre-wrap text-sm text-stone-700">
+            <p className="mt-2.5 max-w-2xl whitespace-pre-wrap text-sm leading-relaxed text-stone-600">
               {domain.description}
             </p>
           ) : null}
+          <p className="mt-3 text-sm text-[#6B7268]">
+            {taskPulse.openTasks} open task{taskPulse.openTasks === 1 ? "" : "s"}
+            {" · "}
+            {taskPulse.dueToday} due today
+            {" · "}
+            {projectFacts.activeCount} active project
+            {projectFacts.activeCount === 1 ? "" : "s"}
+          </p>
         </div>
       </header>
 
-      <details className="rounded-lg border border-stone-200 bg-white p-4">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-stone-700 [&::-webkit-details-marker]:hidden">
-          <Pencil size={15} />
+      <details>
+        <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 px-1 text-[13px] font-medium text-stone-500 transition hover:text-stone-950 [&::-webkit-details-marker]:hidden">
+          <Pencil size={12} />
           Edit description
         </summary>
-        <form action={updateDomainDescription} className="mt-4 space-y-3">
+        <form
+          action={updateDomainDescription}
+          className="mt-2.5 max-w-2xl space-y-3 rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+        >
           <input type="hidden" name="domainId" value={domain.id} />
           <label className="block text-sm font-medium text-stone-700">
             <span className="sr-only">Description</span>
@@ -68,13 +76,13 @@ export default async function DomainPage({ params }: DomainPageProps) {
               name="description"
               rows={4}
               defaultValue={domain.description ?? ""}
-              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1 w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm leading-relaxed outline-none transition focus:border-teal-700"
             />
           </label>
           <div className="flex justify-end">
             <button
               type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
             >
               Save
             </button>
@@ -82,46 +90,32 @@ export default async function DomainPage({ params }: DomainPageProps) {
         </form>
       </details>
 
-      <section className="rounded-lg border border-stone-200 bg-white px-4 py-3">
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-stone-700">
-          <span>
-            {taskPulse.openTasks} open task{taskPulse.openTasks === 1 ? "" : "s"}
-          </span>
-          <span>
-            {taskPulse.dueToday} due today
-          </span>
-          <span>
-            {projectFacts.activeCount} active project
-            {projectFacts.activeCount === 1 ? "" : "s"}
-          </span>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-stone-800">Areas</h2>
+      <section className="space-y-2.5">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Areas
+        </h2>
         {areas.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-white/60 p-4 text-sm text-stone-500">
-            No areas in this domain.
-          </div>
+          <p className="text-sm text-[#6B7268]">No areas in this domain.</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {areas.map((area) => (
               <Link
                 key={area.id}
                 href={`/areas/${area.id}`}
-                className="rounded-lg border border-stone-200 bg-white p-4 transition hover:border-teal-400"
+                className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3.5 transition hover:border-teal-700/50"
               >
-                <p className="text-sm font-medium text-stone-900">{area.name}</p>
-                <p className="mt-0.5 text-xs text-stone-500">
-                  {area.status}
-                  {area.openTaskCount > 0
-                    ? ` · ${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`
-                    : ""}
-                </p>
+                <div className="flex items-baseline justify-between gap-2.5">
+                  <p className="text-[15px] font-medium text-stone-950">{area.name}</p>
+                  <p className="shrink-0 text-xs text-[#9AA096]">
+                    {area.openTaskCount > 0
+                      ? `${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`
+                      : area.status}
+                  </p>
+                </div>
                 {area.latestCheckIn ? (
-                  <p className="mt-2 text-sm text-stone-700">
+                  <p className="mt-1.5 text-[13px] leading-normal text-stone-600">
                     {checkInSnippet(area.latestCheckIn.bodyMd, 110)}{" "}
-                    <span className="text-stone-500">
+                    <span className="text-[#9AA096]">
                       · {formatShortDate(area.latestCheckIn.createdAt)}
                     </span>
                   </p>
@@ -133,21 +127,21 @@ export default async function DomainPage({ params }: DomainPageProps) {
       </section>
 
       {projectFacts.slipping.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-stone-800">
+        <section className="space-y-2.5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
             Project facts
           </h2>
-          <div className="space-y-2">
+          <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
             {projectFacts.slipping.map((project) => (
               <Link
                 key={project.id}
                 href={`/projects/${project.id}`}
-                className="block rounded-lg border border-stone-200 bg-white p-4 transition hover:border-teal-400"
+                className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
               >
-                <p className="text-sm font-medium text-stone-900">
+                <p className="text-sm font-medium text-stone-950">
                   {project.name}
                 </p>
-                <p className="mt-0.5 text-sm text-stone-600">{project.fact}</p>
+                <p className="mt-0.5 text-[13px] text-stone-600">{project.fact}</p>
               </Link>
             ))}
           </div>

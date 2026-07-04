@@ -18,43 +18,38 @@ export default async function NewProjectPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header className="space-y-3">
         <Link
           href="/projects"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Projects
         </Link>
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-            Project
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-            New project
-          </h1>
-        </div>
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          New project
+        </h1>
       </header>
 
       <form
         action={createProject}
-        className="max-w-2xl space-y-4 rounded-lg border border-stone-200 bg-white p-4"
+        className="max-w-2xl space-y-4 rounded-[14px] border border-[#E2E6DF] bg-white p-4"
       >
-        <label className="block text-sm font-medium text-stone-700">
+        <label className="block text-[13px] font-medium text-stone-600">
           <span>Name</span>
           <input
             name="name"
             required
-            className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
           />
         </label>
-        <label className="block text-sm font-medium text-stone-700">
+        <label className="block text-[13px] font-medium text-stone-600">
           <span>Area</span>
           <select
             name="areaId"
             required
-            className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
             defaultValue={result.domains[0]?.areas[0]?.id ?? ""}
           >
             {result.domains.map((domain) => (
@@ -68,32 +63,59 @@ export default async function NewProjectPage() {
             ))}
           </select>
         </label>
-        <label className="block text-sm font-medium text-stone-700">
+        <label className="block text-[13px] font-medium text-stone-600">
           <span>Target date</span>
           <input
             type="date"
             name="targetDate"
-            className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
           />
         </label>
-        <label className="block text-sm font-medium text-stone-700">
-          <span>Start mode</span>
-          <select
-            name="startMode"
-            defaultValue="active"
-            className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+        <fieldset>
+          <legend className="text-[13px] font-medium text-stone-600">
+            Start mode
+          </legend>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <label className="cursor-pointer rounded-[14px] border border-[#E2E6DF] bg-white p-3.5 transition hover:border-teal-700/40 has-[:checked]:border-teal-700 has-[:checked]:bg-[#F5FAF8] has-[:focus-visible]:border-teal-700">
+              <input
+                type="radio"
+                name="startMode"
+                value="active"
+                defaultChecked
+                className="sr-only"
+              />
+              <span className="block text-sm font-medium text-stone-950">
+                Start now
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">
+                Currently being worked.
+              </span>
+            </label>
+            <label className="cursor-pointer rounded-[14px] border border-[#E2E6DF] bg-white p-3.5 transition hover:border-teal-700/40 has-[:checked]:border-teal-700 has-[:checked]:bg-[#F5FAF8] has-[:focus-visible]:border-teal-700">
+              <input
+                type="radio"
+                name="startMode"
+                value="someday"
+                className="sr-only"
+              />
+              <span className="block text-sm font-medium text-stone-950">
+                Someday
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-stone-600">
+                Wanted, not committed.
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-[18px] text-sm font-medium text-white transition hover:bg-teal-800"
           >
-            <option value="active">Start now</option>
-            <option value="someday">Someday</option>
-          </select>
-        </label>
-        <button
-          type="submit"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
-        >
-          <Plus size={16} />
-          Create
-        </button>
+            <Plus size={14} />
+            Create
+          </button>
+        </div>
       </form>
     </div>
   );
