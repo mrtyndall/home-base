@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type React from "react";
-import { Bell, CalendarDays, KeyRound, ServerCog, type LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatShortDate, formatTime } from "@/lib/dates";
 import { SetupNotice } from "@/components/setup-notice";
 import { PushoverTestButton } from "@/components/settings/pushover-test-button";
 import { ApiKeyRevokeButton } from "@/components/settings/api-key-revoke-button";
 import { McpHealthCheck } from "@/components/settings/mcp-health-check";
+import { CopyLine } from "@/components/settings/copy-line";
 import { normalizeScopes } from "@/lib/api/auth";
 
 export const dynamic = "force-dynamic";
@@ -53,40 +53,41 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-3xl font-semibold tracking-normal">Settings</h1>
+        <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
+          Settings
+        </h1>
       </header>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold text-stone-800">Integrations</h2>
-        <div className="grid gap-3 md:grid-cols-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Integrations
+        </h2>
+        <div className="grid gap-3">
           <IntegrationCard
-            icon={CalendarDays}
             title="Google Calendar"
             status={google.status}
             tone={google.tone}
           >
-            <p className="text-sm text-stone-600">{google.detail}</p>
+            <p className="text-[13px] text-stone-600">{google.detail}</p>
             {calendarSync?.lastSyncedAt ? (
-              <p className="text-sm text-stone-600">
+              <p className="text-[13px] text-stone-600">
                 Last sync attempt {formatShortDate(calendarSync.lastSyncedAt)} at{" "}
                 {formatTime(calendarSync.lastSyncedAt)}.
               </p>
             ) : null}
             {calendarSync?.status === "failed" && calendarSync.error ? (
-              <p className="text-sm text-red-700">{calendarSync.error}</p>
+              <p className="text-[13px] text-amber-800">{calendarSync.error}</p>
             ) : null}
             {googleMissing.length > 0 ? (
               <MissingVariables names={googleMissing} />
             ) : null}
             <div className="space-y-1">
-              <p className="text-xs font-medium text-stone-500">
-                Authorized redirect URI (Google Cloud Console)
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9AA096]">
+                Redirect URI (Google Cloud Console)
               </p>
-              <p className="break-all rounded-md bg-stone-50 px-2 py-1.5 font-mono text-xs text-stone-700">
-                {REQUIRED_REDIRECT_URI}
-              </p>
+              <CopyLine value={REQUIRED_REDIRECT_URI} />
               {redirectUriMismatch ? (
-                <p className="text-xs text-amber-700">
+                <p className="text-xs text-amber-800">
                   GOOGLE_REDIRECT_URI is set to a different value than the URI above.
                 </p>
               ) : null}
@@ -94,7 +95,7 @@ export default async function SettingsPage() {
             {googleMissing.length === 0 && !calendarConnected ? (
               <Link
                 href="/api/google/oauth/start"
-                className="inline-flex h-9 items-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white transition hover:bg-teal-800"
+                className="inline-flex h-9 items-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
               >
                 Connect Google Calendar
               </Link>
@@ -102,14 +103,13 @@ export default async function SettingsPage() {
           </IntegrationCard>
 
           <IntegrationCard
-            icon={Bell}
             title="Pushover"
             status={pushoverMissing.length === 0 ? "Configured" : "Missing variables"}
             tone={pushoverMissing.length === 0 ? "good" : "attention"}
           >
             {pushoverMissing.length === 0 ? (
               <>
-                <p className="text-sm text-stone-600">
+                <p className="text-[13px] text-stone-600">
                   Reminder delivery credentials are present.
                   {lastReminderSentAt
                     ? ` Last reminder sent ${formatShortDate(lastReminderSentAt)} at ${formatTime(lastReminderSentAt)}.`
@@ -119,7 +119,7 @@ export default async function SettingsPage() {
               </>
             ) : (
               <>
-                <p className="text-sm text-stone-600">
+                <p className="text-[13px] text-stone-600">
                   Add the missing variables to Railway variables (or the local env) to
                   enable reminder delivery. Values live in 1Password, never in the repo.
                 </p>
@@ -129,14 +129,12 @@ export default async function SettingsPage() {
           </IntegrationCard>
 
           <IntegrationCard
-            icon={KeyRound}
             title="API access"
             status={`${activeKeys.length} active ${activeKeys.length === 1 ? "key" : "keys"}`}
             tone={activeKeys.length > 0 ? "good" : "neutral"}
-            className="md:col-span-2"
           >
             {apiKeys.length > 0 ? (
-              <ul className="divide-y divide-stone-100">
+              <ul className="divide-y divide-[#EEF1EC]">
                 {apiKeys.map((key) => (
                   <li
                     key={key.id}
@@ -146,12 +144,12 @@ export default async function SettingsPage() {
                       <p className="text-sm font-medium text-stone-800">
                         {key.label}
                         {key.revokedAt ? (
-                          <span className="ml-2 text-xs font-normal text-stone-500">
+                          <span className="ml-2 text-xs font-normal text-[#B0ACA2]">
                             revoked {formatShortDate(key.revokedAt)}
                           </span>
                         ) : null}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xs text-[#9AA096]">
                         {normalizeScopes(key.scopes).join(", ") || "no scopes"} ·{" "}
                         {key.rateLimit}/hr writes ·{" "}
                         {key.lastUsedAt
@@ -164,31 +162,27 @@ export default async function SettingsPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone-600">No API keys are registered.</p>
+              <p className="text-[13px] text-stone-600">No API keys are registered.</p>
             )}
-            <div className="space-y-1 border-t border-stone-100 pt-3">
-              <p className="text-sm text-stone-600">
+            <div className="space-y-1 border-t border-[#EEF1EC] pt-3">
+              <p className="text-[13px] text-stone-600">
                 New keys are created from the command line so the token itself never
                 passes through this page. Set <code className="font-mono text-xs">HOME_BASE_API_TOKEN</code>{" "}
                 from 1Password, then run:
               </p>
-              <p className="break-all rounded-md bg-stone-50 px-2 py-1.5 font-mono text-xs text-stone-700">
-                npm run api:key:register -- &lt;label&gt; read,write,capture [rateLimit]
-              </p>
-              <p className="text-xs text-stone-500">
+              <CopyLine value="npm run api:key:register -- <label> read,write,capture [rateLimit]" />
+              <p className="text-xs text-[#9AA096]">
                 Only the token hash is stored. Keys are revoked, never deleted.
               </p>
             </div>
           </IntegrationCard>
 
           <IntegrationCard
-            icon={ServerCog}
             title="MCP server"
             status="Local / Tailscale"
             tone="neutral"
-            className="md:col-span-2"
           >
-            <p className="text-sm text-stone-600">
+            <p className="text-[13px] text-stone-600">
               The MCP server wraps the REST API over streamable HTTP and runs beside
               the local runtime, separate from the web app.
             </p>
@@ -208,65 +202,67 @@ export default async function SettingsPage() {
 }
 
 function IntegrationCard({
-  icon: Icon,
   title,
   status,
   tone,
-  className,
   children,
 }: {
-  icon: LucideIcon;
   title: string;
   status: string;
   tone: StatusTone;
-  className?: string;
   children: React.ReactNode;
 }) {
-  const toneClass =
+  const toneDot =
     tone === "good"
-      ? "text-teal-700"
+      ? "h-1.5 w-1.5 rounded-full bg-teal-700"
       : tone === "attention"
-        ? "text-amber-700"
+        ? "h-1.5 w-1.5 rounded-full bg-amber-600"
+        : "h-1.5 w-1.5 rounded-full border border-[#C9CFC5]";
+  const toneText =
+    tone === "good"
+      ? "text-stone-600"
+      : tone === "attention"
+        ? "text-amber-800"
         : "text-stone-500";
 
   return (
-    <article className={`rounded-lg border border-stone-200 bg-white p-4 ${className ?? ""}`}>
-      <div className="flex items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-teal-50 text-teal-700">
-          <Icon size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="font-semibold">{title}</h3>
-            <p className={`text-sm font-medium ${toneClass}`}>{status}</p>
-          </div>
-          <div className="mt-2 space-y-3">{children}</div>
-        </div>
+    <article className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[15px] font-medium text-stone-950">{title}</h3>
+        <p className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${toneText}`}>
+          <span className={`inline-block ${toneDot}`} aria-hidden="true" />
+          {status}
+        </p>
       </div>
+      <div className="mt-2.5 space-y-3">{children}</div>
     </article>
   );
 }
 
 function MissingVariables({ names }: { names: readonly string[] }) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-stone-500">Missing variables</p>
-      <ul className="space-y-0.5">
-        {names.map((name) => (
-          <li key={name} className="font-mono text-xs text-amber-700">
-            {name}
-          </li>
-        ))}
-      </ul>
+    <div className="flex flex-wrap gap-1.5">
+      {names.map((name) => (
+        <span
+          key={name}
+          className="rounded-[8px] bg-[#F7F9F5] px-2 py-1 font-mono text-[11px] text-stone-600"
+        >
+          {name}
+        </span>
+      ))}
     </div>
   );
 }
 
 function McpRoute({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
-      <dt className="w-20 shrink-0 text-xs font-medium text-stone-500">{label}</dt>
-      <dd className="break-all font-mono text-xs text-stone-700">{value}</dd>
+    <div>
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9AA096]">
+        {label}
+      </dt>
+      <dd>
+        <CopyLine value={value} />
+      </dd>
     </div>
   );
 }

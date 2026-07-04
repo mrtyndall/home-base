@@ -13,7 +13,7 @@ export function PushoverTestButton() {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-9 items-center rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-500 hover:text-teal-700 disabled:opacity-60"
+        className="inline-flex h-8 items-center rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 disabled:opacity-60"
       >
         {pending ? "Sending…" : "Send test notification"}
       </button>
@@ -21,8 +21,8 @@ export function PushoverTestButton() {
         <p
           className={
             state.status === "sent"
-              ? "text-sm text-teal-700"
-              : "text-sm text-red-700"
+              ? "text-[13px] text-teal-700"
+              : "text-[13px] text-amber-800"
           }
         >
           {state.message}

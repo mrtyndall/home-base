@@ -13,7 +13,7 @@ export function ApiKeyRevokeButton({ keyId }: { keyId: string }) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="inline-flex h-8 items-center rounded-md border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-600 transition hover:border-red-400 hover:text-red-700"
+        className="inline-flex h-[30px] items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-xs font-medium text-stone-600 transition hover:border-stone-400 hover:text-stone-950"
       >
         Revoke
       </button>
@@ -25,14 +25,14 @@ export function ApiKeyRevokeButton({ keyId }: { keyId: string }) {
       <input type="hidden" name="keyId" value={keyId} />
       <button
         type="submit"
-        className="inline-flex h-8 items-center rounded-md bg-red-700 px-2.5 text-xs font-medium text-white transition hover:bg-red-800"
+        className="inline-flex h-[30px] items-center rounded-full bg-stone-950 px-3 text-xs font-medium text-white transition hover:bg-stone-800"
       >
         Confirm revoke
       </button>
       <button
         type="button"
         onClick={() => setConfirming(false)}
-        className="inline-flex h-8 items-center rounded-md border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-600 transition hover:border-teal-500"
+        className="inline-flex h-[30px] items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-xs font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
       >
         Keep
       </button>
