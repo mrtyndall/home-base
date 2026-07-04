@@ -85,7 +85,9 @@ export default async function PersonPage({ params }: PersonPageProps) {
                   {dateLead ? (
                     <p className="text-xs text-[#9AA096]">{dateLead}</p>
                   ) : null}
-                  <p className={`text-[15px] text-stone-950 ${dateLead ? "mt-0.5" : ""}`}>
+                  <p
+                    className={`text-[15px] text-stone-950 ${dateLead ? "mt-0.5" : ""}`}
+                  >
                     {fact.factValue}
                   </p>
                   <p className="mt-0.5 text-xs text-[#B0ACA2]">{trail}</p>
@@ -103,7 +105,10 @@ export default async function PersonPage({ params }: PersonPageProps) {
         {person.interactions.length === 0 ? null : (
           <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
             {person.interactions.map((interaction) => (
-              <div key={interaction.id} className="flex items-baseline gap-3 px-4 py-3">
+              <div
+                key={interaction.id}
+                className="flex items-baseline gap-3 px-4 py-3"
+              >
                 <span className="min-w-[46px] text-xs text-[#9AA096]">
                   {formatShortDate(interaction.occurredAt)}
                 </span>
@@ -117,7 +122,9 @@ export default async function PersonPage({ params }: PersonPageProps) {
                       : interaction.source === "capture"
                         ? "from capture"
                         : "noted by hand"}
-                    {interaction.notesMd ? ` · ${interaction.interactionType}` : ""}
+                    {interaction.notesMd
+                      ? ` · ${interaction.interactionType}`
+                      : ""}
                   </p>
                 </div>
               </div>
