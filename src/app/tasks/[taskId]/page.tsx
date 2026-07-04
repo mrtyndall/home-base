@@ -33,33 +33,60 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   const { task, domains, projects } = result;
   const reminderOffsets = parseReminderOffsets(task.reminderOffsets).join(", ");
+  const parsedReminderOffsets = parseReminderOffsets(task.reminderOffsets);
+  const facts: Array<[string, string]> = [];
+  if (task.dueDate) {
+    facts.push([
+      "Due",
+      `${formatDateOnly(task.dueDate)}${task.dueTime ? ` · ${formatDueTime(task.dueTime)}` : ""}`,
+    ]);
+  } else if (task.dueTime) {
+    facts.push(["Due", formatDueTime(task.dueTime)]);
+  }
+  if (task.someday) {
+    facts.push(["Scheduled", "Someday"]);
+  }
+  if (task.priority) {
+    facts.push([
+      "Priority",
+      task.priority.charAt(0).toUpperCase() + task.priority.slice(1),
+    ]);
+  }
+  if (parsedReminderOffsets.length > 0) {
+    facts.push([
+      "Reminders",
+      parsedReminderOffsets.map(humanizeReminderOffset).join(" · "),
+    ]);
+  }
+  if (task.recurrenceRule) {
+    facts.push(["Repeats", task.recurrenceRule]);
+  }
+  if (task.status === "completed" && task.completedAt) {
+    facts.push(["Completed", formatDateOnly(task.completedAt)]);
+  }
 
   return (
-    <div className="space-y-5">
-      <header className="space-y-3">
+    <div className="space-y-6">
+      <header className="space-y-3.5">
         <Link
           href="/tasks"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} />
           Tasks
         </Link>
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.14em] text-teal-700">
-              Task detail
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-normal">
-              {task.title}
-            </h1>
-            <p className="mt-1 text-sm text-stone-500">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               {task.area.name}
               {task.project ? ` / ${task.project.name}` : ""}
-              {task.dueDate ? ` / ${formatDateOnly(task.dueDate)}` : ""}
             </p>
+            <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950">
+              {task.title}
+            </h1>
           </div>
           {task.status === "open" ? (
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5 pt-1">
               <TaskStarButton taskId={task.id} starred={task.starred} />
               <TaskCompleteButton taskId={task.id} />
             </div>
@@ -67,128 +94,57 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
         </div>
       </header>
 
-      <form
-        action={updateTaskDetail}
-        className="space-y-4 rounded-lg border border-stone-200 bg-white p-4"
-      >
-        <input type="hidden" name="taskId" value={task.id} />
+      {facts.length > 0 ? (
+        <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4">
+          <dl className="divide-y divide-[#EEF1EC]">
+            {facts.map(([label, value]) => (
+              <div key={label} className="flex gap-4 py-2.5">
+                <dt className="min-w-[88px] pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                  {label}
+                </dt>
+                <dd className="text-[15px] text-stone-950">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Due date">
-            <input
-              type="date"
-              name="dueDate"
-              defaultValue={dateInputValue(task.dueDate)}
-              className={inputClassName}
-            />
-          </Field>
-          <Field label="Due time">
-            <input
-              type="time"
-              name="dueTime"
-              defaultValue={task.dueTime ?? ""}
-              className={inputClassName}
-            />
-          </Field>
-          <Field label="Priority">
-            <select
-              name="priority"
-              defaultValue={task.priority ?? ""}
-              className={inputClassName}
-            >
-              <option value="">None</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </Field>
-          <Field label="Area">
-            <select
-              name="areaId"
-              defaultValue={task.areaId}
-              className={inputClassName}
-            >
-              {domains.map((domain) => (
-                <optgroup key={domain.id} label={domain.name}>
-                  {domain.areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </Field>
-          <Field label="Project">
-            <select
-              name="projectId"
-              defaultValue={task.projectId ?? ""}
-              className={inputClassName}
-            >
-              <option value="">No project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Reminder offsets">
-            <input
-              name="reminderOffsets"
-              defaultValue={reminderOffsets}
-              className={inputClassName}
-            />
-          </Field>
-        </div>
+      {task.notes ? (
+        <section className="space-y-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            Notes
+          </h2>
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
+            {task.notes}
+          </p>
+        </section>
+      ) : null}
 
-        <Field label="Notes">
-          <textarea
-            name="notes"
-            defaultValue={task.notes ?? ""}
-            rows={5}
-            className={`${inputClassName} h-auto py-2`}
-          />
-        </Field>
-
-        <Field label="RRULE">
-          <input
-            name="recurrenceRule"
-            defaultValue={task.recurrenceRule ?? ""}
-            className={inputClassName}
-          />
-        </Field>
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
-          >
-            Save detail
-          </button>
-        </div>
-      </form>
-
-      <section className="space-y-3 rounded-lg border border-stone-200 bg-white p-4">
-        <h2 className="text-base font-semibold text-stone-800">Subtasks</h2>
-        {task.subtasks.length === 0 ? (
-          <p className="text-sm text-stone-500">No open subtasks.</p>
-        ) : (
-          <div className="divide-y divide-stone-100">
+      <section className="space-y-2.5">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Subtasks{" "}
+          {task.subtasks.length > 0 ? (
+            <span className="font-medium text-[#B0ACA2]">
+              {task.subtasks.length}
+            </span>
+          ) : null}
+        </h2>
+        {task.subtasks.length > 0 ? (
+          <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
             {task.subtasks.map((subtask) => (
               <div
                 key={subtask.id}
-                className="flex items-center justify-between gap-3 py-2"
+                className="flex items-center justify-between gap-3 px-4 py-3"
               >
                 <Link
                   href={`/tasks/${subtask.id}`}
-                  className="-m-1 min-w-0 flex-1 rounded-md p-1 transition hover:bg-stone-50"
+                  className="-m-1 min-w-0 flex-1 rounded-[10px] p-1 transition hover:bg-[#F7F9F5]"
                 >
-                  <p className="text-sm font-medium text-stone-800">
+                  <p className="text-sm font-medium text-stone-900">
                     {subtask.title}
                   </p>
                   {subtask.dueDate ? (
-                    <p className="mt-0.5 text-xs text-stone-500">
+                    <p className="mt-0.5 text-xs text-[#9AA096]">
                       {formatDateOnly(subtask.dueDate)}
                     </p>
                   ) : null}
@@ -197,8 +153,116 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
               </div>
             ))}
           </div>
-        )}
-        <AddSubtaskForm parentTaskId={task.id} />
+        ) : null}
+        <div className="flex flex-wrap items-start gap-x-2.5 gap-y-2.5">
+          <AddSubtaskForm parentTaskId={task.id} />
+          <details className="min-w-0 open:basis-full">
+            <summary className="inline-flex h-8 cursor-pointer list-none items-center px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950 [&::-webkit-details-marker]:hidden">
+              Edit
+            </summary>
+            <form
+              action={updateTaskDetail}
+              className="mt-2.5 space-y-4 rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+            >
+              <input type="hidden" name="taskId" value={task.id} />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Due date">
+                  <input
+                    type="date"
+                    name="dueDate"
+                    defaultValue={dateInputValue(task.dueDate)}
+                    className={inputClassName}
+                  />
+                </Field>
+                <Field label="Due time">
+                  <input
+                    type="time"
+                    name="dueTime"
+                    defaultValue={task.dueTime ?? ""}
+                    className={inputClassName}
+                  />
+                </Field>
+                <Field label="Priority">
+                  <select
+                    name="priority"
+                    defaultValue={task.priority ?? ""}
+                    className={inputClassName}
+                  >
+                    <option value="">None</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </Field>
+                <Field label="Area">
+                  <select
+                    name="areaId"
+                    defaultValue={task.areaId}
+                    className={inputClassName}
+                  >
+                    {domains.map((domain) => (
+                      <optgroup key={domain.id} label={domain.name}>
+                        {domain.areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Project">
+                  <select
+                    name="projectId"
+                    defaultValue={task.projectId ?? ""}
+                    className={inputClassName}
+                  >
+                    <option value="">No project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Reminder offsets">
+                  <input
+                    name="reminderOffsets"
+                    defaultValue={reminderOffsets}
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Notes">
+                <textarea
+                  name="notes"
+                  defaultValue={task.notes ?? ""}
+                  rows={5}
+                  className={`${inputClassName} h-auto rounded-[14px] py-2`}
+                />
+              </Field>
+
+              <Field label="RRULE">
+                <input
+                  name="recurrenceRule"
+                  defaultValue={task.recurrenceRule ?? ""}
+                  className={inputClassName}
+                />
+              </Field>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
+                >
+                  Save detail
+                </button>
+              </div>
+            </form>
+          </details>
+        </div>
       </section>
     </div>
   );
@@ -206,7 +270,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block text-sm font-medium text-stone-700">
+    <label className="block text-[13px] font-medium text-stone-600">
       <span>{label}</span>
       <div className="mt-1">{children}</div>
     </label>
@@ -215,26 +279,54 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function AddSubtaskForm({ parentTaskId }: { parentTaskId: string }) {
   return (
-    <form action={addSubtask} className="flex gap-2 border-t border-stone-100 pt-3">
-      <input type="hidden" name="parentTaskId" value={parentTaskId} />
-      <input
-        name="title"
-        aria-label="Subtask title"
-        className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-      />
-      <button
-        type="submit"
-        title="Add subtask"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-500 hover:text-teal-700"
-      >
-        <Plus size={16} />
-      </button>
-    </form>
+    <details>
+      <summary className="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+        <Plus size={13} />
+        Add subtask
+      </summary>
+      <form action={addSubtask} className="mt-2.5 flex gap-2">
+        <input type="hidden" name="parentTaskId" value={parentTaskId} />
+        <input
+          name="title"
+          aria-label="Subtask title"
+          className="h-10 min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
+        />
+        <button
+          type="submit"
+          title="Add subtask"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal-700 text-white transition hover:bg-teal-800"
+        >
+          <Plus size={16} />
+        </button>
+      </form>
+    </details>
   );
 }
 
 function dateInputValue(value: Date | null) {
   return value ? value.toISOString().slice(0, 10) : "";
+}
+
+function formatDueTime(time: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return time;
+  const hours = Number(match[1]);
+  if (hours > 23) return time;
+  const suffix = hours >= 12 ? "pm" : "am";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${match[2]}${suffix}`;
+}
+
+function humanizeReminderOffset(offset: number) {
+  if (offset >= 24 * 60 && offset % (24 * 60) === 0) {
+    const days = offset / (24 * 60);
+    return `${days} day${days === 1 ? "" : "s"} before`;
+  }
+  if (offset >= 60 && offset % 60 === 0) {
+    const hours = offset / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"} before`;
+  }
+  return `${offset} minute${offset === 1 ? "" : "s"} before`;
 }
 
 async function loadTaskDetail(taskId: string) {
@@ -284,4 +376,4 @@ async function loadTaskDetail(taskId: string) {
 }
 
 const inputClassName =
-  "h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
+  "h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-teal-700";
