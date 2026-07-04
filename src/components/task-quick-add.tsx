@@ -58,7 +58,12 @@ export function TaskQuickAdd({
       const response = await fetch("/api/tasks/quick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmedTitle, dueDate, areaId, projectId }),
+        body: JSON.stringify({
+          title: trimmedTitle,
+          dueDate,
+          areaId,
+          projectId,
+        }),
       });
 
       if (!response.ok) {
@@ -140,8 +145,8 @@ export function TaskQuickAdd({
                     </option>
                   ))}
                 </optgroup>
-                ))}
-              </select>
+              ))}
+            </select>
           ) : null}
           <button
             type="submit"

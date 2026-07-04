@@ -3,7 +3,9 @@ import { completeRoutine } from "@/app/actions";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import type { getRoutinesWithState, RoutineSchedule } from "@/lib/routines";
 
-type RoutineWithState = Awaited<ReturnType<typeof getRoutinesWithState>>[number];
+type RoutineWithState = Awaited<
+  ReturnType<typeof getRoutinesWithState>
+>[number];
 
 function scheduleFact(schedule: RoutineSchedule) {
   const cadence =

@@ -75,7 +75,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     ? (projectSearch[0] ?? "")
     : (projectSearch ?? "");
   const filtersActive =
-    selectedDomainIds.length > 0 || selectedProjectIds.length > 0 || starredOnly;
+    selectedDomainIds.length > 0 ||
+    selectedProjectIds.length > 0 ||
+    starredOnly;
   const visibleTasks = tasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
@@ -169,7 +171,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           unscheduledCount={sections.noDate.length}
         />
       ) : null}
-      {(selectedView === "open" || selectedView === "all") ? (
+      {selectedView === "open" || selectedView === "all" ? (
         <AllOpenSection
           tasks={visibleTasks}
           today={today}
@@ -180,13 +182,15 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           totalCount={filtersActive ? null : openCount}
         />
       ) : null}
-      {(selectedView === "done" || selectedView === "all") ? (
+      {selectedView === "done" || selectedView === "all" ? (
         <DoneSection
           tasks={visibleDoneTasks}
           totalCount={filtersActive ? null : doneCount}
         />
       ) : null}
-      {selectedView === "routines" ? <RoutinesView routines={routines} /> : null}
+      {selectedView === "routines" ? (
+        <RoutinesView routines={routines} />
+      ) : null}
       {selectedView === "schedule" &&
       (selectedSection === "all" || selectedSection === "today") ? (
         <TaskSection
@@ -291,7 +295,11 @@ function SectionJumps({
     unscheduledCount,
   });
   const totalCount =
-    todayCount + tomorrowCount + upcomingCount + somedayCount + unscheduledCount;
+    todayCount +
+    tomorrowCount +
+    upcomingCount +
+    somedayCount +
+    unscheduledCount;
   const allLink = {
     href: buildTasksFilterHref({
       domains: selectedDomainIds,
@@ -313,15 +321,14 @@ function SectionJumps({
       {[allLink, ...links].map((item) => {
         const { href, label, count, hasItems } = item;
         const sectionValue = href.replace("#", "") as TaskSectionFilter;
-        const filterHref =
-          href.startsWith("#")
-            ? buildTasksFilterHref({
-                domains: selectedDomainIds,
-                projects: selectedProjectIds,
-                section: sectionValue,
-                starred: starredOnly,
-              })
-            : href;
+        const filterHref = href.startsWith("#")
+          ? buildTasksFilterHref({
+              domains: selectedDomainIds,
+              projects: selectedProjectIds,
+              section: sectionValue,
+              starred: starredOnly,
+            })
+          : href;
         const isActive =
           "active" in item ? item.active : selectedSection === sectionValue;
         return (
@@ -432,9 +439,7 @@ function DomainFilter({
           view,
         })}
         className={`${
-          selectedDomainIds.length === 0
-            ? filterChipOn
-            : filterChipOff
+          selectedDomainIds.length === 0 ? filterChipOn : filterChipOff
         }`}
       >
         All
@@ -450,9 +455,7 @@ function DomainFilter({
             view,
           })}
           className={`${
-            selectedDomainIds.includes(domain.id)
-              ? filterChipOn
-              : filterChipOff
+            selectedDomainIds.includes(domain.id) ? filterChipOn : filterChipOff
           }`}
         >
           {domain.name}
@@ -482,7 +485,9 @@ function TaskFilters({
   view: TaskViewFilter;
 }) {
   const filtersActive =
-    selectedDomainIds.length > 0 || selectedProjectIds.length > 0 || starredOnly;
+    selectedDomainIds.length > 0 ||
+    selectedProjectIds.length > 0 ||
+    starredOnly;
 
   return (
     <details className="relative">
@@ -598,7 +603,12 @@ function ProjectFilter({
           <input key={domainId} type="hidden" name="domain" value={domainId} />
         ))}
         {selectedProjectIds.map((projectId) => (
-          <input key={projectId} type="hidden" name="project" value={projectId} />
+          <input
+            key={projectId}
+            type="hidden"
+            name="project"
+            value={projectId}
+          />
         ))}
         <input type="hidden" name="section" value={selectedSection} />
         <input type="hidden" name="view" value={view} />
@@ -620,41 +630,39 @@ function ProjectFilter({
         </button>
       </form>
       <nav className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
-      <Link
-        href={buildTasksFilterHref({
-          domains: selectedDomainIds,
-          projects: [],
-          section: selectedSection,
-          starred: starredOnly,
-          view,
-        })}
-        className={`${
-          selectedProjectIds.length === 0
-            ? filterChipOn
-            : filterChipOff
-        }`}
-      >
-        All
-      </Link>
-      {visibleProjects.map((project) => (
         <Link
-          key={project.id}
           href={buildTasksFilterHref({
             domains: selectedDomainIds,
-            projects: toggleFilterValue(selectedProjectIds, project.id),
+            projects: [],
             section: selectedSection,
             starred: starredOnly,
             view,
           })}
           className={`${
-            selectedProjectIds.includes(project.id)
-              ? filterChipOn
-              : filterChipOff
+            selectedProjectIds.length === 0 ? filterChipOn : filterChipOff
           }`}
         >
-          {project.name}
+          All
         </Link>
-      ))}
+        {visibleProjects.map((project) => (
+          <Link
+            key={project.id}
+            href={buildTasksFilterHref({
+              domains: selectedDomainIds,
+              projects: toggleFilterValue(selectedProjectIds, project.id),
+              section: selectedSection,
+              starred: starredOnly,
+              view,
+            })}
+            className={`${
+              selectedProjectIds.includes(project.id)
+                ? filterChipOn
+                : filterChipOff
+            }`}
+          >
+            {project.name}
+          </Link>
+        ))}
       </nav>
     </div>
   );
@@ -686,7 +694,8 @@ function TaskSection({
   return (
     <section id={anchor} className="scroll-mt-4 space-y-3">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        {title} <span className="font-medium text-[#B0ACA2]">{tasks.length}</span>
+        {title}{" "}
+        <span className="font-medium text-[#B0ACA2]">{tasks.length}</span>
       </h2>
       <TaskDropZone
         targetDate={targetDate}
@@ -947,12 +956,17 @@ function SubtaskList({
   return (
     <div className="mt-3 divide-y divide-[#EEF1EC] border-t border-[#EEF1EC] pt-2">
       {subtasks.map((subtask) => (
-        <div key={subtask.id} className="flex items-center justify-between gap-3 py-2">
+        <div
+          key={subtask.id}
+          className="flex items-center justify-between gap-3 py-2"
+        >
           <DraggableTaskLink
             taskId={subtask.id}
             href={`/tasks/${subtask.id}`}
             title={subtask.title}
-            detail={subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"}
+            detail={
+              subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"
+            }
             currentDueDate={subtask.dueDate?.toISOString().slice(0, 10) ?? null}
             currentAreaId={subtask.areaId}
             currentProjectId={subtask.projectId}
@@ -1051,74 +1065,83 @@ function groupTasks(tasks: TaskListItem[], today: string, tomorrow: string) {
 
 async function loadTasks(view: TaskViewFilter) {
   try {
-    const [tasks, doneTasks, openCount, doneCount, projects, domains] = await Promise.all([
-      view === "done"
-        ? Promise.resolve([] as TaskListItem[])
-        : prisma.task.findMany({
-            where: {
-              status: "open",
-              OR: [
-                { parentTaskId: null },
-                { parent: { status: { not: "open" } } },
-              ],
-            },
-            include: {
-              area: { include: { domain: true } },
-              project: true,
-              subtasks: {
-                where: { status: "open" },
-                include: { area: true, project: true },
-                orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    const [tasks, doneTasks, openCount, doneCount, projects, domains] =
+      await Promise.all([
+        view === "done"
+          ? Promise.resolve([] as TaskListItem[])
+          : prisma.task.findMany({
+              where: {
+                status: "open",
+                OR: [
+                  { parentTaskId: null },
+                  { parent: { status: { not: "open" } } },
+                ],
               },
-            },
-            orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-            take: view === "schedule" ? 80 : 200,
-          }),
-      view === "done" || view === "all"
-        ? prisma.task.findMany({
-            where: { status: "completed" },
-            include: {
-              area: { include: { domain: true } },
-              project: true,
-            },
-            orderBy: [{ completedAt: "desc" }],
-            take: 100,
-          })
-        : Promise.resolve([] as DoneTaskItem[]),
-      view === "open" || view === "all"
-        ? prisma.task.count({
-            where: {
-              status: "open",
-              OR: [
-                { parentTaskId: null },
-                { parent: { status: { not: "open" } } },
-              ],
-            },
-          })
-        : Promise.resolve(0),
-      view === "done" || view === "all"
-        ? prisma.task.count({ where: { status: "completed" } })
-        : Promise.resolve(0),
-      prisma.project.findMany({
-        where: { status: { in: ["active", "parked", "someday"] } },
-        include: { area: { include: { domain: true } } },
-        orderBy: [{ area: { sortOrder: "asc" } }, { name: "asc" }],
-      }),
-      prisma.domain.findMany({
-        where: {
-          OR: [{ active: true, isSystem: false }, { isSystem: true }],
-        },
-        include: {
-          areas: {
-            where: { status: "active" },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+              include: {
+                area: { include: { domain: true } },
+                project: true,
+                subtasks: {
+                  where: { status: "open" },
+                  include: { area: true, project: true },
+                  orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+                },
+              },
+              orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+              take: view === "schedule" ? 80 : 200,
+            }),
+        view === "done" || view === "all"
+          ? prisma.task.findMany({
+              where: { status: "completed" },
+              include: {
+                area: { include: { domain: true } },
+                project: true,
+              },
+              orderBy: [{ completedAt: "desc" }],
+              take: 100,
+            })
+          : Promise.resolve([] as DoneTaskItem[]),
+        view === "open" || view === "all"
+          ? prisma.task.count({
+              where: {
+                status: "open",
+                OR: [
+                  { parentTaskId: null },
+                  { parent: { status: { not: "open" } } },
+                ],
+              },
+            })
+          : Promise.resolve(0),
+        view === "done" || view === "all"
+          ? prisma.task.count({ where: { status: "completed" } })
+          : Promise.resolve(0),
+        prisma.project.findMany({
+          where: { status: { in: ["active", "parked", "someday"] } },
+          include: { area: { include: { domain: true } } },
+          orderBy: [{ area: { sortOrder: "asc" } }, { name: "asc" }],
+        }),
+        prisma.domain.findMany({
+          where: {
+            OR: [{ active: true, isSystem: false }, { isSystem: true }],
           },
-        },
-        orderBy: { sortOrder: "asc" },
-      }),
-    ]);
+          include: {
+            areas: {
+              where: { status: "active" },
+              orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+            },
+          },
+          orderBy: { sortOrder: "asc" },
+        }),
+      ]);
 
-    return { ok: true as const, tasks, doneTasks, openCount, doneCount, projects, domains };
+    return {
+      ok: true as const,
+      tasks,
+      doneTasks,
+      openCount,
+      doneCount,
+      projects,
+      domains,
+    };
   } catch {
     return { ok: false as const };
   }
