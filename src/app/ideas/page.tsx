@@ -1,4 +1,4 @@
-import type { JournalEntry, Person } from "@prisma/client";
+import type { JournalEntry, Person, Reference } from "@prisma/client";
 import Link from "next/link";
 import { JournalEntryEditor } from "@/components/journal-entry-editor";
 import { MarkdownPreview } from "@/components/markdown-preview";
@@ -18,7 +18,7 @@ export default async function LibraryPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { ideas, journalEntries, people } = result;
+  const { ideas, journalEntries, people, books, movies, references } = result;
 
   return (
     <div className="space-y-8">
@@ -31,7 +31,10 @@ export default async function LibraryPage() {
         <JournalSection entries={journalEntries} />
         <div className="space-y-8">
           <PeopleSection people={people} />
+          <ReferenceSection title="Books" references={books} />
+          <ReferenceSection title="Movies" references={movies} />
           <IdeasSection ideas={ideas} />
+          <ReferenceSection title="References" references={references} />
         </div>
       </div>
     </div>
@@ -173,6 +176,73 @@ function PeopleSection({
   );
 }
 
+type LibraryReference = Pick<
+  Reference,
+  "id" | "title" | "body" | "url" | "tags" | "metadata" | "kind" | "createdAt"
+>;
+
+function ReferenceSection({
+  title,
+  references,
+}: {
+  title: string;
+  references: LibraryReference[];
+}) {
+  if (references.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-2.5">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        {title}
+      </h2>
+      <div className="space-y-2.5">
+        {references.map((reference) => (
+          <details
+            key={reference.id}
+            className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+          >
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium leading-snug text-stone-950">
+                    {reference.title ?? reference.body}
+                  </h3>
+                  <p className="mt-1 text-xs text-[#9AA096]">
+                    {referenceMetaLine(reference)}
+                  </p>
+                </div>
+                {referenceRating(reference) ? (
+                  <span className="shrink-0 rounded-full border border-[#E2E6DF] px-2 py-0.5 text-xs font-medium text-stone-600">
+                    {referenceRating(reference)}
+                  </span>
+                ) : null}
+              </div>
+              {reference.body ? (
+                <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-600">
+                  {reference.body}
+                </p>
+              ) : null}
+            </summary>
+            <div className="mt-3 space-y-2 border-t border-[#EEF1EC] pt-3">
+              <MarkdownPreview body={reference.body} />
+              {reference.url ? (
+                <a
+                  href={reference.url}
+                  className="inline-flex text-sm font-medium text-teal-700 transition hover:text-teal-900"
+                >
+                  Open source
+                </a>
+              ) : null}
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function JournalSection({ entries }: { entries: JournalEntry[] }) {
   const groups = new Map<string, JournalEntry[]>();
   for (const entry of entries) {
@@ -249,32 +319,105 @@ function dateInputValue(value: Date) {
 
 async function loadIdeas() {
   try {
-    const [ideas, journalEntries, people] = await Promise.all([
-      prisma.idea.findMany({
-        where: { status: { in: ["seed", "developing"] } },
-        include: {
-          area: { include: { domain: true } },
-          project: { include: { area: { include: { domain: true } } } },
-          notes: { orderBy: { createdAt: "desc" }, take: 6 },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: 80,
-      }),
-      prisma.journalEntry.findMany({
-        where: { status: "active" },
-        orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
-        take: 60,
-      }),
-      prisma.person.findMany({
-        where: { status: "active" },
-        include: { _count: { select: { facts: true, interactions: true } } },
-        orderBy: { name: "asc" },
-        take: 100,
-      }),
-    ]);
+    const [ideas, journalEntries, people, books, movies, references] =
+      await Promise.all([
+        prisma.idea.findMany({
+          where: { status: { in: ["seed", "developing"] } },
+          include: {
+            area: { include: { domain: true } },
+            project: { include: { area: { include: { domain: true } } } },
+            notes: { orderBy: { createdAt: "desc" }, take: 6 },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 80,
+        }),
+        prisma.journalEntry.findMany({
+          where: { status: "active" },
+          orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+          take: 60,
+        }),
+        prisma.person.findMany({
+          where: { status: "active" },
+          include: { _count: { select: { facts: true, interactions: true } } },
+          orderBy: { name: "asc" },
+          take: 100,
+        }),
+        prisma.reference.findMany({
+          where: { kind: "book" },
+          orderBy: [{ createdAt: "desc" }],
+          take: 12,
+        }),
+        prisma.reference.findMany({
+          where: { kind: "movie" },
+          orderBy: [{ createdAt: "desc" }],
+          take: 12,
+        }),
+        prisma.reference.findMany({
+          where: { kind: "reference" },
+          orderBy: [{ createdAt: "desc" }],
+          take: 12,
+        }),
+      ]);
 
-    return { ok: true as const, ideas, journalEntries, people };
+    return {
+      ok: true as const,
+      ideas,
+      journalEntries,
+      people,
+      books,
+      movies,
+      references,
+    };
   } catch {
     return { ok: false as const };
   }
+}
+
+function referenceMetaLine(reference: LibraryReference) {
+  const metadata = getMetadata(reference);
+  if (reference.kind === "book") {
+    return [
+      stringValue(metadata.author),
+      stringValue(metadata.status),
+      stringValue(metadata.genre),
+      metadata.pages ? `${metadata.pages} pages` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  if (reference.kind === "movie") {
+    return [
+      stringValue(metadata.year),
+      stringValue(metadata.director),
+      stringValue(metadata.status),
+      stringValue(metadata.genre),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  return reference.tags.join(" · ") || formatShortDate(reference.createdAt);
+}
+
+function referenceRating(reference: LibraryReference) {
+  const rating = getMetadata(reference).rating;
+  return typeof rating === "number" || typeof rating === "string"
+    ? `${rating}`
+    : null;
+}
+
+function getMetadata(reference: LibraryReference) {
+  return typeof reference.metadata === "object" &&
+    reference.metadata !== null &&
+    !Array.isArray(reference.metadata)
+    ? (reference.metadata as Record<string, unknown>)
+    : {};
+}
+
+function stringValue(value: unknown) {
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string" && value.trim()) return value;
+  return null;
 }

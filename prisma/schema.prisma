@@ -159,19 +159,19 @@ model Capture {
   createdItems  Json?               @map("created_items")
   createdAt     DateTime            @default(now()) @map("created_at")
 
-  calendarEvents  CalendarEvent[]
-  checkIns        CheckIn[]
-  journalEntries  JournalEntry[]
-  scheduledReviews ScheduledReview[]
+  calendarEvents     CalendarEvent[]
+  checkIns           CheckIn[]
+  journalEntries     JournalEntry[]
+  scheduledReviews   ScheduledReview[]
   personFacts        PersonFact[]
   personInteractions PersonInteraction[]
-  entityDocs      EntityDoc[]
-  entityNotes     EntityNote[]
-  ideaNotes       IdeaNote[]
-  ideas           Idea[]
-  projectActivity ProjectActivity[]
-  references      Reference[]
-  tasks           Task[]
+  entityDocs         EntityDoc[]
+  entityNotes        EntityNote[]
+  ideaNotes          IdeaNote[]
+  ideas              Idea[]
+  projectActivity    ProjectActivity[]
+  references         Reference[]
+  tasks              Task[]
 
   @@index([createdAt])
   @@index([parseStatus])
@@ -344,9 +344,13 @@ model IdeaNote {
 
 model Reference {
   id          String   @id @default(uuid())
+  title       String?
+  kind        String   @default("reference")
   body        String
   url         String?
   tags        String[] @default([])
+  metadata    Json?
+  sourcePath  String?  @unique @map("source_path")
   areaId      String?  @map("area_id")
   projectId   String?  @map("project_id")
   relatedType String?  @map("related_type")
@@ -361,6 +365,7 @@ model Reference {
 
   @@index([areaId])
   @@index([projectId])
+  @@index([kind])
   @@index([captureId])
   @@map("references")
 }
@@ -466,9 +471,9 @@ model Routine {
 }
 
 model RoutineCompletion {
-  id          String   @id @default(uuid())
-  routineId   String   @map("routine_id")
-  completedAt DateTime @default(now()) @map("completed_at")
+  id          String    @id @default(uuid())
+  routineId   String    @map("routine_id")
+  completedAt DateTime  @default(now()) @map("completed_at")
   undoneAt    DateTime? @map("undone_at")
   value       String?
 
