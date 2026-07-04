@@ -467,7 +467,9 @@ function ScheduleMenu({
   const [assigning, setAssigning] = useState(false);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState(currentAreaId);
-  const [selectedProjectId, setSelectedProjectId] = useState(currentProjectId ?? "");
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    currentProjectId ?? "",
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [, startTransition] = useTransition();
@@ -591,7 +593,10 @@ function ScheduleMenu({
             Someday
           </MenuButton>
           {areaGroups.length > 0 ? (
-            <MenuButton disabled={pending} onClick={() => setAssigning(!assigning)}>
+            <MenuButton
+              disabled={pending}
+              onClick={() => setAssigning(!assigning)}
+            >
               Assign
             </MenuButton>
           ) : null}
@@ -639,7 +644,9 @@ function ScheduleMenu({
               </button>
             </div>
           ) : null}
-          {error ? <p className="px-3 py-1 text-xs text-amber-800">{error}</p> : null}
+          {error ? (
+            <p className="px-3 py-1 text-xs text-amber-800">{error}</p>
+          ) : null}
         </div>
       ) : null}
     </div>
