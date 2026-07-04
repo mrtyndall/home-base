@@ -27,7 +27,7 @@ export default async function ProjectsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { projects } = result;
+  const { projects, domains } = result;
   const activeProjects = projects.filter(
     (project) => project.status === "active",
   );
@@ -42,7 +42,7 @@ export default async function ProjectsPage() {
     <div className="space-y-7">
       <header className="flex items-center justify-between gap-3">
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
-          Projects
+          Areas & Projects
         </h1>
         <Link
           href="/projects/new"
@@ -52,22 +52,94 @@ export default async function ProjectsPage() {
           New project
         </Link>
       </header>
-      <ProjectShelf
-        title="Active"
-        empty="No active projects."
-        projects={activeProjects}
-      />
-      <ProjectShelf
-        title="Someday"
-        empty="No someday projects."
-        projects={somedayProjects}
-      />
-      <ProjectShelf
-        title="Parked"
-        empty="No parked projects."
-        projects={parkedProjects}
-      />
+      <AreaShelves domains={domains} />
+      <section className="space-y-5">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          Projects
+        </h2>
+        <ProjectShelf
+          title="Active"
+          empty="No active projects."
+          projects={activeProjects}
+        />
+        <ProjectShelf
+          title="Someday"
+          empty="No someday projects."
+          projects={somedayProjects}
+        />
+        <ProjectShelf
+          title="Parked"
+          empty="No parked projects."
+          projects={parkedProjects}
+        />
+      </section>
     </div>
+  );
+}
+
+function AreaShelves({ domains }: { domains: DomainWithAreas[] }) {
+  return (
+    <section className="space-y-4">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Areas
+      </h2>
+      {domains.map((domain) => {
+        if (domain.areas.length === 0) {
+          return null;
+        }
+
+        return (
+          <div key={domain.id} className="space-y-2.5">
+            <Link
+              href={`/domains/${domain.id}`}
+              className="inline-flex text-[11px] font-semibold uppercase tracking-[0.12em] text-[#B0ACA2] transition hover:text-teal-700"
+            >
+              {domain.name}
+            </Link>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {domain.areas.map((area) => (
+                <AreaCard key={area.id} area={area} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function AreaCard({ area }: { area: AreaListItem }) {
+  const factParts = [
+    `${area.openTaskCount} open task${area.openTaskCount === 1 ? "" : "s"}`,
+    `${area.activeProjectCount} active project${area.activeProjectCount === 1 ? "" : "s"}`,
+    area.starredNoteCount > 0
+      ? `${area.starredNoteCount} important note${area.starredNoteCount === 1 ? "" : "s"}`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return (
+    <Link
+      href={`/areas/${area.id}`}
+      className="block rounded-[14px] border border-[#E2E6DF] bg-white p-4 transition hover:border-teal-700/50"
+    >
+      <h3 className="text-[17px] font-medium leading-[1.3] text-stone-950">
+        {area.name}
+      </h3>
+      {area.currentState ? (
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-700">
+          {area.currentState}
+        </p>
+      ) : null}
+      {area.latestCheckIn ? (
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-700">
+          {checkInSnippet(area.latestCheckIn.bodyMd, 120)}{" "}
+          <span className="text-[#9AA096]">
+            · {formatShortDate(area.latestCheckIn.createdAt)}
+          </span>
+        </p>
+      ) : null}
+      <p className="mt-2 text-xs text-[#9AA096]">{factParts.join(" · ")}</p>
+    </Link>
   );
 }
 
@@ -220,6 +292,17 @@ type ProjectListItem = Project & {
   milestoneCounts: { completed: number; total: number } | null;
 };
 
+type AreaListItem = Area & {
+  openTaskCount: number;
+  activeProjectCount: number;
+  starredNoteCount: number;
+  latestCheckIn: { bodyMd: string; createdAt: Date } | null;
+};
+
+type DomainWithAreas = Domain & {
+  areas: AreaListItem[];
+};
+
 function getNextDatedTask(project: ProjectListItem) {
   const openTasks = project.tasks.filter((task) => task.status === "open");
   return openTasks
@@ -249,47 +332,90 @@ function getFreshNote(project: ProjectListItem) {
 
 async function loadProjects() {
   try {
-    const projects = await prisma.project.findMany({
-      where: { status: { in: ["active", "someday", "parked"] } },
-      include: {
-        area: { include: { domain: true } },
-        tasks: {
-          where: { status: { in: ["open", "completed"] } },
-          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-          take: 60,
+    const [projects, domains] = await Promise.all([
+      prisma.project.findMany({
+        where: { status: { in: ["active", "someday", "parked"] } },
+        include: {
+          area: { include: { domain: true } },
+          tasks: {
+            where: { status: { in: ["open", "completed"] } },
+            orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+            take: 60,
+          },
+          activity: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
         },
-        activity: {
-          orderBy: { createdAt: "desc" },
-          take: 5,
+        orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
+        take: 80,
+      }),
+      prisma.domain.findMany({
+        where: { active: true },
+        orderBy: [{ isSystem: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
+        include: {
+          areas: {
+            where: { status: { in: ["active", "parked"] } },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
         },
-      },
-      orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
-      take: 80,
-    });
+      }),
+    ]);
 
     const projectIds = projects.map((project) => project.id);
-    const [notes, taskActivity, latestCheckIns, milestoneGroups] =
-      await Promise.all([
-        prisma.entityNote.findMany({
-          where: {
-            parentType: "project",
-            parentId: { in: projectIds },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 160,
-        }),
-        prisma.task.groupBy({
-          by: ["projectId"],
-          where: { projectId: { in: projectIds } },
-          _max: { createdAt: true, completedAt: true, updatedAt: true },
-        }),
-        getLatestCheckIns("project", projectIds),
-        prisma.milestone.groupBy({
-          by: ["projectId", "status"],
-          where: { projectId: { in: projectIds } },
-          _count: { _all: true },
-        }),
-      ]);
+    const areaIds = domains.flatMap((domain) =>
+      domain.areas.map((area) => area.id),
+    );
+    const [
+      notes,
+      taskActivity,
+      latestCheckIns,
+      milestoneGroups,
+      areaOpenTaskGroups,
+      areaActiveProjectGroups,
+      areaStarredNoteGroups,
+      latestAreaCheckIns,
+    ] = await Promise.all([
+      prisma.entityNote.findMany({
+        where: {
+          parentType: "project",
+          parentId: { in: projectIds },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 160,
+      }),
+      prisma.task.groupBy({
+        by: ["projectId"],
+        where: { projectId: { in: projectIds } },
+        _max: { createdAt: true, completedAt: true, updatedAt: true },
+      }),
+      getLatestCheckIns("project", projectIds),
+      prisma.milestone.groupBy({
+        by: ["projectId", "status"],
+        where: { projectId: { in: projectIds } },
+        _count: { _all: true },
+      }),
+      prisma.task.groupBy({
+        by: ["areaId"],
+        where: { areaId: { in: areaIds }, status: "open" },
+        _count: { _all: true },
+      }),
+      prisma.project.groupBy({
+        by: ["areaId"],
+        where: { areaId: { in: areaIds }, status: "active" },
+        _count: { _all: true },
+      }),
+      prisma.entityNote.groupBy({
+        by: ["parentId"],
+        where: {
+          parentType: "area",
+          parentId: { in: areaIds },
+          starredAt: { not: null },
+        },
+        _count: { _all: true },
+      }),
+      getLatestCheckIns("area", areaIds),
+    ]);
     const notesByProject = new Map<string, EntityNote[]>();
     for (const note of notes) {
       const group = notesByProject.get(note.parentId) ?? [];
@@ -332,8 +458,31 @@ async function loadProjects() {
       latestCheckIn: latestCheckIns.get(project.id) ?? null,
       milestoneCounts: milestoneCountsByProject.get(project.id) ?? null,
     }));
+    const openTasksByArea = new Map(
+      areaOpenTaskGroups.map((group) => [group.areaId, group._count._all]),
+    );
+    const activeProjectsByArea = new Map(
+      areaActiveProjectGroups.map((group) => [group.areaId, group._count._all]),
+    );
+    const starredNotesByArea = new Map(
+      areaStarredNoteGroups.map((group) => [group.parentId, group._count._all]),
+    );
+    const domainsWithAreas = domains.map((domain) => ({
+      ...domain,
+      areas: domain.areas.map((area) => ({
+        ...area,
+        openTaskCount: openTasksByArea.get(area.id) ?? 0,
+        activeProjectCount: activeProjectsByArea.get(area.id) ?? 0,
+        starredNoteCount: starredNotesByArea.get(area.id) ?? 0,
+        latestCheckIn: latestAreaCheckIns.get(area.id) ?? null,
+      })),
+    }));
 
-    return { ok: true as const, projects: projectsWithNotes };
+    return {
+      ok: true as const,
+      projects: projectsWithNotes,
+      domains: domainsWithAreas,
+    };
   } catch {
     return { ok: false as const };
   }

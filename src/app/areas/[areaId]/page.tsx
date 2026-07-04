@@ -86,51 +86,42 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </div>
       </header>
 
+      <CheckInFeed
+        parentType="area"
+        parentId={area.id}
+        checkIns={area.checkIns}
+      />
+
       {area.id === "area_inbox" ? (
         <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="space-y-6">
-            <NeedsReviewPanel reviews={reviews} domains={domains} />
-            <PendingCapturesPanel
-              captures={pendingCaptures}
-              domains={domains}
-            />
-          </div>
-          <div className="space-y-6">
-            <CheckInFeed
-              parentType="area"
-              parentId={area.id}
-              checkIns={area.checkIns}
-            />
-            <EntityDepth
-              parentType="area"
-              parentId={area.id}
-              notes={area.notes}
-              docs={area.docs}
-              attachments={area.attachments}
-              variant="project"
-            />
-          </div>
+          <NeedsReviewPanel reviews={reviews} domains={domains} />
+          <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
         </section>
-      ) : (
-        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="space-y-6">
-            <CheckInFeed
-              parentType="area"
-              parentId={area.id}
-              checkIns={area.checkIns}
-            />
-            <Panel title="Standing tasks">
-              {area.tasks.map((task) => (
-                <Link
-                  key={task.id}
-                  href={`/tasks/${task.id}`}
-                  className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
-                >
-                  {task.title}
-                </Link>
-              ))}
-            </Panel>
-          </div>
+      ) : null}
+
+      <EntityDepth
+        parentType="area"
+        parentId={area.id}
+        notes={area.notes}
+        docs={area.docs}
+        attachments={area.attachments}
+        variant="project"
+      />
+
+      {area.id === "area_inbox" ? null : (
+        <section className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
+          <Panel title="Standing tasks">
+            {area.tasks.map((task) => (
+              <Link
+                key={task.id}
+                href={`/tasks/${task.id}`}
+                className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
+              >
+                {task.title}
+              </Link>
+            ))}
+          </Panel>
+
           <div className="space-y-6">
             <Panel title="Projects">
               {area.projects.map((project) => (
@@ -163,15 +154,6 @@ export default async function AreaPage({ params }: AreaPageProps) {
                 </Link>
               ))}
             </Panel>
-
-            <EntityDepth
-              parentType="area"
-              parentId={area.id}
-              notes={area.notes}
-              docs={area.docs}
-              attachments={area.attachments}
-              variant="project"
-            />
           </div>
         </section>
       )}
