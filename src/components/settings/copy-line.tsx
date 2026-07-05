@@ -6,8 +6,8 @@ export function CopyLine({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="mt-1.5 flex items-center gap-2 rounded-[10px] bg-[#F7F9F5] py-2 pl-2.5 pr-2">
-      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-stone-600">
+    <div className="mt-1.5 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-[10px] bg-[#F7F9F5] py-2 pl-2.5 pr-2">
+      <span className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[11px] text-stone-600 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {value}
       </span>
       <button

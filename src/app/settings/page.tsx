@@ -57,7 +57,7 @@ export default async function SettingsPage() {
   const activeKeys = apiKeys.filter((key) => !key.revokedAt);
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="min-w-0 max-w-2xl space-y-5 pb-12">
       <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Settings
@@ -140,10 +140,12 @@ export default async function SettingsPage() {
 
           <IntegrationCard
             title="Reference lookup"
-            status={tmdbConfigured ? "Books and movies ready" : "Movie lookup missing"}
+            status={
+              tmdbConfigured ? "Books and movies ready" : "Movie lookup missing"
+            }
             tone={tmdbConfigured ? "good" : "attention"}
           >
-            <div className="space-y-2">
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <ProviderStatus
                 label="Books"
                 status="Open Library"
@@ -166,7 +168,7 @@ export default async function SettingsPage() {
               />
             </div>
             {!tmdbConfigured ? (
-              <div className="space-y-1.5 border-t border-[#EEF1EC] pt-3">
+              <div className="min-w-0 space-y-1.5 border-t border-[#EEF1EC] pt-3">
                 <p className="text-xs text-[#9AA096]">
                   Either variable enables TMDB lookup. Values live in
                   1Password, never in the repo.
@@ -188,7 +190,7 @@ export default async function SettingsPage() {
                     key={key.id}
                     className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-stone-800">
                         {key.label}
                         {key.revokedAt ? (
@@ -197,7 +199,7 @@ export default async function SettingsPage() {
                           </span>
                         ) : null}
                       </p>
-                      <p className="text-xs text-[#9AA096]">
+                      <p className="break-words text-xs text-[#9AA096]">
                         {normalizeScopes(key.scopes).join(", ") || "no scopes"}{" "}
                         · {key.rateLimit}/hr writes ·{" "}
                         {key.lastUsedAt
@@ -216,7 +218,7 @@ export default async function SettingsPage() {
                 No API keys are registered.
               </p>
             )}
-            <div className="space-y-1 border-t border-[#EEF1EC] pt-3">
+            <div className="min-w-0 space-y-1 border-t border-[#EEF1EC] pt-3">
               <p className="text-[13px] text-stone-600">
                 New keys are created from the command line so the token itself
                 never passes through this page. Set{" "}
@@ -272,7 +274,7 @@ function ProviderStatus({
   const toneText = tone === "attention" ? "text-amber-800" : "text-stone-600";
 
   return (
-    <div className="rounded-[12px] border border-[#EEF1EC] bg-[#FBFCFA] p-3">
+    <div className="min-w-0 rounded-[12px] border border-[#EEF1EC] bg-[#FBFCFA] p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-medium text-stone-900">{label}</p>
         <p className={`text-xs font-medium ${toneText}`}>{status}</p>
@@ -313,17 +315,19 @@ function IntegrationCard({
         : "text-stone-500";
 
   return (
-    <article className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+    <article className="min-w-0 overflow-hidden rounded-[14px] border border-[#E2E6DF] bg-white p-3.5 sm:p-4">
+      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-1.5 sm:gap-2">
         <h3 className="text-[15px] font-medium text-stone-950">{title}</h3>
         <p
-          className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${toneText}`}
+          className={`inline-flex min-w-0 items-center gap-1.5 text-[12px] font-medium sm:text-[13px] ${toneText}`}
         >
           <span className={`inline-block ${toneDot}`} aria-hidden="true" />
-          {status}
+          <span className="min-w-0 break-words">{status}</span>
         </p>
       </div>
-      <div className="mt-2.5 space-y-3">{children}</div>
+      <div className="mt-2.5 min-w-0 space-y-3 [&_p]:break-words">
+        {children}
+      </div>
     </article>
   );
 }
