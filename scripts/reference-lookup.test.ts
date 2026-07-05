@@ -7,6 +7,7 @@ const databasePage = fs.readFileSync(
   "utf8",
 );
 const actions = fs.readFileSync("src/app/actions.ts", "utf8");
+const settingsPage = fs.readFileSync("src/app/settings/page.tsx", "utf8");
 
 assert.ok(
   lookup.includes("openlibrary.org/search.json"),
@@ -28,4 +29,15 @@ assert.ok(
 assert.ok(
   actions.includes("export async function createReferenceFromLookup"),
   "Lookup results need a server action that saves the selected book/movie.",
+);
+assert.ok(
+  settingsPage.includes("Reference lookup") &&
+    settingsPage.includes("Open Library") &&
+    settingsPage.includes("TMDB"),
+  "Settings should expose the book/movie lookup providers.",
+);
+assert.ok(
+  settingsPage.includes("TMDB_ACCESS_TOKEN") &&
+    settingsPage.includes("TMDB_API_KEY"),
+  "Settings should show the accepted TMDB env variable names.",
 );

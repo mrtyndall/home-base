@@ -126,7 +126,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 - `src/lib/db.ts`: Prisma client configured for PostgreSQL.
 - `src/lib/reminders.ts`: due reminder selection, Pushover delivery, and audit writes.
 - `src/lib/tasks.ts`: shared task creation/completion and recurrence behavior.
-- `src/app/settings/page.tsx`: integration control surface with per-variable configuration status (names only, never values), Google Calendar connect flow, Pushover test delivery, API key list with revoke, and MCP posture/health.
+- `src/app/settings/page.tsx`: integration control surface with per-variable configuration status (names only, never values), Google Calendar connect flow, Pushover test delivery, Library reference lookup provider status, API key list with revoke, and MCP posture/health.
 - `src/app/settings/actions.ts`: server actions for the Pushover test notification and API key revocation, both audited through the notifications feed.
 - `src/app/api/settings/mcp-health/route.ts`: read-only probe of the MCP server `/health` endpoint (`MCP_HEALTH_URL` override, defaults to the local port).
 
@@ -135,6 +135,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 ### 2026-07-04
 
 - Reweighted Areas as the primary information canvas. The Projects route now surfaces domain-grouped area cards before project shelves; Area pages lead with check-ins, then important notes/knowledge containers, then standing tasks and child projects. Project pages keep check-ins as the heartbeat, with milestones and important notes before task execution. Added manual starred shared notes through `entity_notes.starred_at`; system-suggested important notes are documented as a future idea only.
+- Added Library reference lookup status to Settings. Open Library renders as available without credentials for book search, while TMDB shows configured or missing based on `TMDB_ACCESS_TOKEN` / `TMDB_API_KEY` without exposing values.
 
 ### 2026-07-03
 

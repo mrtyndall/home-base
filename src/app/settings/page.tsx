@@ -20,6 +20,7 @@ const GOOGLE_ENV_VARS = [
   "GOOGLE_TOKEN_ENCRYPTION_KEY",
 ] as const;
 const PUSHOVER_ENV_VARS = ["PUSHOVER_APP_TOKEN", "PUSHOVER_USER_KEY"] as const;
+const TMDB_ENV_VARS = ["TMDB_ACCESS_TOKEN", "TMDB_API_KEY"] as const;
 // Sync runs on a 15-minute cron; four skipped windows means something is wrong.
 const SYNC_STALE_AFTER_MS = 60 * 60_000;
 
@@ -41,6 +42,8 @@ export default async function SettingsPage() {
   const pushoverMissing = PUSHOVER_ENV_VARS.filter(
     (name) => !process.env[name],
   );
+  const tmdbConfigured = TMDB_ENV_VARS.some((name) => Boolean(process.env[name]));
+  const tmdbMissing = tmdbConfigured ? [] : TMDB_ENV_VARS;
   const redirectUriMismatch = Boolean(
     process.env.GOOGLE_REDIRECT_URI &&
     process.env.GOOGLE_REDIRECT_URI !== REQUIRED_REDIRECT_URI,
@@ -136,6 +139,44 @@ export default async function SettingsPage() {
           </IntegrationCard>
 
           <IntegrationCard
+            title="Reference lookup"
+            status={tmdbConfigured ? "Books and movies ready" : "Movie lookup missing"}
+            tone={tmdbConfigured ? "good" : "attention"}
+          >
+            <div className="space-y-2">
+              <ProviderStatus
+                label="Books"
+                status="Open Library"
+                tone="good"
+                detail="Book search uses Open Library. No API key is required."
+                href="/ideas/books"
+                hrefLabel="Open books"
+              />
+              <ProviderStatus
+                label="Movies"
+                status={tmdbConfigured ? "TMDB configured" : "TMDB missing"}
+                tone={tmdbConfigured ? "good" : "attention"}
+                detail={
+                  tmdbConfigured
+                    ? "Movie search can use TMDB metadata from the Library."
+                    : "Add one TMDB credential to Railway variables (or the local env) to enable movie search."
+                }
+                href="/ideas/movies"
+                hrefLabel="Open movies"
+              />
+            </div>
+            {!tmdbConfigured ? (
+              <div className="space-y-1.5 border-t border-[#EEF1EC] pt-3">
+                <p className="text-xs text-[#9AA096]">
+                  Either variable enables TMDB lookup. Values live in
+                  1Password, never in the repo.
+                </p>
+                <MissingVariables names={tmdbMissing} />
+              </div>
+            ) : null}
+          </IntegrationCard>
+
+          <IntegrationCard
             title="API access"
             status={`${activeKeys.length} active ${activeKeys.length === 1 ? "key" : "keys"}`}
             tone={activeKeys.length > 0 ? "good" : "neutral"}
@@ -209,6 +250,40 @@ export default async function SettingsPage() {
           </IntegrationCard>
         </div>
       </section>
+    </div>
+  );
+}
+
+function ProviderStatus({
+  label,
+  status,
+  tone,
+  detail,
+  href,
+  hrefLabel,
+}: {
+  label: string;
+  status: string;
+  tone: StatusTone;
+  detail: string;
+  href: string;
+  hrefLabel: string;
+}) {
+  const toneText = tone === "attention" ? "text-amber-800" : "text-stone-600";
+
+  return (
+    <div className="rounded-[12px] border border-[#EEF1EC] bg-[#FBFCFA] p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-medium text-stone-900">{label}</p>
+        <p className={`text-xs font-medium ${toneText}`}>{status}</p>
+      </div>
+      <p className="mt-1 text-[13px] text-stone-600">{detail}</p>
+      <Link
+        href={href}
+        className="mt-2 inline-flex text-[13px] font-medium text-teal-800 hover:text-teal-950"
+      >
+        {hrefLabel}
+      </Link>
     </div>
   );
 }
