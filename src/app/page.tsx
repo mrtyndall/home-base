@@ -5,7 +5,6 @@ import {
   HomeRoutineCheck,
   HomeTaskActions,
 } from "@/components/home-action-buttons";
-import { CaptureFileActions } from "@/components/capture-file-actions";
 import { prisma } from "@/lib/db";
 import {
   formatDateOnly,
@@ -92,14 +91,7 @@ export default async function HomePage() {
         </section>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <RecentCaptures
-          captures={todayData.recentCaptures}
-          domains={todayData.domains}
-        />
-
-        <MemoryCard item={todayData.resurfacedItem} />
-      </div>
+      <MemoryCard item={todayData.resurfacedItem} />
     </div>
   );
 }
@@ -311,55 +303,6 @@ function AttentionSurface({
   );
 }
 
-function RecentCaptures({
-  captures,
-  domains,
-}: {
-  captures: ReadyToday["recentCaptures"];
-  domains: ReadyToday["domains"];
-}) {
-  if (captures.length === 0) {
-    return null;
-  }
-
-  return (
-    <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3">
-      <SectionHeader title="Recently captured" href="/areas/area_inbox" />
-      <div className="mt-2 divide-y divide-[#EEF1EC]">
-        {captures.slice(0, 5).map((capture) => {
-          const pending = isPendingCapture(capture);
-          return (
-            <div
-              key={capture.id}
-              className="grid gap-2 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-            >
-              <Link
-                href={getCaptureHref(capture)}
-                className="truncate text-stone-900 transition hover:text-teal-700"
-              >
-                {capture.rawText}
-              </Link>
-              {pending ? (
-                <CaptureFileActions
-                  captureId={capture.id}
-                  domains={domains}
-                  align="right"
-                />
-              ) : (
-                <span className="text-xs text-[#9AA096]">
-                  {formatCaptureOutcome(capture.createdItems) ??
-                    capture.parseStatus ??
-                    "saved"}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 function MemoryCard({ item }: { item: ResurfacedItem | null }) {
   if (!item) {
     return null;
@@ -517,76 +460,4 @@ async function getHomeData() {
   } catch {
     return { ok: false as const };
   }
-}
-
-type CaptureItem = {
-  type: string;
-  id: string;
-  label: string;
-};
-
-function formatCaptureOutcome(value: unknown) {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const labels = value
-    .filter(isCaptureItem)
-    .filter((item) => item.type !== "pending_capture")
-    .slice()
-    .reverse()
-    .map((item) => item.label)
-    .filter((label) => !label.startsWith("Saved to Inbox to sort later"));
-
-  if (labels.length > 0) {
-    return labels.slice(0, 2).join("; ");
-  }
-
-  const pending = value.filter(isCaptureItem).at(-1);
-  return pending?.label ?? null;
-}
-
-function getCaptureHref(capture: ReadyToday["recentCaptures"][number]) {
-  const item = Array.isArray(capture.createdItems)
-    ? capture.createdItems.filter(isCaptureItem).at(-1)
-    : null;
-  if (!item || item.type === "pending_capture") {
-    return "/areas/area_inbox#pending-captures";
-  }
-  if (item.type === "task") return `/tasks/${item.id}`;
-  if (item.type === "project") return `/projects/${item.id}`;
-  if (item.type === "area") return `/areas/${item.id}`;
-  if (item.type === "idea") return "/ideas";
-  if (item.type === "entity_note") return `/notes/${item.id}`;
-  if (item.type === "idea_note") return "/ideas";
-  if (item.type === "check_in") return `/check-ins/${item.id}`;
-  if (item.type === "reference") return `/references/${item.id}`;
-  if (item.type === "calendar_event") return `/calendar-events/${item.id}`;
-  if (item.type === "journal_entry") return "/ideas";
-  if (item.type === "person") return `/people/${item.id}`;
-  return "/areas/area_inbox#pending-captures";
-}
-
-function isCaptureItem(item: unknown): item is CaptureItem {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    "type" in item &&
-    typeof item.type === "string" &&
-    "id" in item &&
-    typeof item.id === "string" &&
-    "label" in item &&
-    typeof item.label === "string"
-  );
-}
-
-function isPendingCapture(capture: ReadyToday["recentCaptures"][number]) {
-  if (capture.parseStatus === "ambiguous" || capture.parseStatus === "failed") {
-    return true;
-  }
-  return Array.isArray(capture.createdItems)
-    ? capture.createdItems.some(
-        (item) => isCaptureItem(item) && item.type === "pending_capture",
-      )
-    : false;
 }

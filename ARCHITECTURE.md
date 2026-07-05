@@ -136,6 +136,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 
 - Reweighted Areas as the primary information canvas. The Projects route now surfaces domain-grouped area cards before project shelves; Area pages lead with check-ins, then important notes/knowledge containers, then standing tasks and child projects. Project pages keep check-ins as the heartbeat, with milestones and important notes before task execution. Added manual starred shared notes through `entity_notes.starred_at`; system-suggested important notes are documented as a future idea only.
 - Added Library reference lookup status to Settings. Open Library renders as available without credentials for book search, while TMDB shows configured or missing based on `TMDB_ACCESS_TOKEN` / `TMDB_API_KEY` without exposing values.
+- Removed recent capture receipts from Home. Capture receipts remain available as audit trail deeper in Inbox/Today, while Home stays focused on clearance, commitments, attention, and resurfaced memory.
 
 ### 2026-07-03
 
