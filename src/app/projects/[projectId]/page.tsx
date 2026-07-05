@@ -13,6 +13,7 @@ import {
 } from "@/components/entity-depth";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { loadReferenceMentions } from "@/lib/reference-mentions";
 
 export const dynamic = "force-dynamic";
 
@@ -362,10 +363,27 @@ async function loadProject(projectId: string) {
         ])
       : [[], [], [], []];
 
+    const noteMentions =
+      project && notes.length > 0
+        ? await loadReferenceMentions(
+            "entity_note",
+            notes.map((note) => note.id),
+          )
+        : new Map();
+
     return {
       ok: true as const,
       project: project
-        ? { ...project, notes, docs, attachments, checkIns }
+        ? {
+            ...project,
+            notes: notes.map((note) => ({
+              ...note,
+              mentions: noteMentions.get(note.id) ?? [],
+            })),
+            docs,
+            attachments,
+            checkIns,
+          }
         : null,
     };
   } catch {

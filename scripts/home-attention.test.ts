@@ -18,12 +18,12 @@ assert.deepEqual(
   }),
   [
     {
-      href: "/areas/area_inbox",
+      href: "/areas/area_inbox#pending-captures",
       label: "12 captures to sort",
       detail: "Inbox",
     },
     {
-      href: "/areas/area_inbox",
+      href: "/areas/area_inbox#needs-review",
       label: "4 reviews waiting",
       detail: "Inbox",
     },

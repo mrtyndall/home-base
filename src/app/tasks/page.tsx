@@ -1092,10 +1092,18 @@ async function loadTasks(view: TaskViewFilter) {
                 subtasks: {
                   where: { status: "open" },
                   include: { area: true, project: true },
-                  orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+                  orderBy: [
+                    { dueDate: "asc" },
+                    { sortOrder: "asc" },
+                    { createdAt: "desc" },
+                  ],
                 },
               },
-              orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+              orderBy: [
+                { dueDate: "asc" },
+                { sortOrder: "asc" },
+                { createdAt: "desc" },
+              ],
               take: view === "schedule" ? 80 : 200,
             }),
         view === "done" || view === "all"

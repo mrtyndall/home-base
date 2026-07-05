@@ -3,7 +3,12 @@ import type { Area, Capture, Domain, ScheduledReview } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Ellipsis } from "lucide-react";
-import { parkAreaById, retireAreaById, unparkAreaById } from "@/app/actions";
+import {
+  parkAreaById,
+  retireAreaById,
+  updateCaptureText,
+  unparkAreaById,
+} from "@/app/actions";
 import {
   dismissReview,
   markReviewDone,
@@ -21,6 +26,7 @@ import {
   localDateString,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { loadReferenceMentions } from "@/lib/reference-mentions";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +88,13 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </div>
       </header>
 
+      {area.id === "area_inbox" ? (
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+          <NeedsReviewPanel reviews={reviews} domains={domains} />
+          <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
+        </section>
+      ) : null}
+
       <CheckInFeed
         parentType="area"
         parentId={area.id}
@@ -93,13 +106,6 @@ export default async function AreaPage({ params }: AreaPageProps) {
         pendingCaptureCount={pendingCaptures.length}
         reviewCount={reviews.length}
       />
-
-      {area.id === "area_inbox" ? (
-        <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <NeedsReviewPanel reviews={reviews} domains={domains} />
-          <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
-        </section>
-      ) : null}
 
       <EntityDepth
         parentType="area"
@@ -247,7 +253,58 @@ function AreaHubOverview({
   );
 }
 
-type ReviewRow = ScheduledReview & { capture: Pick<Capture, "rawText"> };
+type CaptureWithEdits = Capture & { textEdits: Array<{ text: string }> };
+type ReviewRow = ScheduledReview & {
+  capture: Pick<Capture, "id" | "rawText"> & {
+    textEdits: Array<{ text: string }>;
+  };
+};
+
+function effectiveCaptureText(
+  capture: Pick<Capture, "rawText"> & { textEdits?: Array<{ text: string }> },
+) {
+  return capture.textEdits?.[0]?.text ?? capture.rawText;
+}
+
+function EditableCaptureText({
+  capture,
+}: {
+  capture: Pick<Capture, "id" | "rawText"> & {
+    textEdits?: Array<{ text: string }>;
+  };
+}) {
+  const text = effectiveCaptureText(capture);
+  return (
+    <div>
+      <p className="max-h-48 overflow-y-auto rounded-[10px] bg-[#F7F9F5] px-3 py-2.5 text-sm leading-relaxed text-stone-800">
+        {text}
+      </p>
+      {capture.textEdits?.length ? (
+        <p className="mt-1 text-xs text-[#B0ACA2]">
+          Edited text. Original capture is still searchable.
+        </p>
+      ) : null}
+      <details className="mt-2">
+        <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+          Edit text
+        </summary>
+        <form action={updateCaptureText} className="mt-2 space-y-2">
+          <input type="hidden" name="captureId" value={capture.id} />
+          <textarea
+            name="text"
+            required
+            rows={3}
+            defaultValue={text}
+            className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-teal-700"
+          />
+          <button className="inline-flex h-[30px] items-center justify-center rounded-full bg-teal-700 px-3 text-[13px] font-medium text-white transition hover:bg-teal-800">
+            Save text
+          </button>
+        </form>
+      </details>
+    </div>
+  );
+}
 
 function NeedsReviewPanel({
   reviews,
@@ -261,7 +318,7 @@ function NeedsReviewPanel({
   }
 
   return (
-    <section className="space-y-2.5">
+    <section id="needs-review" className="scroll-mt-24 space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Needs review{" "}
         <span className="font-medium text-[#B0ACA2]">{reviews.length}</span>
@@ -269,9 +326,7 @@ function NeedsReviewPanel({
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {reviews.map((review) => (
           <div key={review.id} className="p-4">
-            <p className="max-h-48 overflow-y-auto rounded-[10px] bg-[#F7F9F5] px-3 py-2.5 text-sm leading-relaxed text-stone-800">
-              {review.capture.rawText}
-            </p>
+            <EditableCaptureText capture={review.capture} />
             <p className="mt-2 text-xs text-[#9AA096]">
               {review.reviewAt
                 ? `Review date ${formatDateOnly(review.reviewAt)}`
@@ -286,29 +341,34 @@ function NeedsReviewPanel({
               />
               <details className="relative">
                 <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
-                  Snooze…
+                  Review later
                 </summary>
                 <form
                   action={snoozeReview}
-                  className="absolute left-0 z-20 mt-2 flex w-max items-center gap-1.5 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
+                  className="absolute left-0 z-20 mt-2 w-72 space-y-2 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
                 >
                   <input type="hidden" name="reviewId" value={review.id} />
-                  <label className="sr-only" htmlFor={`snooze-${review.id}`}>
-                    Snooze until
-                  </label>
-                  <input
-                    id={`snooze-${review.id}`}
-                    type="date"
-                    name="snoozeUntil"
-                    required
-                    className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
-                  />
-                  <button
-                    type="submit"
-                    className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+                  <label
+                    className="block text-xs text-[#6B7268]"
+                    htmlFor={`snooze-${review.id}`}
                   >
-                    Snooze
-                  </button>
+                    Bring this review back on
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      id={`snooze-${review.id}`}
+                      type="date"
+                      name="snoozeUntil"
+                      required
+                      className="h-[30px] min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
+                    />
+                    <button
+                      type="submit"
+                      className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+                    >
+                      Save
+                    </button>
+                  </div>
                 </form>
               </details>
               <form action={markReviewDone}>
@@ -341,7 +401,7 @@ function PendingCapturesPanel({
   captures,
   domains,
 }: {
-  captures: Capture[];
+  captures: CaptureWithEdits[];
   domains: Array<Domain & { areas: Area[] }>;
 }) {
   if (captures.length === 0) {
@@ -349,7 +409,7 @@ function PendingCapturesPanel({
   }
 
   return (
-    <section className="space-y-2.5">
+    <section id="pending-captures" className="scroll-mt-24 space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Pending captures{" "}
         <span className="font-medium text-[#B0ACA2]">{captures.length}</span>
@@ -357,9 +417,7 @@ function PendingCapturesPanel({
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
         {captures.map((capture) => (
           <div key={capture.id} className="p-4">
-            <p className="max-h-48 overflow-y-auto rounded-[10px] bg-[#F7F9F5] px-3 py-2.5 text-sm leading-relaxed text-stone-800">
-              {capture.rawText}
-            </p>
+            <EditableCaptureText capture={capture} />
             <div className="mt-2.5">
               <CaptureFileActions
                 captureId={capture.id}
@@ -530,6 +588,13 @@ async function loadArea(areaId: string) {
                 where: {
                   OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
                 },
+                include: {
+                  textEdits: {
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { text: true },
+                  },
+                },
                 orderBy: { createdAt: "desc" },
                 take: 20,
               })
@@ -543,7 +608,19 @@ async function loadArea(areaId: string) {
                     { status: "pending", reviewAt: null },
                   ],
                 },
-                include: { capture: { select: { rawText: true } } },
+                include: {
+                  capture: {
+                    select: {
+                      id: true,
+                      rawText: true,
+                      textEdits: {
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { text: true },
+                      },
+                    },
+                  },
+                },
                 orderBy: [{ reviewAt: "asc" }, { createdAt: "asc" }],
                 take: 30,
               })
@@ -559,12 +636,23 @@ async function loadArea(areaId: string) {
           [],
         ];
 
+    const noteMentions =
+      area && notes.length > 0
+        ? await loadReferenceMentions(
+            "entity_note",
+            notes.map((note) => note.id),
+          )
+        : new Map();
+
     return {
       ok: true as const,
       area: area
         ? {
             ...area,
-            notes,
+            notes: notes.map((note) => ({
+              ...note,
+              mentions: noteMentions.get(note.id) ?? [],
+            })),
             docs,
             attachments,
             checkIns,

@@ -66,14 +66,12 @@ export default async function TodayPage() {
 
           <section className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-7">
-              <div className="space-y-2.5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <SectionHeader title="Today's calendar" />
-                  <CalendarSyncMeta data={data.calendarSync} />
-                </div>
-                {data.todayEvents.length === 0 ? (
-                  <EmptyLine text="No calendar events today." />
-                ) : (
+              {data.todayEvents.length > 0 ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <SectionHeader title="Today's calendar" />
+                    <CalendarSyncMeta data={data.calendarSync} />
+                  </div>
                   <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
                     {data.todayEvents.map((event) => {
                       const hasPassed =
@@ -107,8 +105,8 @@ export default async function TodayPage() {
                       );
                     })}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : null}
 
               <div className="space-y-2.5">
                 <SectionHeader title="Due today" />
@@ -413,10 +411,6 @@ function SectionHeader({ title }: { title: string }) {
       {title}
     </h2>
   );
-}
-
-function EmptyLine({ text }: { text: string }) {
-  return <p className="text-sm text-[#6B7268]">{text}</p>;
 }
 
 function formatCaptureOutcome(value: unknown) {

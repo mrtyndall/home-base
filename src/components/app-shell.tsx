@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { MessageCircle, Search, Settings } from "lucide-react";
-import { CaptureBar } from "@/components/capture-bar";
-import { NavTabs } from "@/components/nav-tabs";
+import { AppDock } from "@/components/app-dock";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -40,12 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-44 pt-5 sm:px-6">
         {children}
       </main>
-      <div className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
-          <CaptureBar />
-          <NavTabs />
-        </div>
-      </div>
+      <AppDock />
     </div>
   );
 }

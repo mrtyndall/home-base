@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
 import { normalizeJournalUpdateInput } from "@/lib/journal";
+import { syncReferenceMentions } from "@/lib/reference-mentions";
 import { completeRoutineById, undoRoutineCompletionById } from "@/lib/routines";
 import {
   completeTaskById,
@@ -99,16 +100,20 @@ export async function createQuickTask(formData: FormData) {
   const selectedAreaId = getTrimmedString(formData, "areaId");
   const project = projectId
     ? await prisma.project.findFirst({
-        where: { id: projectId, status: { in: ["active", "parked", "someday"] } },
+        where: {
+          id: projectId,
+          status: { in: ["active", "parked", "someday"] },
+        },
         select: { id: true, areaId: true },
       })
     : null;
-  const area = !project && selectedAreaId
-    ? await prisma.area.findFirst({
-        where: { id: selectedAreaId, status: "active" },
-        select: { id: true },
-      })
-    : null;
+  const area =
+    !project && selectedAreaId
+      ? await prisma.area.findFirst({
+          where: { id: selectedAreaId, status: "active" },
+          select: { id: true },
+        })
+      : null;
 
   await createTaskWithDefaultArea(
     {
@@ -354,6 +359,7 @@ export async function updateJournalEntry(formData: FormData) {
     where: { id: entryId },
     data: normalized,
   });
+  await syncReferenceMentions("journal_entry", entry.id, entry.bodyMd);
 
   await prisma.notification.create({
     data: {
@@ -386,7 +392,9 @@ function parseReminderOffsetsInput(value: string) {
     .map((item) => Math.trunc(item));
 }
 
-function normalizeCreatedItems(value: Prisma.JsonValue | null): CreatedItemRef[] {
+function normalizeCreatedItems(
+  value: Prisma.JsonValue | null,
+): CreatedItemRef[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is CreatedItemRef => {
     if (typeof item !== "object" || item === null || Array.isArray(item)) {
@@ -579,7 +587,8 @@ export async function updateProjectTimeframe(formData: FormData) {
   const project = await prisma.project.update({
     where: { id: projectId },
     data: {
-      targetDate: openEnded || !targetDate ? null : dateOnlyFromString(targetDate),
+      targetDate:
+        openEnded || !targetDate ? null : dateOnlyFromString(targetDate),
     },
   });
 
@@ -653,11 +662,15 @@ export async function addEntityNote(formData: FormData) {
   const parentType = getTrimmedString(formData, "parentType");
   const parentId = getTrimmedString(formData, "parentId");
   const bodyMd = getTrimmedString(formData, "bodyMd");
-  if ((parentType !== "area" && parentType !== "project") || !parentId || !bodyMd) {
+  if (
+    (parentType !== "area" && parentType !== "project") ||
+    !parentId ||
+    !bodyMd
+  ) {
     return;
   }
 
-  await prisma.entityNote.create({
+  const note = await prisma.entityNote.create({
     data: {
       parentType,
       parentId,
@@ -665,8 +678,81 @@ export async function addEntityNote(formData: FormData) {
       source: "manual",
     },
   });
+  await syncReferenceMentions("entity_note", note.id, bodyMd);
 
   revalidateEntityParent(parentType, parentId);
+}
+
+export async function updateEntityNote(formData: FormData) {
+  const noteId = getTrimmedString(formData, "noteId");
+  const bodyMd = getTrimmedString(formData, "bodyMd");
+  if (!noteId || !bodyMd) return;
+
+  const note = await prisma.entityNote.update({
+    where: { id: noteId },
+    data: { bodyMd },
+  });
+  await syncReferenceMentions("entity_note", note.id, bodyMd);
+
+  await prisma.notification.create({
+    data: {
+      type: "note_updated",
+      title: "Note updated",
+      body: bodyMd.length > 120 ? `${bodyMd.slice(0, 117)}...` : bodyMd,
+      sourceRef: {
+        type: "entity_note",
+        id: note.id,
+        parentType: note.parentType,
+        parentId: note.parentId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidateEntityParent(note.parentType, note.parentId);
+}
+
+async function getEffectiveCaptureText(captureId: string, rawText: string) {
+  const latestEdit = await prisma.captureTextEdit.findFirst({
+    where: { captureId },
+    orderBy: { createdAt: "desc" },
+    select: { text: true },
+  });
+  return latestEdit?.text ?? rawText;
+}
+
+export async function updateCaptureText(formData: FormData) {
+  const captureId = getTrimmedString(formData, "captureId");
+  const text = getTrimmedString(formData, "text");
+  if (!captureId || !text) return;
+
+  const capture = await prisma.capture.findUnique({
+    where: { id: captureId },
+    select: { id: true, rawText: true },
+  });
+  if (!capture || capture.rawText === text) return;
+
+  await prisma.captureTextEdit.create({
+    data: {
+      captureId: capture.id,
+      text,
+      source: "manual",
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "capture_text_edited",
+      title: "Capture text edited",
+      body: text.length > 120 ? `${text.slice(0, 117)}...` : text,
+      sourceRef: { type: "capture", id: capture.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/areas/area_inbox");
+  revalidatePath("/");
+  revalidatePath("/today");
+  revalidatePath("/search");
 }
 
 export async function convertPendingCapture(formData: FormData) {
@@ -693,12 +779,16 @@ export async function convertPendingCapture(formData: FormData) {
     }),
   ]);
   if (!capture || !area) return;
+  const captureText = await getEffectiveCaptureText(
+    capture.id,
+    capture.rawText,
+  );
 
   let item: CreatedItemRef;
   if (targetType === "task") {
     const task = await createTaskWithAudit(
       {
-        title: capture.rawText,
+        title: captureText,
         areaId: area.id,
         captureId: capture.id,
         source: "manual",
@@ -709,8 +799,8 @@ export async function convertPendingCapture(formData: FormData) {
   } else if (targetType === "idea") {
     const idea = await prisma.idea.create({
       data: {
-        title: capture.rawText,
-        body: capture.rawText,
+        title: captureText,
+        body: captureText,
         areaId: area.id,
         source: "manual",
         captureId: capture.id,
@@ -722,16 +812,21 @@ export async function convertPendingCapture(formData: FormData) {
       data: {
         parentType: "area",
         parentId: area.id,
-        bodyMd: capture.rawText,
+        bodyMd: captureText,
         source: "manual",
         captureId: capture.id,
       },
     });
-    item = { type: "entity_note", id: note.id, label: `Note added to ${area.name}` };
+    item = {
+      type: "entity_note",
+      id: note.id,
+      label: `Note added to ${area.name}`,
+    };
+    await syncReferenceMentions("entity_note", note.id, captureText);
   } else {
     const reference = await prisma.reference.create({
       data: {
-        body: capture.rawText,
+        body: captureText,
         areaId: area.id,
         source: "manual",
         captureId: capture.id,
@@ -742,6 +837,7 @@ export async function convertPendingCapture(formData: FormData) {
       id: reference.id,
       label: `Reference saved to ${area.name}`,
     };
+    await syncReferenceMentions("reference", reference.id, captureText);
   }
 
   const existingItems = normalizeCreatedItems(capture.createdItems);
@@ -750,7 +846,9 @@ export async function convertPendingCapture(formData: FormData) {
     data: {
       parseStatus: "parsed",
       createdItems: [
-        ...existingItems.filter((existing) => existing.type !== "pending_capture"),
+        ...existingItems.filter(
+          (existing) => existing.type !== "pending_capture",
+        ),
         item,
       ] as Prisma.InputJsonValue,
     },
@@ -846,7 +944,8 @@ export async function importEntityDocMarkdown(formData: FormData) {
 
   const bodyMd = await file.text();
   const fallbackTitle = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
-  const title = getTrimmedString(formData, "title") || fallbackTitle || "Imported doc";
+  const title =
+    getTrimmedString(formData, "title") || fallbackTitle || "Imported doc";
 
   await prisma.entityDoc.create({
     data: {
@@ -967,8 +1066,13 @@ export async function moveMilestone(formData: FormData) {
   revalidatePath(`/projects/${milestone.projectId}`);
 }
 
-function revalidateEntityParent(parentType: "area" | "project", parentId: string) {
-  revalidatePath(parentType === "area" ? `/areas/${parentId}` : `/projects/${parentId}`);
+function revalidateEntityParent(
+  parentType: "area" | "project",
+  parentId: string,
+) {
+  revalidatePath(
+    parentType === "area" ? `/areas/${parentId}` : `/projects/${parentId}`,
+  );
 }
 
 export async function updateDomainDescription(formData: FormData) {
@@ -1045,7 +1149,12 @@ async function setAreaStatusById(
   await prisma.notification.create({
     data: {
       type: `area_${status}`,
-      title: status === "active" ? "Area active" : status === "parked" ? "Area parked" : "Area retired",
+      title:
+        status === "active"
+          ? "Area active"
+          : status === "parked"
+            ? "Area parked"
+            : "Area retired",
       body: area.name,
       sourceRef: { type: "area", id: area.id, source: "manual" },
     },

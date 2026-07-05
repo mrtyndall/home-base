@@ -62,7 +62,12 @@ export async function getTodayDashboard() {
           dueDate: { lte: todayDate },
         },
         include: { area: true, project: true },
-        orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }, { createdAt: "asc" }],
+        orderBy: [
+          { dueDate: "asc" },
+          { sortOrder: "asc" },
+          { dueTime: "asc" },
+          { createdAt: "asc" },
+        ],
         take: 12,
       }),
       prisma.task.findMany({
@@ -72,12 +77,19 @@ export async function getTodayDashboard() {
           dueDate: tomorrowDate,
         },
         include: { area: true, project: true },
-        orderBy: [{ dueTime: "asc" }, { createdAt: "asc" }],
+        orderBy: [
+          { sortOrder: "asc" },
+          { dueTime: "asc" },
+          { createdAt: "asc" },
+        ],
         take: 8,
       }),
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: todayCalendarBounds.start, lt: todayCalendarBounds.end },
+          start: {
+            gte: todayCalendarBounds.start,
+            lt: todayCalendarBounds.end,
+          },
         },
         orderBy: { start: "asc" },
         take: 8,
@@ -100,7 +112,11 @@ export async function getTodayDashboard() {
           parentTaskId: null,
         },
         include: { area: true, project: true },
-        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+        orderBy: [
+          { sortOrder: "asc" },
+          { updatedAt: "desc" },
+          { createdAt: "desc" },
+        ],
         take: getTodayTaskInboxLimit(),
       }),
       prisma.capture.findMany({

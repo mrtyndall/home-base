@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { addDaysToDateString, localDateString } from "@/lib/dates";
 import { isPushoverConfigured, sendPushoverMessage } from "@/lib/pushover";
+import { syncReferenceMentions } from "@/lib/reference-mentions";
 
 export type PersonActor = {
   source: "manual" | "capture" | "api";
@@ -61,24 +62,32 @@ export async function createPersonRecord(
 
 /**
  * Log interactions for synced calendar events whose attendees match known
- * people by email. Idempotent: one interaction per person per event.
+ * people by email or display name. Idempotent: one interaction per person per
+ * event.
  */
 export async function logCalendarInteractions(options?: {
   windowDays?: number;
 }) {
   const windowDays = options?.windowDays ?? 30;
   const now = new Date();
-  const windowStart = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+  const windowStart = new Date(
+    now.getTime() - windowDays * 24 * 60 * 60 * 1000,
+  );
 
   const people = await prisma.person.findMany({
-    where: { status: "active", email: { not: null } },
+    where: { status: "active" },
     select: { id: true, name: true, email: true },
   });
   if (people.length === 0) {
     return 0;
   }
   const peopleByEmail = new Map(
-    people.map((person) => [person.email!.toLowerCase(), person]),
+    people
+      .filter((person) => person.email)
+      .map((person) => [person.email!.toLowerCase(), person]),
+  );
+  const peopleByName = new Map(
+    people.map((person) => [normalizePersonMatch(person.name), person]),
   );
 
   const events = await prisma.calendarEvent.findMany({
@@ -101,9 +110,38 @@ export async function logCalendarInteractions(options?: {
         typeof attendee.email === "string"
           ? attendee.email.toLowerCase()
           : null;
-      if (!email) continue;
-      const person = peopleByEmail.get(email);
+      const displayName =
+        typeof attendee === "object" &&
+        attendee !== null &&
+        "displayName" in attendee &&
+        typeof attendee.displayName === "string"
+          ? attendee.displayName
+          : null;
+      const person =
+        (email ? peopleByEmail.get(email) : undefined) ??
+        (displayName
+          ? peopleByName.get(normalizePersonMatch(displayName))
+          : undefined);
       if (!person) continue;
+
+      await prisma.referenceMention.upsert({
+        where: {
+          sourceType_sourceId_targetType_targetId: {
+            sourceType: "calendar_event",
+            sourceId: event.id,
+            targetType: "person",
+            targetId: person.id,
+          },
+        },
+        update: { label: person.name, status: "active" },
+        create: {
+          sourceType: "calendar_event",
+          sourceId: event.id,
+          targetType: "person",
+          targetId: person.id,
+          label: person.name,
+        },
+      });
 
       const existing = await prisma.personInteraction.findFirst({
         where: { personId: person.id, calendarEventId: event.id },
@@ -136,9 +174,18 @@ export async function logCalendarInteractions(options?: {
       });
       logged += 1;
     }
+    await syncReferenceMentions("calendar_event", event.id, event.title);
   }
 
   return logged;
+}
+
+function normalizePersonMatch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const FACT_NUDGE_LEAD_DAYS = 14;

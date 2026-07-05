@@ -26,7 +26,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
     notFound();
   }
 
-  const { person, linkedCaptures } = result;
+  const { person, linkedCaptures, linkedMentions } = result;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -133,6 +133,33 @@ export default async function PersonPage({ params }: PersonPageProps) {
         )}
       </section>
 
+      {linkedMentions.length > 0 ? (
+        <section className="space-y-2.5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            Mentioned here
+          </h2>
+          <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+            {linkedMentions.map((item) => (
+              <Link
+                key={`${item.type}:${item.id}`}
+                href={item.href}
+                className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
+              >
+                <p className="text-sm font-medium text-stone-950">
+                  {item.title}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-sm text-stone-600">
+                  {item.body}
+                </p>
+                <p className="mt-1 text-xs text-[#B0ACA2]">
+                  {item.type} · {formatShortDate(item.createdAt)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {linkedCaptures.length > 0 ? (
         <section className="space-y-2.5">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -167,7 +194,12 @@ async function loadPerson(personId: string) {
     });
 
     if (!person) {
-      return { ok: true as const, person: null, linkedCaptures: [] };
+      return {
+        ok: true as const,
+        person: null,
+        linkedCaptures: [],
+        linkedMentions: [],
+      };
     }
 
     const captureIds = [
@@ -182,9 +214,109 @@ async function loadPerson(personId: string) {
           take: 20,
         })
       : [];
+    const linkedMentions = await loadPersonMentionHistory(person.id);
 
-    return { ok: true as const, person, linkedCaptures };
+    return { ok: true as const, person, linkedCaptures, linkedMentions };
   } catch {
     return { ok: false as const };
   }
+}
+
+async function loadPersonMentionHistory(personId: string) {
+  const mentions = await prisma.referenceMention.findMany({
+    where: { targetType: "person", targetId: personId, status: "active" },
+    orderBy: { createdAt: "desc" },
+    take: 80,
+  });
+
+  const idsByType = new Map<string, string[]>();
+  for (const mention of mentions) {
+    const ids = idsByType.get(mention.sourceType) ?? [];
+    ids.push(mention.sourceId);
+    idsByType.set(mention.sourceType, ids);
+  }
+
+  const [notes, checkIns, references, journals, events] = await Promise.all([
+    prisma.entityNote.findMany({
+      where: { id: { in: idsByType.get("entity_note") ?? [] } },
+      select: {
+        id: true,
+        bodyMd: true,
+        parentType: true,
+        parentId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.checkIn.findMany({
+      where: { id: { in: idsByType.get("check_in") ?? [] } },
+      select: {
+        id: true,
+        bodyMd: true,
+        parentType: true,
+        parentId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.reference.findMany({
+      where: { id: { in: idsByType.get("reference") ?? [] } },
+      select: { id: true, title: true, body: true, createdAt: true },
+    }),
+    prisma.journalEntry.findMany({
+      where: { id: { in: idsByType.get("journal_entry") ?? [] } },
+      select: { id: true, bodyMd: true, entryDate: true, createdAt: true },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { id: { in: idsByType.get("calendar_event") ?? [] } },
+      select: { id: true, title: true, start: true, createdAt: true },
+    }),
+  ]);
+
+  return [
+    ...notes.map((note) => ({
+      id: note.id,
+      type: "note",
+      title: "Note",
+      body: note.bodyMd,
+      createdAt: note.createdAt,
+      href:
+        note.parentType === "area"
+          ? `/areas/${note.parentId}`
+          : `/projects/${note.parentId}`,
+    })),
+    ...checkIns.map((checkIn) => ({
+      id: checkIn.id,
+      type: "check-in",
+      title: "Check-in",
+      body: checkIn.bodyMd,
+      createdAt: checkIn.createdAt,
+      href:
+        checkIn.parentType === "area"
+          ? `/areas/${checkIn.parentId}`
+          : `/projects/${checkIn.parentId}`,
+    })),
+    ...references.map((reference) => ({
+      id: reference.id,
+      type: "reference",
+      title: reference.title ?? "Reference",
+      body: reference.body,
+      createdAt: reference.createdAt,
+      href: `/ideas#reference-${reference.id}`,
+    })),
+    ...journals.map((entry) => ({
+      id: entry.id,
+      type: "journal",
+      title: formatDateOnly(entry.entryDate),
+      body: entry.bodyMd,
+      createdAt: entry.createdAt,
+      href: "/ideas",
+    })),
+    ...events.map((event) => ({
+      id: event.id,
+      type: "meeting",
+      title: event.title,
+      body: formatDateOnly(event.start),
+      createdAt: event.start,
+      href: `/calendar-events/${event.id}`,
+    })),
+  ].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
 }

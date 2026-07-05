@@ -6,6 +6,7 @@ import { parseCaptureWithContext } from "@/lib/capture/parser";
 import { createCheckInRecord } from "@/lib/checkins";
 import { boostResurfaceByMatch } from "@/lib/resurfacing";
 import { createPersonRecord, findPersonByMatch } from "@/lib/people";
+import { syncReferenceMentions } from "@/lib/reference-mentions";
 import { completeRoutineByMatch } from "@/lib/routines";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
 import {
@@ -61,9 +62,14 @@ export async function submitCapture(
 
   try {
     const parserContext = await buildParserContext(parsedInput.source);
-    actions = await parseCaptureWithContext(parsedInput.rawText, parserContext);
+    actions =
+      parsedInput.captureIntent === "auto"
+        ? await parseCaptureWithContext(parsedInput.rawText, parserContext)
+        : actionsFromCaptureIntent(parsedInput);
 
-    const ambiguous = actions.some((action) => "needs_disambiguation" in action);
+    const ambiguous = actions.some(
+      (action) => "needs_disambiguation" in action,
+    );
     const failed = actions.some((action) => "error" in action);
     status = ambiguous ? "ambiguous" : failed ? "failed" : "parsed";
 
@@ -87,7 +93,8 @@ export async function submitCapture(
     status = "failed";
     actions = [
       {
-        error: error instanceof Error ? error.message : "Capture parsing failed.",
+        error:
+          error instanceof Error ? error.message : "Capture parsing failed.",
       },
     ];
 
@@ -193,7 +200,8 @@ function buildActorContext(input: CaptureInput) {
   }
 
   const label =
-    isRecord(input.deviceContext) && typeof input.deviceContext.apiKeyLabel === "string"
+    isRecord(input.deviceContext) &&
+    typeof input.deviceContext.apiKeyLabel === "string"
       ? input.deviceContext.apiKeyLabel
       : undefined;
 
@@ -202,6 +210,44 @@ function buildActorContext(input: CaptureInput) {
     writeSource: label ? `api:${label}` : "api",
     calendarSource: "api" as const,
   };
+}
+
+function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
+  switch (input.captureIntent) {
+    case "task":
+      return [
+        {
+          type: "create_task",
+          title: input.rawText,
+          due_date: input.captureDueDate,
+        },
+      ];
+    case "note":
+      return [
+        {
+          type: "create_entity_note",
+          parent_type: "area",
+          body_md: input.rawText,
+        },
+      ];
+    case "idea":
+      return [
+        {
+          type: "create_idea",
+          title: input.rawText,
+          body: input.rawText,
+        },
+      ];
+    case "reference":
+      return [
+        {
+          type: "create_reference",
+          body: input.rawText,
+        },
+      ];
+    case "auto":
+      return [];
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -235,7 +281,8 @@ async function getInboxAreaId() {
       domainId: systemDomain.id,
       isSystem: true,
       status: "active",
-      currentState: "System catch-all for quick-add and genuinely ambiguous captures.",
+      currentState:
+        "System catch-all for quick-add and genuinely ambiguous captures.",
       nextStep: "Route items when the right area becomes clear.",
     },
   });
@@ -573,7 +620,8 @@ async function createProject(
   action: Extract<ExecutableAction, { type: "create_project" }>,
   context: ExecutionContext,
 ) {
-  const areaId = matchAreaId(action.area_match, context.areas) ?? context.inboxAreaId;
+  const areaId =
+    matchAreaId(action.area_match, context.areas) ?? context.inboxAreaId;
 
   const project = await prisma.project.create({
     data: {
@@ -853,6 +901,7 @@ async function createReference(
     },
     include: { area: true, project: true },
   });
+  await syncReferenceMentions("reference", reference.id, action.body);
 
   return {
     type: "reference" as const,
@@ -881,6 +930,7 @@ async function createEntityNote(
       captureId: context.captureId,
     },
   });
+  await syncReferenceMentions("entity_note", note.id, action.body_md);
 
   return {
     type: "entity_note" as const,
@@ -930,10 +980,7 @@ function matchDomain(
   return domains.find((domain) => normalizeMatch(domain.name) === normalized);
 }
 
-function matchAreaId(
-  areaMatch: string | undefined,
-  areas: AreaContext[],
-) {
+function matchAreaId(areaMatch: string | undefined, areas: AreaContext[]) {
   if (!areaMatch) {
     return undefined;
   }
@@ -942,7 +989,8 @@ function matchAreaId(
   const exact = areas.find((area) => normalizeMatch(area.name) === normalized);
   if (exact) return exact.id;
 
-  return areas.find((area) => normalizeMatch(area.name).includes(normalized))?.id;
+  return areas.find((area) => normalizeMatch(area.name).includes(normalized))
+    ?.id;
 }
 
 async function matchProjectId(projectMatch: string) {
@@ -1153,6 +1201,7 @@ async function executeJournal(
       captureId: context.captureId,
     },
   });
+  await syncReferenceMentions("journal_entry", entry.id, action.body_md);
 
   return {
     type: "journal_entry" as const,
@@ -1237,6 +1286,10 @@ async function resolveEntityParent(
     return { type: "project" as const, id: project.id, label: project.name };
   }
 
+  if (!areaMatch) {
+    return { type: "area" as const, id: context.inboxAreaId, label: "Inbox" };
+  }
+
   const areaId = matchAreaId(areaMatch, context.areas);
   if (!areaId) {
     throw new Error(`No area matched "${areaMatch ?? ""}".`);
@@ -1275,7 +1328,9 @@ function buildConfirmationMessage(
   status: "parsed" | "ambiguous" | "failed",
   createdItems: CreatedItemRef[],
 ) {
-  const visibleItems = createdItems.filter((item) => item.type !== "notification");
+  const visibleItems = createdItems.filter(
+    (item) => item.type !== "notification",
+  );
   if (status === "ambiguous") {
     return "Saved to Inbox to sort later";
   }

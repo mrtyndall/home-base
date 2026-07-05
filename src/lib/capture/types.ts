@@ -5,6 +5,13 @@ export const captureInputSchema = z.object({
   source: z
     .enum(["in_app_text", "in_app_voice", "ios_shortcut", "android_shortcut", "api"])
     .default("in_app_text"),
+  captureIntent: z
+    .enum(["auto", "task", "note", "idea", "reference"])
+    .default("auto"),
+  captureDueDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   deviceContext: z.record(z.string(), z.unknown()).optional(),
 });
 

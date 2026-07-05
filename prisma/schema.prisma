@@ -162,6 +162,7 @@ model Capture {
   calendarEvents     CalendarEvent[]
   checkIns           CheckIn[]
   journalEntries     JournalEntry[]
+  textEdits          CaptureTextEdit[]
   scheduledReviews   ScheduledReview[]
   personFacts        PersonFact[]
   personInteractions PersonInteraction[]
@@ -176,6 +177,19 @@ model Capture {
   @@index([createdAt])
   @@index([parseStatus])
   @@map("captures")
+}
+
+model CaptureTextEdit {
+  id        String   @id @default(uuid())
+  captureId String   @map("capture_id")
+  text      String
+  source    String   @default("manual")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  capture Capture @relation(fields: [captureId], references: [id])
+
+  @@index([captureId, createdAt])
+  @@map("capture_text_edits")
 }
 
 model Domain {
@@ -278,6 +292,7 @@ model Task {
   reminderOffsets Json?      @map("reminder_offsets")
   source          String?
   captureId       String?    @map("capture_id")
+  sortOrder       Int        @default(0) @map("sort_order")
   createdAt       DateTime   @default(now()) @map("created_at")
   completedAt     DateTime?  @map("completed_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
@@ -293,6 +308,7 @@ model Task {
   @@index([someday, status])
   @@index([starred, status])
   @@index([dueDate, dueTime])
+  @@index([status, dueDate, sortOrder])
   @@index([projectId])
   @@index([captureId])
   @@map("tasks")
@@ -368,6 +384,23 @@ model Reference {
   @@index([kind])
   @@index([captureId])
   @@map("references")
+}
+
+model ReferenceMention {
+  id         String   @id @default(uuid())
+  sourceType String   @map("source_type")
+  sourceId   String   @map("source_id")
+  label      String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  status     String   @default("active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([sourceType, sourceId, targetType, targetId])
+  @@index([sourceType, sourceId, status])
+  @@index([targetType, targetId, status])
+  @@map("reference_mentions")
 }
 
 model EntityNote {

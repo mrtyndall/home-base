@@ -27,17 +27,106 @@ export default async function LibraryPage() {
           Library
         </h1>
       </header>
+      <ReferenceDatabaseOverview
+        people={people}
+        books={books}
+        movies={movies}
+        references={references}
+      />
       <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">
         <JournalSection entries={journalEntries} />
         <div className="space-y-8">
           <PeopleSection people={people} />
-          <ReferenceSection title="Books" references={books} />
-          <ReferenceSection title="Movies" references={movies} />
+          <ReferenceSection id="books" title="Books" references={books} />
+          <ReferenceSection id="movies" title="Movies" references={movies} />
           <IdeasSection ideas={ideas} />
-          <ReferenceSection title="References" references={references} />
+          <ReferenceSection
+            id="references"
+            title="References"
+            references={references}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+type PeopleListItem = Person & {
+  _count: { facts: number; interactions: number };
+};
+
+function ReferenceDatabaseOverview({
+  people,
+  books,
+  movies,
+  references,
+}: {
+  people: PeopleListItem[];
+  books: LibraryReference[];
+  movies: LibraryReference[];
+  references: LibraryReference[];
+}) {
+  const databases = [
+    {
+      href: "#people",
+      label: "People",
+      count: people.length,
+      detail: people[0]
+        ? [
+            people[0].name,
+            people[0]._count.facts > 0
+              ? `${people[0]._count.facts} fact${people[0]._count.facts === 1 ? "" : "s"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : "No people saved yet.",
+    },
+    {
+      href: "#books",
+      label: "Books",
+      count: books.length,
+      detail: latestReferenceLine(books[0]) ?? "No books saved yet.",
+    },
+    {
+      href: "#movies",
+      label: "Movies",
+      count: movies.length,
+      detail: latestReferenceLine(movies[0]) ?? "No movies saved yet.",
+    },
+    {
+      href: "#references",
+      label: "References",
+      count: references.length,
+      detail: latestReferenceLine(references[0]) ?? "No references saved yet.",
+    },
+  ];
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+        Reference databases
+      </h2>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        {databases.map((database) => (
+          <Link
+            key={database.label}
+            href={database.href}
+            className="rounded-[18px] border border-[#E2E6DF] bg-white px-4 py-3.5 transition hover:border-teal-700/50"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-medium text-stone-950">
+                {database.label}
+              </h3>
+              <p className="text-sm text-[#9AA096]">{database.count}</p>
+            </div>
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-[#6B7268]">
+              {database.detail}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -133,17 +222,13 @@ function IdeasSection({ ideas }: { ideas: IdeaListItem[] }) {
   );
 }
 
-function PeopleSection({
-  people,
-}: {
-  people: Array<Person & { _count: { facts: number; interactions: number } }>;
-}) {
+function PeopleSection({ people }: { people: PeopleListItem[] }) {
   if (people.length === 0) {
     return null;
   }
 
   return (
-    <section className="space-y-2.5">
+    <section id="people" className="scroll-mt-24 space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         People
       </h2>
@@ -182,9 +267,11 @@ type LibraryReference = Pick<
 >;
 
 function ReferenceSection({
+  id,
   title,
   references,
 }: {
+  id: string;
   title: string;
   references: LibraryReference[];
 }) {
@@ -193,7 +280,7 @@ function ReferenceSection({
   }
 
   return (
-    <section className="space-y-2.5">
+    <section id={id} className="scroll-mt-24 space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         {title} {references.length}
       </h2>
@@ -398,6 +485,16 @@ function referenceMetaLine(reference: LibraryReference) {
   }
 
   return reference.tags.join(" · ") || formatShortDate(reference.createdAt);
+}
+
+function latestReferenceLine(reference: LibraryReference | undefined) {
+  if (!reference) {
+    return null;
+  }
+
+  return [reference.title ?? reference.body, referenceMetaLine(reference)]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function referenceRating(reference: LibraryReference) {

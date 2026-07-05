@@ -214,6 +214,11 @@ export function DraggableTaskLink({
   const suppressNextClick = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragPending, setDragPending] = useState(false);
+  const [nativeDragEnabled] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: fine)").matches,
+  );
   const [dragPreviewPosition, setDragPreviewPosition] =
     useState<TaskDragPreviewPosition | null>(null);
   const [, startTransition] = useTransition();
@@ -246,9 +251,16 @@ export function DraggableTaskLink({
     }
   }
 
+  function isDragHandle(target: EventTarget | null) {
+    return target instanceof HTMLElement
+      ? Boolean(target.closest("[data-task-drag-handle]"))
+      : false;
+  }
+
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if ((event.target as HTMLElement).closest("button,input")) return;
+    if (!isDragHandle(event.target)) return;
     clearLongPress();
+    setMenuOpen(false);
     pointerStart.current = { x: event.clientX, y: event.clientY };
     pointerDragging.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -284,18 +296,28 @@ export function DraggableTaskLink({
 
     if (!wasDragging) return;
 
-    const dropTarget = document
+    const taskTarget = document
       .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLElement>("[data-drop-date]");
+      ?.closest<HTMLElement>("[data-task-id]");
+    const targetTaskId = taskTarget?.dataset.taskId;
+    const dropTarget = taskTarget
+      ? null
+      : document
+          .elementFromPoint(event.clientX, event.clientY)
+          ?.closest<HTMLElement>("[data-drop-date]");
     const targetDateValue = dropTarget?.dataset.dropDate;
     const targetDate = targetDateValue === "none" ? null : targetDateValue;
     markDragEnded();
-    if (targetDate === undefined) return;
+    if (!targetTaskId && targetDate === undefined) return;
 
     event.preventDefault();
     setDragPending(true);
     try {
-      await updateTaskSchedule(taskId, { dueDate: targetDate });
+      if (targetTaskId && targetTaskId !== taskId) {
+        await updateTaskOrder(taskId, { targetTaskId });
+      } else {
+        await updateTaskSchedule(taskId, { dueDate: targetDate });
+      }
       startTransition(() => router.refresh());
     } finally {
       setDragPending(false);
@@ -303,7 +325,8 @@ export function DraggableTaskLink({
   }
 
   function handleMouseDown(event: MouseEvent<HTMLDivElement>) {
-    if ((event.target as HTMLElement).closest("button,input")) return;
+    if (!isDragHandle(event.target)) return;
+    setMenuOpen(false);
     mouseStart.current = { x: event.clientX, y: event.clientY };
     activeMouseDragTaskId = null;
   }
@@ -336,8 +359,12 @@ export function DraggableTaskLink({
     <>
       <div
         data-task-id={taskId}
-        draggable
+        draggable={nativeDragEnabled}
         onDragStart={(event) => {
+          if (!nativeDragEnabled) {
+            event.preventDefault();
+            return;
+          }
           markDragStarted(event.clientX, event.clientY);
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("application/x-home-base-task-id", taskId);
@@ -359,11 +386,13 @@ export function DraggableTaskLink({
           dragPending ? "opacity-60" : ""
         } ${dragPreviewPosition ? "opacity-50" : ""}`}
       >
-        <GripVertical
-          aria-hidden="true"
-          className="mt-0.5 hidden shrink-0 text-[#C9CFC5] sm:block"
-          size={16}
-        />
+        <span
+          aria-label="Drag task"
+          data-task-drag-handle
+          className="mt-0.5 grid h-8 w-8 shrink-0 touch-none place-items-center rounded-full text-[#B0B7AD] sm:h-auto sm:w-auto"
+        >
+          <GripVertical aria-hidden="true" size={16} />
+        </span>
         <Link
           href={href}
           onClickCapture={(event) => {
@@ -523,14 +552,15 @@ function ScheduleMenu({
         type="button"
         title="Move, schedule, or assign task"
         onClick={() => setOpen(!open)}
-        className={`inline-flex h-8 items-center gap-1.5 rounded-full border bg-white px-3 text-[13px] font-medium transition ${
+        aria-label="Move, schedule, or assign task"
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[13px] font-medium transition sm:w-auto sm:gap-1.5 sm:px-3 ${
           open
             ? "border-teal-700/40 text-teal-800"
             : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
         }`}
       >
         <CalendarDays size={15} />
-        Move
+        <span className="hidden sm:inline">Move</span>
       </button>
       {open ? (
         <div className="absolute right-0 top-10 z-30 w-56 rounded-[20px] border border-white/65 bg-[#FAFBF9]/80 p-2 text-sm shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
@@ -687,6 +717,15 @@ async function updateTaskSchedule(
   if (!response.ok) {
     throw new Error("Task date update failed.");
   }
+}
+
+async function updateTaskOrder(taskId: string, body: { targetTaskId: string }) {
+  const response = await fetch(`/api/tasks/${taskId}/order`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error("Task order update failed.");
 }
 
 async function updateTaskAssignment(

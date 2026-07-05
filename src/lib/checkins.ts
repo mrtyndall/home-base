@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CheckInSource, EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { syncReferenceMentions } from "@/lib/reference-mentions";
 
 export type CheckInActor = {
   source: "manual" | "capture" | "api";
@@ -34,6 +35,7 @@ export async function createCheckInRecord(
       captureId: input.captureId ?? undefined,
     },
   });
+  await syncReferenceMentions("check_in", checkIn.id, input.bodyMd);
 
   await prisma.notification.create({
     data: {
@@ -85,8 +87,7 @@ export async function getLatestCheckIns(
 }
 
 export type SummarizeDraftResult =
-  | { ok: true; draft: string }
-  | { ok: false; reason: string };
+  { ok: true; draft: string } | { ok: false; reason: string };
 
 /**
  * Drafts a check-in from everything since the last check-in: completed
@@ -121,8 +122,8 @@ export async function draftCheckInFromActivity(
   });
   const since = latest?.createdAt ?? new Date(Date.now() - 30 * DAY_MS);
 
-  const [completedTasks, notes, docs, milestones, activity] =
-    await Promise.all([
+  const [completedTasks, notes, docs, milestones, activity] = await Promise.all(
+    [
       prisma.task.findMany({
         where: {
           status: "completed",
@@ -166,7 +167,8 @@ export async function draftCheckInFromActivity(
             take: 20,
           })
         : Promise.resolve([]),
-    ]);
+    ],
+  );
 
   if (
     completedTasks.length === 0 &&
@@ -220,10 +222,7 @@ Return only the check-in body, no preamble or headings.`,
     : { ok: false, reason: "The model returned an empty draft." };
 }
 
-async function getParentName(
-  parentType: EntityParentType,
-  parentId: string,
-) {
+async function getParentName(parentType: EntityParentType, parentId: string) {
   if (parentType === "project") {
     const project = await prisma.project.findUnique({
       where: { id: parentId },

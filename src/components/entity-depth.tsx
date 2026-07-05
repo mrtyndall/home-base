@@ -7,9 +7,11 @@ import {
   importEntityDocMarkdown,
   moveMilestone,
   updateEntityDoc,
+  updateEntityNote,
 } from "@/app/actions";
 import { AttachmentUpload } from "@/components/attachment-upload";
 import { MarkdownPreview } from "@/components/markdown-preview";
+import { MentionTextarea } from "@/components/mention-textarea";
 import { NoteStarButton } from "@/components/note-star-button";
 import { formatShortDate } from "@/lib/dates";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
@@ -19,6 +21,12 @@ type EntityNoteItem = {
   bodyMd: string;
   starredAt: Date | null;
   createdAt: Date;
+  mentions?: Array<{
+    label: string;
+    targetType: "person" | "reference" | "calendar_event";
+    targetId: string;
+    href: string;
+  }>;
 };
 
 type EntityDocItem = {
@@ -133,7 +141,7 @@ function NotesPanel({
               >
                 Note
               </label>
-              <textarea
+              <MentionTextarea
                 id={`${parentType}-${parentId}-note`}
                 name="bodyMd"
                 required
@@ -222,10 +230,41 @@ function NoteRow({
               : "min-w-0 flex-1"
           }
         >
-          <MarkdownPreview body={note.bodyMd} />
+          <MarkdownPreview body={note.bodyMd} mentions={note.mentions} />
+          {note.mentions && note.mentions.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5 not-italic">
+              {note.mentions.map((mention) => (
+                <a
+                  key={`${mention.targetType}:${mention.targetId}`}
+                  href={mention.href}
+                  className="inline-flex h-7 items-center rounded-full border border-[#E2E6DF] bg-white px-2.5 text-xs font-medium text-teal-700 transition hover:border-teal-700/50"
+                >
+                  @{mention.label}
+                </a>
+              ))}
+            </div>
+          ) : null}
           <p className="mt-2 text-xs not-italic text-[#B0ACA2]">
             {formatShortDate(note.createdAt)}
           </p>
+          <details className="mt-2">
+            <summary className="inline-flex h-8 cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium not-italic text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+              Edit
+            </summary>
+            <form action={updateEntityNote} className="mt-2 space-y-2">
+              <input type="hidden" name="noteId" value={note.id} />
+              <MentionTextarea
+                name="bodyMd"
+                required
+                rows={4}
+                defaultValue={note.bodyMd}
+                className="w-full rounded-[12px] border border-[#E2E6DF] bg-white px-3.5 py-2.5 text-sm not-italic outline-none transition focus:border-teal-700"
+              />
+              <button className="inline-flex h-8 items-center justify-center rounded-full bg-teal-700 px-3.5 text-[13px] font-medium not-italic text-white transition hover:bg-teal-800">
+                Save
+              </button>
+            </form>
+          </details>
         </div>
         <NoteStarButton noteId={note.id} starred={Boolean(note.starredAt)} />
       </div>

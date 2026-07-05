@@ -2,12 +2,29 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Mic, Send, Square, TriangleAlert } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Mic,
+  Send,
+  Square,
+  TriangleAlert,
+} from "lucide-react";
 
 type CaptureResponse = {
   status: "parsed" | "ambiguous" | "failed";
   message: string;
 };
+
+type CaptureIntent = "auto" | "task" | "note" | "idea" | "reference";
+
+const captureIntents: Array<{ value: CaptureIntent; label: string }> = [
+  { value: "auto", label: "Auto" },
+  { value: "task", label: "Task" },
+  { value: "note", label: "Note" },
+  { value: "idea", label: "Idea" },
+  { value: "reference", label: "Reference" },
+];
 
 type SpeechRecognitionLike = {
   continuous: boolean;
@@ -41,6 +58,9 @@ export function CaptureBar() {
   const [status, setStatus] = useState<"idle" | "saving" | "ok" | "error">(
     "idle",
   );
+  const [captureIntent, setCaptureIntent] = useState<CaptureIntent>("auto");
+  const [captureDueDate, setCaptureDueDate] = useState("");
+  const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceDraftRef = useRef("");
@@ -56,6 +76,23 @@ export function CaptureBar() {
       speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition,
     );
   }, []);
+
+  const expanded =
+    focused ||
+    rawText.trim().length > 0 ||
+    captureIntent !== "auto" ||
+    captureDueDate.length > 0;
+
+  const placeholder =
+    captureIntent === "task"
+      ? "Task title"
+      : captureIntent === "note"
+        ? "Note"
+        : captureIntent === "idea"
+          ? "Idea"
+          : captureIntent === "reference"
+            ? "Reference"
+            : "";
 
   async function submitCapture(
     source: "in_app_text" | "in_app_voice",
@@ -75,6 +112,11 @@ export function CaptureBar() {
       body: JSON.stringify({
         rawText: text,
         source,
+        captureIntent,
+        captureDueDate:
+          captureIntent === "task" && captureDueDate
+            ? captureDueDate
+            : undefined,
         deviceContext: {
           userAgent: navigator.userAgent,
         },
@@ -94,6 +136,8 @@ export function CaptureBar() {
     setStatus(body.status === "failed" ? "error" : "ok");
     setMessage(body.message ?? "Capture saved.");
     setRawText("");
+    setCaptureIntent("auto");
+    setCaptureDueDate("");
     router.refresh();
   }
 
@@ -105,7 +149,9 @@ export function CaptureBar() {
   function toggleMic() {
     if (!speechSupported || typeof window === "undefined") {
       setStatus("error");
-      setMessage("Voice is not available here. Any text already captured is still in the field.");
+      setMessage(
+        "Voice is not available here. Any text already captured is still in the field.",
+      );
       return;
     }
 
@@ -185,7 +231,10 @@ export function CaptureBar() {
         <input
           id="capture-text"
           value={rawText}
+          placeholder={placeholder}
           onChange={(event) => setRawText(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           className={`h-11 min-w-0 flex-1 rounded-full border px-4 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:bg-white ${
             listening
               ? "border-teal-700 bg-white"
@@ -201,6 +250,44 @@ export function CaptureBar() {
           <Send size={17} />
         </button>
       </form>
+      {expanded ? (
+        <div className="mt-2 space-y-2 px-1 pb-1">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {captureIntents.map((intent) => (
+              <button
+                key={intent.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setCaptureIntent(intent.value);
+                  if (intent.value !== "task") {
+                    setCaptureDueDate("");
+                  }
+                }}
+                className={`h-9 shrink-0 rounded-full border px-3 text-sm transition ${
+                  captureIntent === intent.value
+                    ? "border-teal-700 bg-teal-50 text-teal-800"
+                    : "border-[#E2E6DF] bg-white/75 text-stone-600 hover:border-teal-700/50"
+                }`}
+              >
+                {intent.label}
+              </button>
+            ))}
+          </div>
+          {captureIntent === "task" ? (
+            <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
+              <CalendarDays size={16} className="text-teal-700" />
+              <span className="shrink-0">Due date</span>
+              <input
+                type="date"
+                value={captureDueDate}
+                onChange={(event) => setCaptureDueDate(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none"
+              />
+            </label>
+          ) : null}
+        </div>
+      ) : null}
       {message ? (
         <div className="flex items-start gap-2 px-3 pb-1.5 pt-2 text-sm text-stone-700">
           {status === "error" ? (

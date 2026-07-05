@@ -11,7 +11,10 @@ import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { getDomainAggregate } from "@/lib/domains";
 import { createPersonRecord } from "@/lib/people";
-import { boostResurfaceWeight, getDailyResurfacedItem } from "@/lib/resurfacing";
+import {
+  boostResurfaceWeight,
+  getDailyResurfacedItem,
+} from "@/lib/resurfacing";
 import { completeRoutineById, getRoutinesWithState } from "@/lib/routines";
 import { getTodayDashboard } from "@/lib/today";
 import { completeTaskById, createTaskWithAudit } from "@/lib/tasks";
@@ -48,7 +51,9 @@ export async function GET(request: Request, context: RouteCtx) {
         return {
           domain: await prisma.domain.findUnique({
             where: { id },
-            include: { areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
+            include: {
+              areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+            },
           }),
         };
       }
@@ -56,7 +61,9 @@ export async function GET(request: Request, context: RouteCtx) {
       return {
         domains: await prisma.domain.findMany({
           where: { active: true },
-          include: { areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] } },
+          include: {
+            areas: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+          },
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         }),
       };
@@ -69,7 +76,10 @@ export async function GET(request: Request, context: RouteCtx) {
             where: { id },
             include: {
               domain: true,
-              tasks: { where: { status: "open" }, orderBy: { createdAt: "desc" } },
+              tasks: {
+                where: { status: "open" },
+                orderBy: { createdAt: "desc" },
+              },
               projects: { orderBy: { createdAt: "desc" } },
               ideas: { orderBy: { updatedAt: "desc" } },
             },
@@ -138,7 +148,11 @@ export async function GET(request: Request, context: RouteCtx) {
                 : {}),
           },
           include: { area: true, project: true, subtasks: true },
-          orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+          orderBy: [
+            { status: "asc" },
+            { dueDate: "asc" },
+            { createdAt: "desc" },
+          ],
           take: query.limit,
           ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         }),
@@ -163,7 +177,9 @@ export async function GET(request: Request, context: RouteCtx) {
             include: {
               area: true,
               activity: { orderBy: { createdAt: "desc" }, take: 20 },
-              milestones: { orderBy: [{ status: "asc" }, { sortOrder: "asc" }] },
+              milestones: {
+                orderBy: [{ status: "asc" }, { sortOrder: "asc" }],
+              },
             },
           }),
         };
@@ -377,580 +393,655 @@ export async function GET(request: Request, context: RouteCtx) {
 export async function POST(request: Request, context: RouteCtx) {
   const path = (await context.params).path ?? [];
   const requiredScope = path[0] === "captures" ? "capture" : "write";
-  return handleApi(request, context, requiredScope, async ({ apiKey, path }) => {
-    const [resource, id, action] = path;
-    const body = await readJson(request);
+  return handleApi(
+    request,
+    context,
+    requiredScope,
+    async ({ apiKey, path }) => {
+      const [resource, id, action] = path;
+      const body = await readJson(request);
 
-    if (resource === "captures") {
-      const parsed = apiCaptureSchema.parse(body);
-      return submitCapture({
-        rawText: parsed.rawText,
-        source: "api",
-        deviceContext: {
-          apiKeyLabel: apiKey.label,
-          ...(parsed.deviceContext ?? {}),
-        },
-      });
-    }
-
-    if (resource === "tasks" && id && action === "star") {
-      const parsed = z
-        .object({ starred: z.boolean().default(true) })
-        .parse(body ?? {});
-      const task = await prisma.task.update({
-        where: { id },
-        data: { starred: parsed.starred },
-      });
-      await auditApiWrite(
-        apiKey,
-        parsed.starred ? "task_starred" : "task_unstarred",
-        parsed.starred ? "Task starred" : "Task unstarred",
-        { type: "task", id: task.id },
-      );
-      return { task };
-    }
-
-    if (resource === "tasks" && id && action === "complete") {
-      const result = await completeTaskById(id, {
-        source: "api",
-        label: apiKey.label,
-      });
-      return result;
-    }
-
-    if (resource === "tasks") {
-      const parsed = createTaskSchema.parse(body);
-      const project = parsed.projectId
-        ? await prisma.project.findUnique({
-            where: { id: parsed.projectId },
-            select: { areaId: true },
-          })
-        : null;
-      const areaId = project?.areaId ?? (await resolveAreaId(parsed.areaId, parsed.areaName));
-      const task = await createTaskWithAudit(
-        {
-          title: parsed.title,
-          notes: parsed.notes,
-          dueDate: parseDateOnly(parsed.dueDate),
-          dueTime: parsed.dueTime,
-          priority: parsed.priority,
-          areaId,
-          projectId: parsed.projectId,
-          parentTaskId: parsed.parentTaskId,
-          someday: parsed.someday,
-          recurrenceRule: parsed.recurrenceRule,
-          reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
-          source: `api:${apiKey.label}`,
-        },
-        { source: "api", label: apiKey.label },
-      );
-      return { task };
-    }
-
-    if (resource === "areas") {
-      const parsed = createAreaSchema.parse(body);
-      const domainId = await resolveDomainId(parsed.domainId, parsed.domainName);
-      const area = await prisma.area.create({
-        data: {
-          name: parsed.name,
-          domainId,
-          status: parsed.status ?? "active",
-          currentState: parsed.currentState,
-          nextStep: parsed.nextStep,
-          tendingCadence: parsed.tendingCadence,
-          sortOrder: parsed.sortOrder,
-        },
-      });
-      await auditApiWrite(apiKey, "area_created", "Area created", {
-        type: "area",
-        id: area.id,
-      });
-      return { area };
-    }
-
-    if (resource === "projects" && id && action === "activity") {
-      const parsed = z.object({ entry: z.string().min(1) }).parse(body);
-      const activity = await prisma.projectActivity.create({
-        data: {
-          projectId: id,
-          entry: parsed.entry,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "project_activity_created", "Project activity logged", {
-        type: "project_activity",
-        id: activity.id,
-        projectId: id,
-      });
-      return { activity };
-    }
-
-    if (resource === "projects") {
-      const parsed = createProjectSchema.parse(body);
-      const areaId = await resolveAreaId(parsed.areaId, parsed.areaName);
-      const now = new Date();
-      const status = parsed.status ?? "active";
-      const project = await prisma.project.create({
-        data: {
-          name: parsed.name,
-          areaId,
-          status,
-          targetDate: parseDateOnly(parsed.targetDate),
-          parkedAt: status === "parked" ? now : undefined,
-          completedAt: status === "completed" ? now : undefined,
-          killedAt: status === "killed" ? now : undefined,
-          currentState: parsed.currentState,
-          nextStep: parsed.nextStep,
-          activity: {
-            create: {
-              entry: "Project created through API.",
-              source: `api:${apiKey.label}`,
-              stateSnapshot: {
-                current_state: parsed.currentState ?? null,
-                next_step: parsed.nextStep ?? null,
-                status,
-              },
-            },
+      if (resource === "captures") {
+        const parsed = apiCaptureSchema.parse(body);
+        return submitCapture({
+          rawText: parsed.rawText,
+          source: "api",
+          captureIntent: "auto",
+          deviceContext: {
+            apiKeyLabel: apiKey.label,
+            ...(parsed.deviceContext ?? {}),
           },
-        },
-      });
-      await auditApiWrite(apiKey, "project_created", "Project created", {
-        type: "project",
-        id: project.id,
-      });
-      return { project };
-    }
+        });
+      }
 
-    if (resource === "ideas" && id && action === "notes") {
-      const parsed = z.object({ body: z.string().min(1) }).parse(body);
-      const note = await prisma.ideaNote.create({
-        data: {
-          ideaId: id,
-          body: parsed.body,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "idea_note_created", "Idea note added", {
-        type: "idea_note",
-        id: note.id,
-        ideaId: id,
-      });
-      return { note };
-    }
+      if (resource === "tasks" && id && action === "star") {
+        const parsed = z
+          .object({ starred: z.boolean().default(true) })
+          .parse(body ?? {});
+        const task = await prisma.task.update({
+          where: { id },
+          data: { starred: parsed.starred },
+        });
+        await auditApiWrite(
+          apiKey,
+          parsed.starred ? "task_starred" : "task_unstarred",
+          parsed.starred ? "Task starred" : "Task unstarred",
+          { type: "task", id: task.id },
+        );
+        return { task };
+      }
 
-    if (resource === "ideas" && id && action === "convert") {
-      const parsed = z.object({ to: z.enum(["task", "project"]), title: z.string().optional(), areaId: z.string().optional() }).parse(body);
-      const idea = await prisma.idea.findUnique({ where: { id } });
-      if (!idea) return notFound();
-      if (parsed.to === "task") {
+      if (resource === "tasks" && id && action === "complete") {
+        const result = await completeTaskById(id, {
+          source: "api",
+          label: apiKey.label,
+        });
+        return result;
+      }
+
+      if (resource === "tasks") {
+        const parsed = createTaskSchema.parse(body);
+        const project = parsed.projectId
+          ? await prisma.project.findUnique({
+              where: { id: parsed.projectId },
+              select: { areaId: true },
+            })
+          : null;
+        const areaId =
+          project?.areaId ??
+          (await resolveAreaId(parsed.areaId, parsed.areaName));
         const task = await createTaskWithAudit(
           {
-            title: parsed.title ?? idea.title,
-            notes: idea.body,
-            areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
+            title: parsed.title,
+            notes: parsed.notes,
+            dueDate: parseDateOnly(parsed.dueDate),
+            dueTime: parsed.dueTime,
+            priority: parsed.priority,
+            areaId,
+            projectId: parsed.projectId,
+            parentTaskId: parsed.parentTaskId,
+            someday: parsed.someday,
+            recurrenceRule: parsed.recurrenceRule,
+            reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
             source: `api:${apiKey.label}`,
           },
           { source: "api", label: apiKey.label },
         );
-        await prisma.idea.update({
-          where: { id },
-          data: { status: "converted", convertedToType: "task", convertedToId: task.id },
-        });
         return { task };
       }
 
-      const project = await prisma.project.create({
-        data: {
-          name: parsed.title ?? idea.title,
-          areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
-          currentState: idea.body ?? "Converted from idea.",
-          activity: { create: { entry: "Converted from idea through API.", source: `api:${apiKey.label}` } },
-        },
-      });
-      await prisma.idea.update({
-        where: { id },
-        data: { status: "converted", convertedToType: "project", convertedToId: project.id },
-      });
-      await auditApiWrite(apiKey, "idea_converted", "Idea converted", { type: "idea", id, to: parsed.to });
-      return { project };
-    }
-
-    if (resource === "ideas") {
-      const parsed = createIdeaSchema.parse(body);
-      const idea = await prisma.idea.create({
-        data: {
-          title: parsed.title,
-          body: parsed.body,
-          areaId: parsed.areaId,
-          projectId: parsed.projectId,
-          tags: parsed.tags ?? [],
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "idea_created", "Idea created", { type: "idea", id: idea.id });
-      return { idea };
-    }
-
-    if (resource === "references") {
-      const parsed = createReferenceSchema.parse(body);
-      const reference = await prisma.reference.create({
-        data: {
-          body: parsed.body,
-          url: parsed.url,
-          tags: parsed.tags ?? [],
-          areaId: parsed.areaId,
-          projectId: parsed.projectId,
-          relatedType: parsed.relatedType,
-          relatedId: parsed.relatedId,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "reference_created", "Reference created", {
-        type: "reference",
-        id: reference.id,
-      });
-      return { reference };
-    }
-
-    if (resource === "entity-notes") {
-      const parsed = createEntityNoteSchema.parse(body);
-      const note = await prisma.entityNote.create({
-        data: {
-          parentType: parsed.parentType,
-          parentId: parsed.parentId,
-          bodyMd: parsed.bodyMd,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "entity_note_created", "Note added", {
-        type: "entity_note",
-        id: note.id,
-        parentType: note.parentType,
-        parentId: note.parentId,
-      });
-      return { note };
-    }
-
-    if (resource === "entity-docs") {
-      const parsed = createEntityDocSchema.parse(body);
-      const doc = await prisma.entityDoc.create({
-        data: {
-          parentType: parsed.parentType,
-          parentId: parsed.parentId,
-          title: parsed.title,
-          bodyMd: parsed.bodyMd,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "entity_doc_created", "Doc created", {
-        type: "entity_doc",
-        id: doc.id,
-        parentType: doc.parentType,
-        parentId: doc.parentId,
-      });
-      return { doc };
-    }
-
-    if (resource === "milestones") {
-      const parsed = createMilestoneSchema.parse(body);
-      const milestone = await prisma.milestone.create({
-        data: {
-          projectId: parsed.projectId,
-          title: parsed.title,
-          sortOrder: parsed.sortOrder ?? 0,
-        },
-      });
-      await auditApiWrite(apiKey, "milestone_created", "Milestone created", {
-        type: "milestone",
-        id: milestone.id,
-        projectId: milestone.projectId,
-      });
-      return { milestone };
-    }
-
-    if (resource === "domains") {
-      const parsed = createDomainSchema.parse(body);
-      const domain = await prisma.domain.create({
-        data: {
-          name: parsed.name,
-          description: parsed.description,
-          sortOrder: parsed.sortOrder,
-          active: parsed.active ?? true,
-        },
-      });
-      await auditApiWrite(apiKey, "domain_created", "Domain created", {
-        type: "domain",
-        id: domain.id,
-      });
-      return { domain };
-    }
-
-    if (resource === "calendar-events") {
-      const parsed = createCalendarEventSchema.parse(body);
-      const event = await prisma.calendarEvent.create({
-        data: {
-          title: parsed.title,
-          start: new Date(parsed.start),
-          end: new Date(parsed.end),
-          location: parsed.location,
-          source: "api",
-        },
-      });
-      await auditApiWrite(apiKey, "calendar_event_created", "Calendar event created", {
-        type: "calendar_event",
-        id: event.id,
-      });
-      return { event };
-    }
-
-    if (resource === "check-ins" && id === "draft") {
-      const parsed = z
-        .object({
-          parentType: z.enum(["area", "project"]),
-          parentId: z.string().min(1),
-        })
-        .parse(body);
-      return draftCheckInFromActivity(parsed.parentType, parsed.parentId);
-    }
-
-    if (resource === "check-ins") {
-      const parsed = z
-        .object({
-          parentType: z.enum(["area", "project"]),
-          parentId: z.string().min(1),
-          bodyMd: z.string().min(1),
-        })
-        .parse(body);
-      const { checkIn } = await createCheckInRecord(
-        {
-          parentType: parsed.parentType,
-          parentId: parsed.parentId,
-          bodyMd: parsed.bodyMd,
-        },
-        { source: "api", label: apiKey.label },
-      );
-      return { checkIn };
-    }
-
-    if (resource === "journal-entries") {
-      const parsed = z
-        .object({
-          bodyMd: z.string().min(1),
-          entryDate: z.string().optional(),
-          tags: z.array(z.string()).optional(),
-          source: z.enum(["typed", "import"]).optional(),
-        })
-        .parse(body);
-      const entry = await prisma.journalEntry.create({
-        data: {
-          bodyMd: parsed.bodyMd,
-          entryDate:
-            parseDateOnly(parsed.entryDate) ??
-            new Date(`${localDateString()}T00:00:00.000Z`),
-          tags: parsed.tags ?? [],
-          source: parsed.source ?? "import",
-        },
-      });
-      await auditApiWrite(apiKey, "journal_entry_created", "Journal entry saved", {
-        type: "journal_entry",
-        id: entry.id,
-      });
-      return { journalEntry: entry };
-    }
-
-    if (
-      resource === "resurfacing" &&
-      id &&
-      (action === "boost" || action === "dismiss")
-    ) {
-      const seen = await prisma.resurfacingSeen.findUnique({ where: { id } });
-      if (!seen || seen.response !== null) {
-        return { updated: false };
-      }
-      if (action === "boost") {
-        await boostResurfaceWeight(seen.itemType, seen.itemId);
-      }
-      await prisma.resurfacingSeen.update({
-        where: { id },
-        data: { response: action === "boost" ? "kept" : "dismissed" },
-      });
-      await auditApiWrite(
-        apiKey,
-        action === "boost" ? "resurface_boosted" : "resurface_dismissed",
-        action === "boost"
-          ? "Resurfaced memory boosted"
-          : "Resurfaced memory dismissed",
-        { type: seen.itemType, id: seen.itemId },
-      );
-      return { updated: true };
-    }
-
-    if (resource === "scheduled-reviews" && id && action) {
-      const review = await prisma.scheduledReview.findUnique({
-        where: { id },
-        include: { capture: { select: { rawText: true } } },
-      });
-      if (!review || review.status === "done" || review.status === "dismissed") {
-        return { updated: false };
+      if (resource === "areas") {
+        const parsed = createAreaSchema.parse(body);
+        const domainId = await resolveDomainId(
+          parsed.domainId,
+          parsed.domainName,
+        );
+        const area = await prisma.area.create({
+          data: {
+            name: parsed.name,
+            domainId,
+            status: parsed.status ?? "active",
+            currentState: parsed.currentState,
+            nextStep: parsed.nextStep,
+            tendingCadence: parsed.tendingCadence,
+            sortOrder: parsed.sortOrder,
+          },
+        });
+        await auditApiWrite(apiKey, "area_created", "Area created", {
+          type: "area",
+          id: area.id,
+        });
+        return { area };
       }
 
-      if (action === "done" || action === "dismiss") {
-        const status = action === "done" ? ("done" as const) : ("dismissed" as const);
-        await prisma.scheduledReview.update({ where: { id }, data: { status } });
+      if (resource === "projects" && id && action === "activity") {
+        const parsed = z.object({ entry: z.string().min(1) }).parse(body);
+        const activity = await prisma.projectActivity.create({
+          data: {
+            projectId: id,
+            entry: parsed.entry,
+            source: `api:${apiKey.label}`,
+          },
+        });
         await auditApiWrite(
           apiKey,
-          status === "done" ? "review_done" : "review_dismissed",
-          status === "done" ? "Review done" : "Review dismissed",
-          { type: "scheduled_review", id: review.id },
+          "project_activity_created",
+          "Project activity logged",
+          {
+            type: "project_activity",
+            id: activity.id,
+            projectId: id,
+          },
+        );
+        return { activity };
+      }
+
+      if (resource === "projects") {
+        const parsed = createProjectSchema.parse(body);
+        const areaId = await resolveAreaId(parsed.areaId, parsed.areaName);
+        const now = new Date();
+        const status = parsed.status ?? "active";
+        const project = await prisma.project.create({
+          data: {
+            name: parsed.name,
+            areaId,
+            status,
+            targetDate: parseDateOnly(parsed.targetDate),
+            parkedAt: status === "parked" ? now : undefined,
+            completedAt: status === "completed" ? now : undefined,
+            killedAt: status === "killed" ? now : undefined,
+            currentState: parsed.currentState,
+            nextStep: parsed.nextStep,
+            activity: {
+              create: {
+                entry: "Project created through API.",
+                source: `api:${apiKey.label}`,
+                stateSnapshot: {
+                  current_state: parsed.currentState ?? null,
+                  next_step: parsed.nextStep ?? null,
+                  status,
+                },
+              },
+            },
+          },
+        });
+        await auditApiWrite(apiKey, "project_created", "Project created", {
+          type: "project",
+          id: project.id,
+        });
+        return { project };
+      }
+
+      if (resource === "ideas" && id && action === "notes") {
+        const parsed = z.object({ body: z.string().min(1) }).parse(body);
+        const note = await prisma.ideaNote.create({
+          data: {
+            ideaId: id,
+            body: parsed.body,
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await auditApiWrite(apiKey, "idea_note_created", "Idea note added", {
+          type: "idea_note",
+          id: note.id,
+          ideaId: id,
+        });
+        return { note };
+      }
+
+      if (resource === "ideas" && id && action === "convert") {
+        const parsed = z
+          .object({
+            to: z.enum(["task", "project"]),
+            title: z.string().optional(),
+            areaId: z.string().optional(),
+          })
+          .parse(body);
+        const idea = await prisma.idea.findUnique({ where: { id } });
+        if (!idea) return notFound();
+        if (parsed.to === "task") {
+          const task = await createTaskWithAudit(
+            {
+              title: parsed.title ?? idea.title,
+              notes: idea.body,
+              areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
+              source: `api:${apiKey.label}`,
+            },
+            { source: "api", label: apiKey.label },
+          );
+          await prisma.idea.update({
+            where: { id },
+            data: {
+              status: "converted",
+              convertedToType: "task",
+              convertedToId: task.id,
+            },
+          });
+          return { task };
+        }
+
+        const project = await prisma.project.create({
+          data: {
+            name: parsed.title ?? idea.title,
+            areaId: parsed.areaId ?? idea.areaId ?? (await getInboxAreaId()),
+            currentState: idea.body ?? "Converted from idea.",
+            activity: {
+              create: {
+                entry: "Converted from idea through API.",
+                source: `api:${apiKey.label}`,
+              },
+            },
+          },
+        });
+        await prisma.idea.update({
+          where: { id },
+          data: {
+            status: "converted",
+            convertedToType: "project",
+            convertedToId: project.id,
+          },
+        });
+        await auditApiWrite(apiKey, "idea_converted", "Idea converted", {
+          type: "idea",
+          id,
+          to: parsed.to,
+        });
+        return { project };
+      }
+
+      if (resource === "ideas") {
+        const parsed = createIdeaSchema.parse(body);
+        const idea = await prisma.idea.create({
+          data: {
+            title: parsed.title,
+            body: parsed.body,
+            areaId: parsed.areaId,
+            projectId: parsed.projectId,
+            tags: parsed.tags ?? [],
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await auditApiWrite(apiKey, "idea_created", "Idea created", {
+          type: "idea",
+          id: idea.id,
+        });
+        return { idea };
+      }
+
+      if (resource === "references") {
+        const parsed = createReferenceSchema.parse(body);
+        const reference = await prisma.reference.create({
+          data: {
+            body: parsed.body,
+            url: parsed.url,
+            tags: parsed.tags ?? [],
+            areaId: parsed.areaId,
+            projectId: parsed.projectId,
+            relatedType: parsed.relatedType,
+            relatedId: parsed.relatedId,
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await auditApiWrite(apiKey, "reference_created", "Reference created", {
+          type: "reference",
+          id: reference.id,
+        });
+        return { reference };
+      }
+
+      if (resource === "entity-notes") {
+        const parsed = createEntityNoteSchema.parse(body);
+        const note = await prisma.entityNote.create({
+          data: {
+            parentType: parsed.parentType,
+            parentId: parsed.parentId,
+            bodyMd: parsed.bodyMd,
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await auditApiWrite(apiKey, "entity_note_created", "Note added", {
+          type: "entity_note",
+          id: note.id,
+          parentType: note.parentType,
+          parentId: note.parentId,
+        });
+        return { note };
+      }
+
+      if (resource === "entity-docs") {
+        const parsed = createEntityDocSchema.parse(body);
+        const doc = await prisma.entityDoc.create({
+          data: {
+            parentType: parsed.parentType,
+            parentId: parsed.parentId,
+            title: parsed.title,
+            bodyMd: parsed.bodyMd,
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await auditApiWrite(apiKey, "entity_doc_created", "Doc created", {
+          type: "entity_doc",
+          id: doc.id,
+          parentType: doc.parentType,
+          parentId: doc.parentId,
+        });
+        return { doc };
+      }
+
+      if (resource === "milestones") {
+        const parsed = createMilestoneSchema.parse(body);
+        const milestone = await prisma.milestone.create({
+          data: {
+            projectId: parsed.projectId,
+            title: parsed.title,
+            sortOrder: parsed.sortOrder ?? 0,
+          },
+        });
+        await auditApiWrite(apiKey, "milestone_created", "Milestone created", {
+          type: "milestone",
+          id: milestone.id,
+          projectId: milestone.projectId,
+        });
+        return { milestone };
+      }
+
+      if (resource === "domains") {
+        const parsed = createDomainSchema.parse(body);
+        const domain = await prisma.domain.create({
+          data: {
+            name: parsed.name,
+            description: parsed.description,
+            sortOrder: parsed.sortOrder,
+            active: parsed.active ?? true,
+          },
+        });
+        await auditApiWrite(apiKey, "domain_created", "Domain created", {
+          type: "domain",
+          id: domain.id,
+        });
+        return { domain };
+      }
+
+      if (resource === "calendar-events") {
+        const parsed = createCalendarEventSchema.parse(body);
+        const event = await prisma.calendarEvent.create({
+          data: {
+            title: parsed.title,
+            start: new Date(parsed.start),
+            end: new Date(parsed.end),
+            location: parsed.location,
+            source: "api",
+          },
+        });
+        await auditApiWrite(
+          apiKey,
+          "calendar_event_created",
+          "Calendar event created",
+          {
+            type: "calendar_event",
+            id: event.id,
+          },
+        );
+        return { event };
+      }
+
+      if (resource === "check-ins" && id === "draft") {
+        const parsed = z
+          .object({
+            parentType: z.enum(["area", "project"]),
+            parentId: z.string().min(1),
+          })
+          .parse(body);
+        return draftCheckInFromActivity(parsed.parentType, parsed.parentId);
+      }
+
+      if (resource === "check-ins") {
+        const parsed = z
+          .object({
+            parentType: z.enum(["area", "project"]),
+            parentId: z.string().min(1),
+            bodyMd: z.string().min(1),
+          })
+          .parse(body);
+        const { checkIn } = await createCheckInRecord(
+          {
+            parentType: parsed.parentType,
+            parentId: parsed.parentId,
+            bodyMd: parsed.bodyMd,
+          },
+          { source: "api", label: apiKey.label },
+        );
+        return { checkIn };
+      }
+
+      if (resource === "journal-entries") {
+        const parsed = z
+          .object({
+            bodyMd: z.string().min(1),
+            entryDate: z.string().optional(),
+            tags: z.array(z.string()).optional(),
+            source: z.enum(["typed", "import"]).optional(),
+          })
+          .parse(body);
+        const entry = await prisma.journalEntry.create({
+          data: {
+            bodyMd: parsed.bodyMd,
+            entryDate:
+              parseDateOnly(parsed.entryDate) ??
+              new Date(`${localDateString()}T00:00:00.000Z`),
+            tags: parsed.tags ?? [],
+            source: parsed.source ?? "import",
+          },
+        });
+        await auditApiWrite(
+          apiKey,
+          "journal_entry_created",
+          "Journal entry saved",
+          {
+            type: "journal_entry",
+            id: entry.id,
+          },
+        );
+        return { journalEntry: entry };
+      }
+
+      if (
+        resource === "resurfacing" &&
+        id &&
+        (action === "boost" || action === "dismiss")
+      ) {
+        const seen = await prisma.resurfacingSeen.findUnique({ where: { id } });
+        if (!seen || seen.response !== null) {
+          return { updated: false };
+        }
+        if (action === "boost") {
+          await boostResurfaceWeight(seen.itemType, seen.itemId);
+        }
+        await prisma.resurfacingSeen.update({
+          where: { id },
+          data: { response: action === "boost" ? "kept" : "dismissed" },
+        });
+        await auditApiWrite(
+          apiKey,
+          action === "boost" ? "resurface_boosted" : "resurface_dismissed",
+          action === "boost"
+            ? "Resurfaced memory boosted"
+            : "Resurfaced memory dismissed",
+          { type: seen.itemType, id: seen.itemId },
         );
         return { updated: true };
       }
 
-      if (action === "snooze") {
-        const parsed = z
-          .object({ reviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
-          .parse(body);
-        await prisma.scheduledReview.update({
+      if (resource === "scheduled-reviews" && id && action) {
+        const review = await prisma.scheduledReview.findUnique({
           where: { id },
-          data: { status: "pending", reviewAt: parseDateOnly(parsed.reviewAt) },
+          include: { capture: { select: { rawText: true } } },
         });
-        await auditApiWrite(apiKey, "review_snoozed", `Review snoozed to ${parsed.reviewAt}`, {
-          type: "scheduled_review",
-          id: review.id,
-        });
-        return { updated: true };
+        if (
+          !review ||
+          review.status === "done" ||
+          review.status === "dismissed"
+        ) {
+          return { updated: false };
+        }
+
+        if (action === "done" || action === "dismiss") {
+          const status =
+            action === "done" ? ("done" as const) : ("dismissed" as const);
+          await prisma.scheduledReview.update({
+            where: { id },
+            data: { status },
+          });
+          await auditApiWrite(
+            apiKey,
+            status === "done" ? "review_done" : "review_dismissed",
+            status === "done" ? "Review done" : "Review dismissed",
+            { type: "scheduled_review", id: review.id },
+          );
+          return { updated: true };
+        }
+
+        if (action === "snooze") {
+          const parsed = z
+            .object({ reviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
+            .parse(body);
+          await prisma.scheduledReview.update({
+            where: { id },
+            data: {
+              status: "pending",
+              reviewAt: parseDateOnly(parsed.reviewAt),
+            },
+          });
+          await auditApiWrite(
+            apiKey,
+            "review_snoozed",
+            `Review snoozed to ${parsed.reviewAt}`,
+            {
+              type: "scheduled_review",
+              id: review.id,
+            },
+          );
+          return { updated: true };
+        }
       }
-    }
 
-    if (resource === "routines" && id && action === "complete") {
-      const result = await completeRoutineById(id, {
-        source: "api",
-        label: apiKey.label,
-      });
-      return { routine: result.routine, repeated: result.repeated };
-    }
+      if (resource === "routines" && id && action === "complete") {
+        const result = await completeRoutineById(id, {
+          source: "api",
+          label: apiKey.label,
+        });
+        return { routine: result.routine, repeated: result.repeated };
+      }
 
-    if (resource === "routines") {
-      const parsed = z
-        .object({
-          name: z.string().min(1),
-          description: z.string().optional(),
-          areaId: z.string().optional(),
-          frequency: z.enum(["daily", "weekly", "custom"]).optional(),
-          days: z.array(z.string()).optional(),
-          timeWindow: z
-            .enum(["morning", "afternoon", "evening", "anytime"])
-            .optional(),
-          timesPerWeek: z.number().optional(),
-          graceDays: z.number().optional(),
-          temporary: z.boolean().optional(),
-          startDate: z.string().optional(),
-          endDate: z.string().optional(),
-        })
-        .parse(body);
-      const routine = await prisma.routine.create({
-        data: {
-          name: parsed.name,
-          description: parsed.description,
-          areaId: parsed.areaId,
-          schedule: {
-            frequency:
-              parsed.frequency ??
-              (parsed.days && parsed.days.length > 0 ? "custom" : "daily"),
-            days: parsed.days ?? [],
-            timeWindow: parsed.timeWindow ?? "anytime",
+      if (resource === "routines") {
+        const parsed = z
+          .object({
+            name: z.string().min(1),
+            description: z.string().optional(),
+            areaId: z.string().optional(),
+            frequency: z.enum(["daily", "weekly", "custom"]).optional(),
+            days: z.array(z.string()).optional(),
+            timeWindow: z
+              .enum(["morning", "afternoon", "evening", "anytime"])
+              .optional(),
+            timesPerWeek: z.number().optional(),
+            graceDays: z.number().optional(),
+            temporary: z.boolean().optional(),
+            startDate: z.string().optional(),
+            endDate: z.string().optional(),
+          })
+          .parse(body);
+        const routine = await prisma.routine.create({
+          data: {
+            name: parsed.name,
+            description: parsed.description,
+            areaId: parsed.areaId,
+            schedule: {
+              frequency:
+                parsed.frequency ??
+                (parsed.days && parsed.days.length > 0 ? "custom" : "daily"),
+              days: parsed.days ?? [],
+              timeWindow: parsed.timeWindow ?? "anytime",
+            },
+            goal:
+              typeof parsed.timesPerWeek === "number"
+                ? { timesPerWeek: parsed.timesPerWeek }
+                : undefined,
+            graceWindow:
+              typeof parsed.graceDays === "number"
+                ? { days: parsed.graceDays }
+                : undefined,
+            temporary: parsed.temporary ?? false,
+            startDate: parseDateOnly(parsed.startDate),
+            endDate: parseDateOnly(parsed.endDate),
           },
-          goal:
-            typeof parsed.timesPerWeek === "number"
-              ? { timesPerWeek: parsed.timesPerWeek }
-              : undefined,
-          graceWindow:
-            typeof parsed.graceDays === "number"
-              ? { days: parsed.graceDays }
-              : undefined,
-          temporary: parsed.temporary ?? false,
-          startDate: parseDateOnly(parsed.startDate),
-          endDate: parseDateOnly(parsed.endDate),
-        },
-      });
-      await auditApiWrite(apiKey, "routine_created", "Routine created", {
-        type: "routine",
-        id: routine.id,
-      });
-      return { routine };
-    }
+        });
+        await auditApiWrite(apiKey, "routine_created", "Routine created", {
+          type: "routine",
+          id: routine.id,
+        });
+        return { routine };
+      }
 
-    if (resource === "people" && id && action === "facts") {
-      const parsed = z
-        .object({
-          factType: z.string().optional(),
-          factValue: z.string().min(1),
-          dateRelevant: z.string().optional(),
-          recurring: z.boolean().optional(),
-        })
-        .parse(body);
-      const fact = await prisma.personFact.create({
-        data: {
+      if (resource === "people" && id && action === "facts") {
+        const parsed = z
+          .object({
+            factType: z.string().optional(),
+            factValue: z.string().min(1),
+            dateRelevant: z.string().optional(),
+            recurring: z.boolean().optional(),
+          })
+          .parse(body);
+        const fact = await prisma.personFact.create({
+          data: {
+            personId: id,
+            factType: parsed.factType ?? "note",
+            factValue: parsed.factValue,
+            dateRelevant: parseDateOnly(parsed.dateRelevant),
+            recurring: parsed.recurring ?? false,
+          },
+        });
+        await auditApiWrite(apiKey, "person_fact_created", "Fact saved", {
+          type: "person_fact",
+          id: fact.id,
           personId: id,
-          factType: parsed.factType ?? "note",
-          factValue: parsed.factValue,
-          dateRelevant: parseDateOnly(parsed.dateRelevant),
-          recurring: parsed.recurring ?? false,
-        },
-      });
-      await auditApiWrite(apiKey, "person_fact_created", "Fact saved", {
-        type: "person_fact",
-        id: fact.id,
-        personId: id,
-      });
-      return { fact };
-    }
+        });
+        return { fact };
+      }
 
-    if (resource === "people" && id && action === "interactions") {
-      const parsed = z
-        .object({
-          interactionType: z.string().optional(),
-          notes: z.string().optional(),
-          occurredAt: z.string().optional(),
-        })
-        .parse(body);
-      const interaction = await prisma.personInteraction.create({
-        data: {
-          personId: id,
-          interactionType: parsed.interactionType ?? "touchpoint",
-          notesMd: parsed.notes,
-          occurredAt: parsed.occurredAt ? new Date(parsed.occurredAt) : new Date(),
-          source: "manual",
-        },
-      });
-      await auditApiWrite(apiKey, "interaction_logged", "Interaction logged", {
-        type: "person_interaction",
-        id: interaction.id,
-        personId: id,
-      });
-      return { interaction };
-    }
+      if (resource === "people" && id && action === "interactions") {
+        const parsed = z
+          .object({
+            interactionType: z.string().optional(),
+            notes: z.string().optional(),
+            occurredAt: z.string().optional(),
+          })
+          .parse(body);
+        const interaction = await prisma.personInteraction.create({
+          data: {
+            personId: id,
+            interactionType: parsed.interactionType ?? "touchpoint",
+            notesMd: parsed.notes,
+            occurredAt: parsed.occurredAt
+              ? new Date(parsed.occurredAt)
+              : new Date(),
+            source: "manual",
+          },
+        });
+        await auditApiWrite(
+          apiKey,
+          "interaction_logged",
+          "Interaction logged",
+          {
+            type: "person_interaction",
+            id: interaction.id,
+            personId: id,
+          },
+        );
+        return { interaction };
+      }
 
-    if (resource === "people") {
-      const parsed = z
-        .object({
-          name: z.string().min(1),
-          relationshipType: z.string().optional(),
-          email: z.string().optional(),
-          phone: z.string().optional(),
-          company: z.string().optional(),
-          areaId: z.string().optional(),
-        })
-        .parse(body);
-      const person = await createPersonRecord(parsed, {
-        source: "api",
-        label: apiKey.label,
-      });
-      return { person };
-    }
+      if (resource === "people") {
+        const parsed = z
+          .object({
+            name: z.string().min(1),
+            relationshipType: z.string().optional(),
+            email: z.string().optional(),
+            phone: z.string().optional(),
+            company: z.string().optional(),
+            areaId: z.string().optional(),
+          })
+          .parse(body);
+        const person = await createPersonRecord(parsed, {
+          source: "api",
+          label: apiKey.label,
+        });
+        return { person };
+      }
 
-    return notFound();
-  });
+      return notFound();
+    },
+  );
 }
 
 export async function PATCH(request: Request, context: RouteCtx) {
@@ -978,7 +1069,9 @@ export async function PATCH(request: Request, context: RouteCtx) {
           priority: parsed.priority,
           areaId:
             project?.areaId ??
-            (parsed.areaName ? await resolveAreaId(parsed.areaId, parsed.areaName) : parsed.areaId),
+            (parsed.areaName
+              ? await resolveAreaId(parsed.areaId, parsed.areaName)
+              : parsed.areaId),
           projectId: parsed.projectId,
           parentTaskId: parsed.parentTaskId,
           someday: parsed.someday,
@@ -987,7 +1080,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
           source: `api:${apiKey.label}`,
         },
       });
-      await auditApiWrite(apiKey, "task_updated", "Task updated", { type: "task", id });
+      await auditApiWrite(apiKey, "task_updated", "Task updated", {
+        type: "task",
+        id,
+      });
       return { task };
     }
 
@@ -1019,7 +1115,9 @@ export async function PATCH(request: Request, context: RouteCtx) {
       await prisma.projectActivity.create({
         data: {
           projectId: id,
-          entry: parsed.logEntry ?? `Project updated through API by ${apiKey.label}.`,
+          entry:
+            parsed.logEntry ??
+            `Project updated through API by ${apiKey.label}.`,
           source: `api:${apiKey.label}`,
           stateSnapshot: {
             status: project.status,
@@ -1028,7 +1126,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
           },
         },
       });
-      await auditApiWrite(apiKey, "project_updated", "Project updated", { type: "project", id });
+      await auditApiWrite(apiKey, "project_updated", "Project updated", {
+        type: "project",
+        id,
+      });
       return { project };
     }
 
@@ -1049,7 +1150,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
           sortOrder: parsed.sortOrder,
         },
       });
-      await auditApiWrite(apiKey, "area_updated", "Area updated", { type: "area", id });
+      await auditApiWrite(apiKey, "area_updated", "Area updated", {
+        type: "area",
+        id,
+      });
       return { area };
     }
 
@@ -1067,7 +1171,10 @@ export async function PATCH(request: Request, context: RouteCtx) {
           source: `api:${apiKey.label}`,
         },
       });
-      await auditApiWrite(apiKey, "idea_updated", "Idea updated", { type: "idea", id });
+      await auditApiWrite(apiKey, "idea_updated", "Idea updated", {
+        type: "idea",
+        id,
+      });
       return { idea };
     }
 
@@ -1156,10 +1263,15 @@ export async function PATCH(request: Request, context: RouteCtx) {
           lastPushedAt: null,
         },
       });
-      await auditApiWrite(apiKey, "calendar_event_updated", "Calendar event updated", {
-        type: "calendar_event",
-        id,
-      });
+      await auditApiWrite(
+        apiKey,
+        "calendar_event_updated",
+        "Calendar event updated",
+        {
+          type: "calendar_event",
+          id,
+        },
+      );
       return { event };
     }
 
@@ -1291,7 +1403,7 @@ async function runSearch(query: string) {
     entityDocs,
     milestones,
   ] = await Promise.all([
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'capture' AS type, id, raw_text AS title, created_at
         FROM captures
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(raw_text, ''))
@@ -1299,7 +1411,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'area' AS type, id, name AS title, created_at
         FROM areas
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(name, '') || ' ' || COALESCE(current_state, '') || ' ' || COALESCE(next_step, ''))
@@ -1307,7 +1419,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'project' AS type, id, name AS title, created_at
         FROM projects
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(name, '') || ' ' || COALESCE(current_state, '') || ' ' || COALESCE(next_step, ''))
@@ -1315,7 +1427,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'task' AS type, id, title, created_at
         FROM tasks
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, '') || ' ' || COALESCE(notes, ''))
@@ -1323,7 +1435,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'idea' AS type, id, title, created_at
         FROM ideas
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, '') || ' ' || COALESCE(body, ''))
@@ -1331,7 +1443,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'reference' AS type, id, body AS title, created_at
         FROM "references"
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(body, '') || ' ' || COALESCE(url, ''))
@@ -1339,7 +1451,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'project_activity' AS type, id, entry AS title, created_at
         FROM project_activity
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(entry, ''))
@@ -1347,7 +1459,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'entity_note' AS type, id, body_md AS title, created_at
         FROM entity_notes
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(body_md, ''))
@@ -1355,7 +1467,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'entity_doc' AS type, id, title, created_at
         FROM entity_docs
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, '') || ' ' || COALESCE(body_md, ''))
@@ -1363,7 +1475,7 @@ async function runSearch(query: string) {
         ORDER BY created_at DESC
         LIMIT 20
       `,
-      prisma.$queryRaw`
+    prisma.$queryRaw`
         SELECT 'milestone' AS type, id, title, completed_at AS created_at
         FROM milestones
         WHERE to_tsvector('pg_catalog.english'::regconfig, COALESCE(title, ''))
@@ -1371,7 +1483,7 @@ async function runSearch(query: string) {
         ORDER BY completed_at DESC NULLS LAST
         LIMIT 20
       `,
-    ]);
+  ]);
 
   return {
     results: [
@@ -1417,7 +1529,9 @@ const createProjectSchema = z.object({
   name: z.string().min(1),
   areaId: z.string().optional(),
   areaName: z.string().optional(),
-  status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
+  status: z
+    .enum(["someday", "active", "parked", "completed", "killed"])
+    .optional(),
   currentState: z.string().optional(),
   nextStep: z.string().optional(),
   targetDate: z.string().optional(),

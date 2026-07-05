@@ -39,6 +39,7 @@ export function TaskQuickAdd({
   const [dueDate, setDueDate] = useState("");
   const [areaId, setAreaId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [projectSearch, setProjectSearch] = useState("");
   const [savedTask, setSavedTask] = useState<SavedTask | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -47,6 +48,7 @@ export function TaskQuickAdd({
   const filteredProjects = areaId
     ? projects.filter((project) => project.areaId === areaId)
     : projects;
+  const selectedProject = projects.find((project) => project.id === projectId);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,6 +80,7 @@ export function TaskQuickAdd({
       setDueDate("");
       setAreaId("");
       setProjectId("");
+      setProjectSearch("");
       startTransition(() => router.refresh());
     } catch {
       setError("Task was not saved. Try again.");
@@ -135,6 +138,7 @@ export function TaskQuickAdd({
               onChange={(event) => {
                 setAreaId(event.target.value);
                 setProjectId("");
+                setProjectSearch("");
               }}
               className="h-10 max-w-32 shrink rounded-full border border-[#E2E6DF] bg-white px-3 text-sm text-stone-700 outline-none focus:border-teal-700 sm:max-w-40"
             >
@@ -160,38 +164,60 @@ export function TaskQuickAdd({
           </button>
         </div>
         {projects.length > 0 ? (
-          <div className="mt-2 flex flex-col gap-2 border-t border-[#EEF1EC] pt-2 sm:flex-row sm:items-start">
+          <div className="mt-2 grid gap-1.5 border-t border-[#EEF1EC] pt-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
             <input type="hidden" name="projectId" value={projectId} />
-            <span className="shrink-0 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            <label
+              htmlFor="quick-add-project-search"
+              className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]"
+            >
               Project
-            </span>
-            <div className="flex max-h-20 flex-1 flex-wrap gap-2 overflow-y-auto pr-1">
-              <button
-                type="button"
-                onClick={() => setProjectId("")}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  !projectId
-                    ? "border-teal-700/40 bg-white font-medium text-teal-800"
-                    : "border-[#E2E6DF] bg-white text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
-                }`}
-              >
-                No project
-              </button>
-              {filteredProjects.map((project) => (
+            </label>
+            <div className="flex min-w-0 items-center gap-2">
+              <input
+                id="quick-add-project-search"
+                list="quick-add-projects"
+                value={projectSearch}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setProjectSearch(value);
+                  const matchedProject = filteredProjects.find(
+                    (project) =>
+                      project.name.toLocaleLowerCase() ===
+                      value.toLocaleLowerCase(),
+                  );
+                  setProjectId(matchedProject?.id ?? "");
+                }}
+                placeholder="Search projects"
+                aria-label="Search projects"
+                className="h-9 min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm text-stone-700 outline-none placeholder:text-stone-400 focus:border-teal-700"
+              />
+              <datalist id="quick-add-projects">
+                {filteredProjects.map((project) => (
+                  <option
+                    key={project.id}
+                    value={project.name}
+                    label={`${project.areaName} / ${project.name}`}
+                  />
+                ))}
+              </datalist>
+              {selectedProject ? (
                 <button
-                  key={project.id}
                   type="button"
-                  onClick={() => setProjectId(project.id)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                    projectId === project.id
-                      ? "border-teal-700/40 bg-white font-medium text-teal-800"
-                      : "border-[#E2E6DF] bg-white text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
-                  }`}
+                  onClick={() => {
+                    setProjectId("");
+                    setProjectSearch("");
+                  }}
+                  className="h-9 shrink-0 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
                 >
-                  {project.name}
+                  Clear
                 </button>
-              ))}
+              ) : null}
             </div>
+            {selectedProject ? (
+              <p className="text-xs text-[#9AA096] sm:col-start-2">
+                Filing to {selectedProject.areaName} / {selectedProject.name}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </form>
