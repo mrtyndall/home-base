@@ -16,6 +16,7 @@ import {
 } from "@/lib/dates";
 import { getTodayDashboard } from "@/lib/today";
 import { projectLastActivityFact } from "@/lib/slippage";
+import { getHomeAttentionItems } from "@/lib/home-attention";
 import type { ResurfacedItem } from "@/lib/resurfacing";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,12 @@ export default async function HomePage() {
         slippingProjectCount={homeData.slippingProjectCount}
       />
 
+      <AttentionSurface
+        pendingCaptureCount={homeData.pendingCaptureCount}
+        reviewDueCount={homeData.reviewDueCount}
+        slippingProjectCount={homeData.slippingProjectCount}
+      />
+
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
         <div className="space-y-5 lg:order-2">
           {todayData.topTasks.length > 0 ? (
@@ -84,13 +91,6 @@ export default async function HomePage() {
           </div>
         </section>
       </div>
-
-      <PulseRow
-        freshCheckInCount={homeData.freshCheckInCount}
-        slippingProjectCount={homeData.slippingProjectCount}
-        pendingCaptureCount={homeData.pendingCaptureCount}
-        reviewDueCount={homeData.reviewDueCount}
-      />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <RecentCaptures
@@ -268,45 +268,45 @@ function RoutinesLine({
   );
 }
 
-function PulseRow({
-  freshCheckInCount,
+function AttentionSurface({
   slippingProjectCount,
   pendingCaptureCount,
   reviewDueCount,
 }: {
-  freshCheckInCount: number;
   slippingProjectCount: number;
   pendingCaptureCount: number;
   reviewDueCount: number;
 }) {
-  const items = [
-    {
-      href: "/projects",
-      text: `Projects: ${freshCheckInCount} fresh check-in${freshCheckInCount === 1 ? "" : "s"} · ${slippingProjectCount} slipping → Projects`,
-    },
-    {
-      href: "/areas/area_inbox",
-      text: `Inbox: ${pendingCaptureCount} capture${pendingCaptureCount === 1 ? "" : "s"} to sort → Inbox`,
-    },
-    reviewDueCount > 0
-      ? {
-          href: "/areas/area_inbox",
-          text: `Reviews: ${reviewDueCount} waiting → Inbox`,
-        }
-      : null,
-  ].filter((item): item is { href: string; text: string } => Boolean(item));
+  const items = getHomeAttentionItems({
+    pendingCaptureCount,
+    reviewDueCount,
+    slippingProjectCount,
+  });
+
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
-    <section className="flex flex-col gap-2 text-sm text-[#6B7268] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
-      {items.map((item) => (
-        <Link
-          key={item.text}
-          href={item.href}
-          className="underline-offset-4 transition hover:text-teal-700 hover:underline"
-        >
-          {item.text}
-        </Link>
-      ))}
+    <section className="rounded-[14px] border border-teal-700/25 bg-[#F2FAF7] px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-800">
+        Needs attention
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {items.map((item) => (
+          <Link
+            key={`${item.detail}-${item.label}`}
+            href={item.href}
+            className="group flex items-center justify-between gap-3 rounded-[10px] border border-teal-700/15 bg-white/75 px-3 py-2 text-sm transition hover:border-teal-700/40 hover:bg-white"
+          >
+            <span className="font-medium text-stone-950">{item.label}</span>
+            <span className="flex shrink-0 items-center gap-1 text-xs text-[#6B7268] group-hover:text-teal-700">
+              {item.detail}
+              <ArrowRight size={13} />
+            </span>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 }
