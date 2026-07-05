@@ -1,5 +1,17 @@
+"use client";
+
 import type { Area, Domain } from "@prisma/client";
+import { useMemo, useState } from "react";
 import { convertPendingCapture } from "@/app/actions";
+
+const targetLabels = {
+  task: "Task",
+  idea: "Idea",
+  note: "Note",
+  reference: "Reference",
+} as const;
+
+type TargetType = keyof typeof targetLabels;
 
 export function CaptureFileActions({
   captureId,
@@ -14,6 +26,23 @@ export function CaptureFileActions({
   align?: "left" | "right";
   label?: string;
 }) {
+  const defaultAreaId =
+    domains
+      .flatMap((domain) => domain.areas)
+      .find((area) => area.id === "area_inbox")?.id ??
+    domains[0]?.areas[0]?.id ??
+    "area_inbox";
+  const [areaId, setAreaId] = useState(defaultAreaId);
+  const [selectedType, setSelectedType] = useState<TargetType | null>(null);
+
+  const selectedAreaName = useMemo(() => {
+    for (const domain of domains) {
+      const area = domain.areas.find((candidate) => candidate.id === areaId);
+      if (area) return area.name;
+    }
+    return "Inbox";
+  }, [areaId, domains]);
+
   return (
     <details className="relative">
       <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-teal-700/40 bg-white px-3 text-[13px] font-medium text-teal-800 transition hover:border-teal-700 [&::-webkit-details-marker]:hidden">
@@ -26,15 +55,25 @@ export function CaptureFileActions({
         }`}
       >
         <input type="hidden" name="captureId" value={captureId} />
-        {reviewId ? <input type="hidden" name="reviewId" value={reviewId} /> : null}
+        {reviewId ? (
+          <input type="hidden" name="reviewId" value={reviewId} />
+        ) : null}
+        {selectedType ? (
+          <input type="hidden" name="targetType" value={selectedType} />
+        ) : null}
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           File as
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
-          <ConvertButton value="task" label="Task" />
-          <ConvertButton value="idea" label="Idea" />
-          <ConvertButton value="note" label="Note" />
-          <ConvertButton value="reference" label="Reference" />
+          {Object.entries(targetLabels).map(([value, targetLabel]) => (
+            <ConvertChoice
+              key={value}
+              value={value as TargetType}
+              label={targetLabel}
+              selected={selectedType === value}
+              onSelect={setSelectedType}
+            />
+          ))}
         </div>
         <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Into
@@ -43,7 +82,8 @@ export function CaptureFileActions({
           <span className="sr-only">Area</span>
           <select
             name="areaId"
-            defaultValue="area_inbox"
+            value={areaId}
+            onChange={(event) => setAreaId(event.target.value)}
             className="h-[30px] min-w-0 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
           >
             {domains.map((domain) => (
@@ -57,18 +97,65 @@ export function CaptureFileActions({
             ))}
           </select>
         </label>
+        {selectedType ? (
+          <div className="mt-3 rounded-[14px] border border-teal-700/20 bg-white px-3 py-2">
+            <p className="text-[13px] leading-snug text-stone-700">
+              File as{" "}
+              <span className="font-semibold text-stone-950">
+                {targetLabels[selectedType]}
+              </span>{" "}
+              into{" "}
+              <span className="font-semibold text-stone-950">
+                {selectedAreaName}
+              </span>
+              ?
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                type="submit"
+                className="h-[30px] rounded-full bg-teal-700 px-3 text-[13px] font-medium text-white transition hover:bg-teal-800"
+              >
+                Confirm file
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedType(null)}
+                className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-[12px] leading-snug text-[#6B7268]">
+            Choose a type to confirm where this will land.
+          </p>
+        )}
       </form>
     </details>
   );
 }
 
-function ConvertButton({ value, label }: { value: string; label: string }) {
+function ConvertChoice({
+  value,
+  label,
+  selected,
+  onSelect,
+}: {
+  value: TargetType;
+  label: string;
+  selected: boolean;
+  onSelect: (value: TargetType) => void;
+}) {
   return (
     <button
-      type="submit"
-      name="targetType"
-      value={value}
-      className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+      type="button"
+      onClick={() => onSelect(value)}
+      className={`h-[30px] rounded-full border px-3 text-[13px] font-medium transition ${
+        selected
+          ? "border-teal-700 bg-[#E8F5F0] text-teal-800"
+          : "border-[#E2E6DF] bg-white text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
+      }`}
     >
       {label}
     </button>
