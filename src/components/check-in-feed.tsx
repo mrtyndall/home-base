@@ -1,6 +1,14 @@
 import type { CheckIn } from "@prisma/client";
+import Link from "next/link";
+import { Inbox } from "lucide-react";
 import { formatShortDate } from "@/lib/dates";
 import { CheckInComposer } from "@/components/check-in-composer";
+import { checkInSourceLabel } from "@/lib/check-in-source";
+
+type CheckInFeedItem = Pick<
+  CheckIn,
+  "id" | "bodyMd" | "createdAt" | "source" | "captureId"
+>;
 
 export function CheckInFeed({
   parentType,
@@ -9,21 +17,29 @@ export function CheckInFeed({
 }: {
   parentType: "area" | "project";
   parentId: string;
-  checkIns: Array<Pick<CheckIn, "id" | "bodyMd" | "createdAt">>;
+  checkIns: CheckInFeedItem[];
 }) {
   const visibleCheckIns = checkIns.slice(0, 3);
   const earlierCheckIns = checkIns.slice(3);
 
-  function CheckInRow({
-    checkIn,
-  }: {
-    checkIn: Pick<CheckIn, "id" | "bodyMd" | "createdAt">;
-  }) {
+  function CheckInRow({ checkIn }: { checkIn: CheckInFeedItem }) {
     return (
       <div className="px-4 py-3.5">
-        <p className="text-xs text-[#9AA096]">
-          {formatShortDate(checkIn.createdAt)}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#9AA096]">
+          <span>{formatShortDate(checkIn.createdAt)}</span>
+          <span aria-hidden="true">·</span>
+          {checkIn.captureId ? (
+            <Link
+              href="/areas/area_inbox"
+              className="inline-flex items-center gap-1 font-medium text-teal-700 transition hover:text-teal-900"
+            >
+              <Inbox size={12} />
+              {checkInSourceLabel(checkIn.source, checkIn.captureId)}
+            </Link>
+          ) : (
+            <span>{checkInSourceLabel(checkIn.source)}</span>
+          )}
+        </div>
         <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
           {checkIn.bodyMd}
         </p>
