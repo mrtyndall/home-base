@@ -29,21 +29,30 @@ export function getRecentCaptureAction(
   if (type === "project") return { label: "Open project", tone: "secondary" };
   if (type === "idea") return { label: "Open ideas", tone: "secondary" };
   if (type === "entity_note") return { label: "Open note", tone: "secondary" };
-  if (type === "reference") return { label: "Open reference", tone: "secondary" };
+  if (type === "reference")
+    return { label: "Open reference", tone: "secondary" };
 
   return { label: "Open", tone: "secondary" };
 }
 
 export function getRecentCaptureHref(capture: CaptureHrefSource) {
   const item = getLatestActionableItem(capture.createdItems);
-  if (!item) return "/areas/area_inbox";
+  if (!item) return "/areas/area_inbox#pending-captures";
 
   const type = normalizeCaptureItemType(item);
   if (type === "task") return `/tasks/${item.id}`;
   if (type === "project") return `/projects/${item.id}`;
+  if (type === "area") return `/areas/${item.id}`;
   if (type === "idea") return "/ideas";
-  if (type === "pending_capture") return "/areas/area_inbox";
-  return `/search?q=${encodeURIComponent(capture.rawText)}`;
+  if (type === "entity_note") return `/notes/${item.id}`;
+  if (type === "idea_note") return "/ideas";
+  if (type === "check_in") return `/check-ins/${item.id}`;
+  if (type === "reference") return `/references/${item.id}`;
+  if (type === "calendar_event") return `/calendar-events/${item.id}`;
+  if (type === "journal_entry") return "/ideas";
+  if (type === "person") return `/people/${item.id}`;
+  if (type === "pending_capture") return "/areas/area_inbox#pending-captures";
+  return "/areas/area_inbox#pending-captures";
 }
 
 function getLatestActionableItem(createdItems: unknown) {
@@ -52,20 +61,22 @@ function getLatestActionableItem(createdItems: unknown) {
   const filedItems = typedItems.filter(
     (item) => normalizeCaptureItemType(item) !== "pending_capture",
   );
-  return filedItems[filedItems.length - 1] ?? typedItems[typedItems.length - 1] ?? null;
+  return (
+    filedItems[filedItems.length - 1] ??
+    typedItems[typedItems.length - 1] ??
+    null
+  );
 }
 
 function normalizeCaptureItemType(item: CaptureItem) {
   if (item.type === "task" || /^task\b/i.test(item.label)) return "task";
-  if (item.type === "project" || /^project\b/i.test(item.label)) return "project";
+  if (item.type === "project" || /^project\b/i.test(item.label))
+    return "project";
   if (item.type === "idea" || /^idea\b/i.test(item.label)) return "idea";
-  if (
-    item.type === "entity_note" ||
-    item.type === "idea_note" ||
-    /^note\b/i.test(item.label)
-  ) {
+  if (item.type === "entity_note" || /^note\b/i.test(item.label)) {
     return "entity_note";
   }
+  if (item.type === "idea_note") return "idea_note";
   if (item.type === "reference" || /^reference\b/i.test(item.label)) {
     return "reference";
   }
@@ -73,9 +84,7 @@ function normalizeCaptureItemType(item: CaptureItem) {
   return item.type;
 }
 
-function isCreatedItem(
-  item: unknown,
-): item is CaptureItem {
+function isCreatedItem(item: unknown): item is CaptureItem {
   return (
     typeof item === "object" &&
     item !== null &&

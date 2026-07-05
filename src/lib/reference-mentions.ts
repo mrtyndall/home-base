@@ -8,7 +8,12 @@ export type ReferenceMentionTarget = {
 };
 
 type SourceType =
-  "entity_note" | "check_in" | "reference" | "journal_entry" | "calendar_event";
+  | "entity_note"
+  | "check_in"
+  | "reference"
+  | "journal_entry"
+  | "calendar_event"
+  | "person_interaction";
 
 export async function syncReferenceMentions(
   sourceType: SourceType,
@@ -241,7 +246,7 @@ function parseExplicitMentionTokens(text: string) {
 function hrefForMentionTarget(targetType: string, targetId: string) {
   if (targetType === "person") return `/people/${targetId}`;
   if (targetType === "calendar_event") return `/calendar-events/${targetId}`;
-  return `/ideas#reference-${targetId}`;
+  return `/references/${targetId}`;
 }
 
 function atSymbolIndexes(text: string) {

@@ -239,7 +239,7 @@ async function loadEventMentionHistory(eventId: string) {
       title: reference.title ?? "Reference",
       body: reference.body,
       createdAt: reference.createdAt,
-      href: `/ideas#reference-${reference.id}`,
+      href: `/references/${reference.id}`,
     })),
     ...journals.map((entry) => ({
       id: entry.id,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { updatePersonProfile } from "@/app/actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
@@ -26,7 +27,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
     notFound();
   }
 
-  const { person, linkedCaptures, linkedMentions } = result;
+  const { person, linkedCaptures, linkedMentions, areas } = result;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -61,6 +62,86 @@ export default async function PersonPage({ params }: PersonPageProps) {
         </div>
       </header>
 
+      <details className="rounded-[18px] border border-[#E2E6DF] bg-white p-4">
+        <summary className="cursor-pointer list-none text-sm font-medium text-stone-700 transition hover:text-teal-700 [&::-webkit-details-marker]:hidden">
+          Edit profile
+        </summary>
+        <form action={updatePersonProfile} className="mt-4 grid gap-3">
+          <input type="hidden" name="personId" value={person.id} />
+          <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+            Name
+            <input
+              name="name"
+              required
+              defaultValue={person.name}
+              className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+              Relationship
+              <input
+                name="relationshipType"
+                defaultValue={person.relationshipType ?? ""}
+                className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+              />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+              Area
+              <select
+                name="areaId"
+                defaultValue={person.areaId ?? ""}
+                className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+              >
+                <option value="">No area</option>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.domain.name} / {area.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+              Company
+              <input
+                name="company"
+                defaultValue={person.company ?? ""}
+                className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+              />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+              Email
+              <input
+                name="email"
+                type="email"
+                defaultValue={person.email ?? ""}
+                className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+              />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+              Phone
+              <input
+                name="phone"
+                defaultValue={person.phone ?? ""}
+                className="h-10 rounded-[12px] border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+              />
+            </label>
+          </div>
+          <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[#9AA096]">
+            Notes
+            <textarea
+              name="notesMd"
+              rows={4}
+              defaultValue={person.notesMd ?? ""}
+              className="rounded-[12px] border border-[#E2E6DF] bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-950 outline-none focus:border-teal-700"
+            />
+          </label>
+          <button className="h-10 rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800 sm:w-fit">
+            Save profile
+          </button>
+        </form>
+      </details>
+
       <section className="space-y-2.5">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Facts
@@ -81,7 +162,11 @@ export default async function PersonPage({ params }: PersonPageProps) {
                 .filter((item): item is string => Boolean(item))
                 .join(" · ");
               return (
-                <div key={fact.id} className="px-4 py-3">
+                <Link
+                  key={fact.id}
+                  href={`/people/${person.id}/facts/${fact.id}`}
+                  className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
+                >
                   {dateLead ? (
                     <p className="text-xs text-[#9AA096]">{dateLead}</p>
                   ) : null}
@@ -91,7 +176,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
                     {fact.factValue}
                   </p>
                   <p className="mt-0.5 text-xs text-[#B0ACA2]">{trail}</p>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -105,8 +190,9 @@ export default async function PersonPage({ params }: PersonPageProps) {
         {person.interactions.length === 0 ? null : (
           <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
             {person.interactions.map((interaction) => (
-              <div
+              <Link
                 key={interaction.id}
+                href={`/people/${person.id}/interactions/${interaction.id}`}
                 className="flex items-baseline gap-3 px-4 py-3"
               >
                 <span className="min-w-[46px] text-xs text-[#9AA096]">
@@ -127,7 +213,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
                       : ""}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -190,6 +276,7 @@ async function loadPerson(personId: string) {
       include: {
         facts: { orderBy: { createdAt: "desc" }, take: 50 },
         interactions: { orderBy: { occurredAt: "desc" }, take: 50 },
+        area: { select: { id: true, name: true } },
       },
     });
 
@@ -199,8 +286,15 @@ async function loadPerson(personId: string) {
         person: null,
         linkedCaptures: [],
         linkedMentions: [],
+        areas: [],
       };
     }
+
+    const areas = await prisma.area.findMany({
+      where: { status: { not: "retired" } },
+      include: { domain: { select: { name: true } } },
+      orderBy: [{ domain: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+    });
 
     const captureIds = [
       ...person.facts.map((fact) => fact.captureId),
@@ -216,7 +310,13 @@ async function loadPerson(personId: string) {
       : [];
     const linkedMentions = await loadPersonMentionHistory(person.id);
 
-    return { ok: true as const, person, linkedCaptures, linkedMentions };
+    return {
+      ok: true as const,
+      person,
+      linkedCaptures,
+      linkedMentions,
+      areas,
+    };
   } catch {
     return { ok: false as const };
   }
@@ -236,40 +336,52 @@ async function loadPersonMentionHistory(personId: string) {
     idsByType.set(mention.sourceType, ids);
   }
 
-  const [notes, checkIns, references, journals, events] = await Promise.all([
-    prisma.entityNote.findMany({
-      where: { id: { in: idsByType.get("entity_note") ?? [] } },
-      select: {
-        id: true,
-        bodyMd: true,
-        parentType: true,
-        parentId: true,
-        createdAt: true,
-      },
-    }),
-    prisma.checkIn.findMany({
-      where: { id: { in: idsByType.get("check_in") ?? [] } },
-      select: {
-        id: true,
-        bodyMd: true,
-        parentType: true,
-        parentId: true,
-        createdAt: true,
-      },
-    }),
-    prisma.reference.findMany({
-      where: { id: { in: idsByType.get("reference") ?? [] } },
-      select: { id: true, title: true, body: true, createdAt: true },
-    }),
-    prisma.journalEntry.findMany({
-      where: { id: { in: idsByType.get("journal_entry") ?? [] } },
-      select: { id: true, bodyMd: true, entryDate: true, createdAt: true },
-    }),
-    prisma.calendarEvent.findMany({
-      where: { id: { in: idsByType.get("calendar_event") ?? [] } },
-      select: { id: true, title: true, start: true, createdAt: true },
-    }),
-  ]);
+  const [notes, checkIns, references, journals, events, interactions] =
+    await Promise.all([
+      prisma.entityNote.findMany({
+        where: { id: { in: idsByType.get("entity_note") ?? [] } },
+        select: {
+          id: true,
+          bodyMd: true,
+          parentType: true,
+          parentId: true,
+          createdAt: true,
+        },
+      }),
+      prisma.checkIn.findMany({
+        where: { id: { in: idsByType.get("check_in") ?? [] } },
+        select: {
+          id: true,
+          bodyMd: true,
+          parentType: true,
+          parentId: true,
+          createdAt: true,
+        },
+      }),
+      prisma.reference.findMany({
+        where: { id: { in: idsByType.get("reference") ?? [] } },
+        select: { id: true, title: true, body: true, createdAt: true },
+      }),
+      prisma.journalEntry.findMany({
+        where: { id: { in: idsByType.get("journal_entry") ?? [] } },
+        select: { id: true, bodyMd: true, entryDate: true, createdAt: true },
+      }),
+      prisma.calendarEvent.findMany({
+        where: { id: { in: idsByType.get("calendar_event") ?? [] } },
+        select: { id: true, title: true, start: true, createdAt: true },
+      }),
+      prisma.personInteraction.findMany({
+        where: { id: { in: idsByType.get("person_interaction") ?? [] } },
+        select: {
+          id: true,
+          personId: true,
+          notesMd: true,
+          interactionType: true,
+          occurredAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
   return [
     ...notes.map((note) => ({
@@ -278,10 +390,7 @@ async function loadPersonMentionHistory(personId: string) {
       title: "Note",
       body: note.bodyMd,
       createdAt: note.createdAt,
-      href:
-        note.parentType === "area"
-          ? `/areas/${note.parentId}`
-          : `/projects/${note.parentId}`,
+      href: `/notes/${note.id}`,
     })),
     ...checkIns.map((checkIn) => ({
       id: checkIn.id,
@@ -289,10 +398,7 @@ async function loadPersonMentionHistory(personId: string) {
       title: "Check-in",
       body: checkIn.bodyMd,
       createdAt: checkIn.createdAt,
-      href:
-        checkIn.parentType === "area"
-          ? `/areas/${checkIn.parentId}`
-          : `/projects/${checkIn.parentId}`,
+      href: `/check-ins/${checkIn.id}`,
     })),
     ...references.map((reference) => ({
       id: reference.id,
@@ -300,7 +406,7 @@ async function loadPersonMentionHistory(personId: string) {
       title: reference.title ?? "Reference",
       body: reference.body,
       createdAt: reference.createdAt,
-      href: `/ideas#reference-${reference.id}`,
+      href: `/references/${reference.id}`,
     })),
     ...journals.map((entry) => ({
       id: entry.id,
@@ -317,6 +423,14 @@ async function loadPersonMentionHistory(personId: string) {
       body: formatDateOnly(event.start),
       createdAt: event.start,
       href: `/calendar-events/${event.id}`,
+    })),
+    ...interactions.map((interaction) => ({
+      id: interaction.id,
+      type: "interaction",
+      title: "Interaction",
+      body: interaction.notesMd ?? interaction.interactionType,
+      createdAt: interaction.createdAt,
+      href: `/people/${interaction.personId}/interactions/${interaction.id}`,
     })),
   ].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
 }

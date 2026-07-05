@@ -12,7 +12,7 @@ import {
 import {
   dismissReview,
   markReviewDone,
-  snoozeReview,
+  snoozeReviewOneDay,
 } from "@/app/review-actions";
 import { CaptureFileActions } from "@/components/capture-file-actions";
 import { SetupNotice } from "@/components/setup-notice";
@@ -75,10 +75,14 @@ export default async function AreaPage({ params }: AreaPageProps) {
               {area.name}
             </h1>
             <p className="mt-1.5 text-[13px] text-stone-500">
-              {area.status.charAt(0).toUpperCase() + area.status.slice(1)}
-              {area.tendingCadence ? ` · tend ${area.tendingCadence}` : ""}
+              {area.id === "area_inbox"
+                ? "Captures and reviews that still need a home."
+                : area.status.charAt(0).toUpperCase() + area.status.slice(1)}
+              {area.id !== "area_inbox" && area.tendingCadence
+                ? ` · tend ${area.tendingCadence}`
+                : ""}
             </p>
-            {latestCheckIn ? (
+            {area.id !== "area_inbox" && latestCheckIn ? (
               <p className="mt-3 max-w-2xl text-base leading-relaxed text-stone-700">
                 {checkInSnippet(latestCheckIn.bodyMd, 160)}
               </p>
@@ -95,17 +99,21 @@ export default async function AreaPage({ params }: AreaPageProps) {
         </section>
       ) : null}
 
-      <CheckInFeed
-        parentType="area"
-        parentId={area.id}
-        checkIns={area.checkIns}
-      />
+      {area.id === "area_inbox" ? null : (
+        <CheckInFeed
+          parentType="area"
+          parentId={area.id}
+          checkIns={area.checkIns}
+        />
+      )}
 
-      <AreaHubOverview
-        area={area}
-        pendingCaptureCount={pendingCaptures.length}
-        reviewCount={reviews.length}
-      />
+      {area.id === "area_inbox" ? null : (
+        <AreaHubOverview
+          area={area}
+          pendingCaptureCount={pendingCaptures.length}
+          reviewCount={reviews.length}
+        />
+      )}
 
       <EntityDepth
         parentType="area"
@@ -339,38 +347,15 @@ function NeedsReviewPanel({
                 domains={domains}
                 label="File as..."
               />
-              <details className="relative">
-                <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700 [&::-webkit-details-marker]:hidden">
-                  Review later
-                </summary>
-                <form
-                  action={snoozeReview}
-                  className="absolute left-0 z-20 mt-2 w-72 space-y-2 rounded-[18px] border border-white/65 bg-[#FAFBF9]/80 p-2 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150"
+              <form action={snoozeReviewOneDay}>
+                <input type="hidden" name="reviewId" value={review.id} />
+                <button
+                  type="submit"
+                  className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
                 >
-                  <input type="hidden" name="reviewId" value={review.id} />
-                  <label
-                    className="block text-xs text-[#6B7268]"
-                    htmlFor={`snooze-${review.id}`}
-                  >
-                    Bring this review back on
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      id={`snooze-${review.id}`}
-                      type="date"
-                      name="snoozeUntil"
-                      required
-                      className="h-[30px] min-w-0 flex-1 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
-                    />
-                    <button
-                      type="submit"
-                      className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </form>
-              </details>
+                  Snooze 1 day
+                </button>
+              </form>
               <form action={markReviewDone}>
                 <input type="hidden" name="reviewId" value={review.id} />
                 <button

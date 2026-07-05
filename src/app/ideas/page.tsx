@@ -68,7 +68,7 @@ function ReferenceDatabaseOverview({
 }) {
   const databases = [
     {
-      href: "#people",
+      href: "/ideas/people",
       label: "People",
       count: people.length,
       detail: people[0]
@@ -83,19 +83,19 @@ function ReferenceDatabaseOverview({
         : "No people saved yet.",
     },
     {
-      href: "#books",
+      href: "/ideas/books",
       label: "Books",
       count: books.length,
       detail: latestReferenceLine(books[0]) ?? "No books saved yet.",
     },
     {
-      href: "#movies",
+      href: "/ideas/movies",
       label: "Movies",
       count: movies.length,
       detail: latestReferenceLine(movies[0]) ?? "No movies saved yet.",
     },
     {
-      href: "#references",
+      href: "/ideas/references",
       label: "References",
       count: references.length,
       detail: latestReferenceLine(references[0]) ?? "No references saved yet.",
@@ -288,6 +288,7 @@ function ReferenceSection({
         {references.map((reference) => (
           <details
             key={reference.id}
+            id={`reference-${reference.id}`}
             className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
           >
             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -322,6 +323,12 @@ function ReferenceSection({
                   Open source
                 </a>
               ) : null}
+              <Link
+                href={`/references/${reference.id}`}
+                className="inline-flex text-sm font-medium text-teal-700 transition hover:text-teal-900"
+              >
+                Open detail
+              </Link>
             </div>
           </details>
         ))}

@@ -551,12 +551,20 @@ function getCaptureHref(capture: ReadyToday["recentCaptures"][number]) {
     ? capture.createdItems.filter(isCaptureItem).at(-1)
     : null;
   if (!item || item.type === "pending_capture") {
-    return "/areas/area_inbox";
+    return "/areas/area_inbox#pending-captures";
   }
   if (item.type === "task") return `/tasks/${item.id}`;
   if (item.type === "project") return `/projects/${item.id}`;
+  if (item.type === "area") return `/areas/${item.id}`;
   if (item.type === "idea") return "/ideas";
-  return `/search?q=${encodeURIComponent(capture.rawText)}`;
+  if (item.type === "entity_note") return `/notes/${item.id}`;
+  if (item.type === "idea_note") return "/ideas";
+  if (item.type === "check_in") return `/check-ins/${item.id}`;
+  if (item.type === "reference") return `/references/${item.id}`;
+  if (item.type === "calendar_event") return `/calendar-events/${item.id}`;
+  if (item.type === "journal_entry") return "/ideas";
+  if (item.type === "person") return `/people/${item.id}`;
+  return "/areas/area_inbox#pending-captures";
 }
 
 function isCaptureItem(item: unknown): item is CaptureItem {

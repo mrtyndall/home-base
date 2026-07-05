@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { dateOnlyFromString } from "@/lib/dates";
+import {
+  addDaysToDateString,
+  dateOnlyFromString,
+  localDateString,
+} from "@/lib/dates";
 
 function getTrimmed(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -21,10 +25,7 @@ async function loadOpenReview(reviewId: string) {
   return review;
 }
 
-async function settleReview(
-  reviewId: string,
-  status: "done" | "dismissed",
-) {
+async function settleReview(reviewId: string, status: "done" | "dismissed") {
   const review = await loadOpenReview(reviewId);
   if (!review) return;
 
@@ -69,6 +70,34 @@ export async function snoozeReview(formData: FormData) {
       title: `Review snoozed to ${snoozeUntil}`,
       body: review.capture.rawText,
       sourceRef: { type: "scheduled_review", id: review.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/areas/area_inbox");
+}
+
+export async function snoozeReviewOneDay(formData: FormData) {
+  const review = await loadOpenReview(getTrimmed(formData, "reviewId"));
+  if (!review) return;
+
+  const snoozeUntil = addDaysToDateString(localDateString(), 1);
+
+  await prisma.scheduledReview.update({
+    where: { id: review.id },
+    data: { status: "pending", reviewAt: dateOnlyFromString(snoozeUntil) },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "review_snoozed",
+      title: "Review snoozed",
+      body: review.capture.rawText,
+      sourceRef: {
+        type: "scheduled_review",
+        id: review.id,
+        source: "manual",
+        snoozeUntil,
+      },
     },
   });
 

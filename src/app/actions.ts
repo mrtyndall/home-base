@@ -377,9 +377,224 @@ export async function updateJournalEntry(formData: FormData) {
   revalidatePath("/ideas");
 }
 
+export async function updatePersonProfile(formData: FormData) {
+  const personId = getTrimmedString(formData, "personId");
+  const name = getTrimmedString(formData, "name");
+  if (!personId || !name) return;
+
+  const areaId = getTrimmedString(formData, "areaId");
+  const validArea = areaId
+    ? await prisma.area.findFirst({
+        where: { id: areaId, status: { not: "retired" } },
+        select: { id: true },
+      })
+    : null;
+
+  const person = await prisma.person.update({
+    where: { id: personId },
+    data: {
+      name,
+      relationshipType: getTrimmedString(formData, "relationshipType") || null,
+      company: getTrimmedString(formData, "company") || null,
+      email: getTrimmedString(formData, "email") || null,
+      phone: getTrimmedString(formData, "phone") || null,
+      notesMd: getTrimmedString(formData, "notesMd") || null,
+      areaId: validArea?.id ?? null,
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "person_updated",
+      title: "Person updated",
+      body: person.name,
+      sourceRef: { type: "person", id: person.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/ideas");
+  revalidatePath(`/people/${person.id}`);
+  redirect(`/people/${person.id}`);
+}
+
+export async function updatePersonFact(formData: FormData) {
+  const personId = getTrimmedString(formData, "personId");
+  const factId = getTrimmedString(formData, "factId");
+  const factValue = getTrimmedString(formData, "factValue");
+  if (!personId || !factId || !factValue) return;
+
+  const dateRelevant = getTrimmedString(formData, "dateRelevant");
+  const fact = await prisma.personFact.update({
+    where: { id: factId },
+    data: {
+      factType: getTrimmedString(formData, "factType") || "note",
+      factValue,
+      dateRelevant: dateRelevant ? dateOnlyFromString(dateRelevant) : null,
+      recurring: formData.get("recurring") === "on",
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "person_fact_updated",
+      title: "Person fact updated",
+      body:
+        fact.factValue.length > 120
+          ? `${fact.factValue.slice(0, 117)}...`
+          : fact.factValue,
+      sourceRef: {
+        type: "person_fact",
+        id: fact.id,
+        personId: fact.personId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath(`/people/${fact.personId}`);
+  revalidatePath(`/people/${fact.personId}/facts/${fact.id}`);
+  redirect(`/people/${fact.personId}/facts/${fact.id}`);
+}
+
+export async function updatePersonInteraction(formData: FormData) {
+  const personId = getTrimmedString(formData, "personId");
+  const interactionId = getTrimmedString(formData, "interactionId");
+  if (!personId || !interactionId) return;
+
+  const occurredOn = getTrimmedString(formData, "occurredOn");
+  const interaction = await prisma.personInteraction.update({
+    where: { id: interactionId },
+    data: {
+      interactionType:
+        getTrimmedString(formData, "interactionType") || "touchpoint",
+      notesMd: getTrimmedString(formData, "notesMd") || null,
+      occurredAt: occurredOn
+        ? new Date(`${occurredOn}T12:00:00.000Z`)
+        : undefined,
+    },
+  });
+
+  await syncReferenceMentions(
+    "person_interaction",
+    interaction.id,
+    interaction.notesMd ?? interaction.interactionType,
+  );
+
+  await prisma.notification.create({
+    data: {
+      type: "person_interaction_updated",
+      title: "Person interaction updated",
+      body: interaction.notesMd?.slice(0, 120) ?? interaction.interactionType,
+      sourceRef: {
+        type: "person_interaction",
+        id: interaction.id,
+        personId: interaction.personId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath(`/people/${interaction.personId}`);
+  revalidatePath(
+    `/people/${interaction.personId}/interactions/${interaction.id}`,
+  );
+  redirect(`/people/${interaction.personId}/interactions/${interaction.id}`);
+}
+
+export async function createReferenceFromLookup(formData: FormData) {
+  const kind = getTrimmedString(formData, "kind");
+  const source = getTrimmedString(formData, "source");
+  const sourceId = getTrimmedString(formData, "sourceId");
+  const title = getTrimmedString(formData, "title");
+  const body = getTrimmedString(formData, "body");
+  if (
+    (kind !== "book" && kind !== "movie" && kind !== "reference") ||
+    !source ||
+    !sourceId ||
+    !title
+  ) {
+    return;
+  }
+
+  const sourcePath = `${source}:${sourceId}`;
+  const tags = parseStringArray(getTrimmedString(formData, "tagsJson"));
+  const metadata = parseJsonObject(getTrimmedString(formData, "metadataJson"));
+
+  const reference = await prisma.reference.upsert({
+    where: { sourcePath },
+    update: {
+      title,
+      body: body || title,
+      url: getTrimmedString(formData, "url") || null,
+      tags,
+      metadata,
+      source,
+    },
+    create: {
+      kind,
+      title,
+      body: body || title,
+      url: getTrimmedString(formData, "url") || null,
+      tags,
+      metadata,
+      source,
+      sourcePath,
+    },
+  });
+
+  await syncReferenceMentions("reference", reference.id, reference.body);
+
+  await prisma.notification.create({
+    data: {
+      type: "reference_saved",
+      title: `${kind === "book" ? "Book" : kind === "movie" ? "Movie" : "Reference"} saved`,
+      body: reference.title ?? reference.body,
+      sourceRef: {
+        type: "reference",
+        id: reference.id,
+        kind,
+        source,
+        sourceId,
+      },
+    },
+  });
+
+  revalidatePath("/ideas");
+  revalidatePath(
+    `/ideas/${kind === "book" ? "books" : kind === "movie" ? "movies" : "references"}`,
+  );
+  redirect(`/references/${reference.id}`);
+}
+
 function getTrimmedString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseStringArray(value: string) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJsonObject(value: string): Prisma.InputJsonObject {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+      ? (parsed as Prisma.InputJsonObject)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function parseReminderOffsetsInput(value: string) {
