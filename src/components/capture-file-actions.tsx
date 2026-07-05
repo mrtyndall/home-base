@@ -26,21 +26,16 @@ export function CaptureFileActions({
   align?: "left" | "right";
   label?: string;
 }) {
-  const defaultAreaId =
-    domains
-      .flatMap((domain) => domain.areas)
-      .find((area) => area.id === "area_inbox")?.id ??
-    domains[0]?.areas[0]?.id ??
-    "area_inbox";
-  const [areaId, setAreaId] = useState(defaultAreaId);
+  const [areaId, setAreaId] = useState("");
   const [selectedType, setSelectedType] = useState<TargetType | null>(null);
 
   const selectedAreaName = useMemo(() => {
+    if (!areaId) return null;
     for (const domain of domains) {
       const area = domain.areas.find((candidate) => candidate.id === areaId);
       if (area) return area.name;
     }
-    return "Inbox";
+    return null;
   }, [areaId, domains]);
 
   return (
@@ -83,9 +78,11 @@ export function CaptureFileActions({
           <select
             name="areaId"
             value={areaId}
+            required
             onChange={(event) => setAreaId(event.target.value)}
             className="h-[30px] min-w-0 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
           >
+            <option value="">Choose area</option>
             {domains.map((domain) => (
               <optgroup key={domain.id} label={domain.name}>
                 {domain.areas.map((area) => (
@@ -100,20 +97,27 @@ export function CaptureFileActions({
         {selectedType ? (
           <div className="mt-3 rounded-[14px] border border-teal-700/20 bg-white px-3 py-2">
             <p className="text-[13px] leading-snug text-stone-700">
-              File as{" "}
-              <span className="font-semibold text-stone-950">
-                {targetLabels[selectedType]}
-              </span>{" "}
-              into{" "}
-              <span className="font-semibold text-stone-950">
-                {selectedAreaName}
-              </span>
-              ?
+              {selectedAreaName ? (
+                <>
+                  File as{" "}
+                  <span className="font-semibold text-stone-950">
+                    {targetLabels[selectedType]}
+                  </span>{" "}
+                  into{" "}
+                  <span className="font-semibold text-stone-950">
+                    {selectedAreaName}
+                  </span>
+                  ?
+                </>
+              ) : (
+                "Choose an area before filing."
+              )}
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <button
                 type="submit"
-                className="h-[30px] rounded-full bg-teal-700 px-3 text-[13px] font-medium text-white transition hover:bg-teal-800"
+                disabled={!selectedAreaName}
+                className="h-[30px] rounded-full bg-teal-700 px-3 text-[13px] font-medium text-white transition hover:bg-teal-800 disabled:bg-[#D7DDD4] disabled:text-stone-500"
               >
                 Confirm file
               </button>

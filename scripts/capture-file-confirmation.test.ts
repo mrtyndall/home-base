@@ -15,6 +15,10 @@ assert.ok(
   "Confirmation should show the selected destination area name.",
 );
 assert.ok(
+  source.includes("Choose area"),
+  "Capture filing should not default to the first area in the list.",
+);
+assert.ok(
   source.includes('type="button"'),
   "Task/Idea/Note/Reference choices should not submit immediately.",
 );
