@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  type DragEvent,
-  type MouseEvent,
   type PointerEvent,
   type ReactNode,
   useEffect,
@@ -15,8 +13,8 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, GripVertical } from "lucide-react";
 import { getTaskDragPreviewPosition } from "@/lib/task-drag-preview";
 
-let activeMouseDragTaskId: string | null = null;
 const dragStartEvent = "home-base-task-drag-start";
+const dragHoverEvent = "home-base-task-drag-hover";
 const dragEndEvent = "home-base-task-drag-end";
 
 type TaskDragPreview = {
@@ -29,17 +27,33 @@ type TaskDragPreviewPosition = {
   top: number;
 };
 
+type TaskDragHover = {
+  dropKey?: string | null;
+  targetTaskId?: string | null;
+};
+
+type TaskDropKind = "date" | "someday" | "unscheduled";
+
+function taskDropKey(kind: TaskDropKind, date?: string | null) {
+  return kind === "date" ? `date:${date ?? ""}` : kind;
+}
+
 function announceTaskDragStart(preview: TaskDragPreview) {
   window.dispatchEvent(new CustomEvent(dragStartEvent, { detail: preview }));
 }
 
+function announceTaskDragHover(detail: TaskDragHover) {
+  window.dispatchEvent(new CustomEvent(dragHoverEvent, { detail }));
+}
+
 function announceTaskDragEnd() {
-  activeMouseDragTaskId = null;
+  announceTaskDragHover({ dropKey: null, targetTaskId: null });
   window.dispatchEvent(new Event(dragEndEvent));
 }
 
 type TaskDropZoneProps = {
   targetDate: string | null;
+  targetKind?: TaskDropKind;
   label?: string;
   isEmpty: boolean;
   emptyText: string;
@@ -52,6 +66,7 @@ type DraggableTaskLinkProps = {
   title: string;
   detail: string;
   currentDueDate: string | null;
+  currentParentTaskId?: string | null;
   currentAreaId?: string;
   currentProjectId?: string | null;
   areaGroups?: Array<{
@@ -70,24 +85,29 @@ type DraggableTaskLinkProps = {
 
 export function TaskDropZone({
   targetDate,
+  targetKind,
   label = "section",
   isEmpty,
   emptyText,
   children,
 }: TaskDropZoneProps) {
-  const router = useRouter();
   const [draggingTask, setDraggingTask] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [preview, setPreview] = useState<TaskDragPreview | null>(null);
-  const [pending, setPending] = useState(false);
-  const [, startTransition] = useTransition();
 
   useEffect(() => {
+    const kind = targetKind ?? (targetDate ? "date" : "unscheduled");
+    const zoneKey = taskDropKey(kind, targetDate);
     const handleDragStart = (event: Event) => {
       setDraggingTask(true);
       setPreview(
         event instanceof CustomEvent ? (event.detail as TaskDragPreview) : null,
       );
+    };
+    const handleDragHover = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail = event.detail as TaskDragHover;
+      setIsActive(detail.dropKey === zoneKey);
     };
     const handleDragEnd = () => {
       setDraggingTask(false);
@@ -95,62 +115,22 @@ export function TaskDropZone({
       setPreview(null);
     };
     window.addEventListener(dragStartEvent, handleDragStart);
+    window.addEventListener(dragHoverEvent, handleDragHover);
     window.addEventListener(dragEndEvent, handleDragEnd);
     return () => {
       window.removeEventListener(dragStartEvent, handleDragStart);
+      window.removeEventListener(dragHoverEvent, handleDragHover);
       window.removeEventListener(dragEndEvent, handleDragEnd);
     };
-  }, []);
+  }, [targetDate, targetKind]);
 
-  async function handleDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    announceTaskDragEnd();
-    setIsActive(false);
-
-    const taskId =
-      event.dataTransfer.getData("application/x-home-base-task-id") ||
-      event.dataTransfer.getData("text/plain");
-    if (!taskId) return;
-
-    setPending(true);
-    try {
-      await updateTaskSchedule(taskId, { dueDate: targetDate });
-      startTransition(() => router.refresh());
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleMouseUp() {
-    const taskId = activeMouseDragTaskId;
-    if (!taskId) return;
-    announceTaskDragEnd();
-
-    setPending(true);
-    try {
-      await updateTaskSchedule(taskId, { dueDate: targetDate });
-      startTransition(() => router.refresh());
-    } finally {
-      setPending(false);
-    }
-  }
+  const kind = targetKind ?? (targetDate ? "date" : "unscheduled");
 
   return (
     <div
-      data-drop-date={targetDate ?? "none"}
-      onMouseUp={handleMouseUp}
-      onDragEnter={() => setIsActive(true)}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setIsActive(false);
-        }
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setIsActive(true);
-        event.dataTransfer.dropEffect = "move";
-      }}
-      onDrop={handleDrop}
+      data-drop-date={targetDate ?? ""}
+      data-drop-kind={kind}
+      data-drop-key={taskDropKey(kind, targetDate)}
       className={`relative min-h-20 space-y-2 rounded-[14px] border p-1.5 transition ${
         isActive
           ? "border-teal-700 bg-teal-700/5"
@@ -167,7 +147,7 @@ export function TaskDropZone({
               : "border border-teal-700/40 bg-white text-teal-800"
           }`}
         >
-          Move here: {label}
+          Drop into {label}
         </div>
       ) : null}
       {draggingTask && isActive && preview ? (
@@ -180,9 +160,7 @@ export function TaskDropZone({
       ) : null}
       <div className={`${draggingTask ? "space-y-2" : ""}`}>
         {isEmpty ? (
-          <p className="px-2.5 py-2 text-sm text-[#6B7268]">
-            {pending ? "Updating date." : emptyText}
-          </p>
+          <p className="px-2.5 py-2 text-sm text-[#6B7268]">{emptyText}</p>
         ) : (
           children
         )}
@@ -197,6 +175,7 @@ export function DraggableTaskLink({
   title,
   detail,
   currentDueDate,
+  currentParentTaskId = null,
   currentAreaId = "area_inbox",
   currentProjectId = null,
   areaGroups = [],
@@ -207,21 +186,31 @@ export function DraggableTaskLink({
   const router = useRouter();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
-  const mouseStart = useRef<{ x: number; y: number } | null>(null);
   const pointerDragging = useRef(false);
   const dragAnnounced = useRef(false);
-  const nativeDragImageRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClick = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragPending, setDragPending] = useState(false);
-  const [nativeDragEnabled] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(pointer: fine)").matches,
-  );
+  const [isDropTarget, setIsDropTarget] = useState(false);
   const [dragPreviewPosition, setDragPreviewPosition] =
     useState<TaskDragPreviewPosition | null>(null);
   const [, startTransition] = useTransition();
+  const currentParentKey = currentParentTaskId ?? "";
+
+  useEffect(() => {
+    const handleDragHover = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail = event.detail as TaskDragHover;
+      setIsDropTarget(detail.targetTaskId === taskId);
+    };
+    const handleDragEnd = () => setIsDropTarget(false);
+    window.addEventListener(dragHoverEvent, handleDragHover);
+    window.addEventListener(dragEndEvent, handleDragEnd);
+    return () => {
+      window.removeEventListener(dragHoverEvent, handleDragHover);
+      window.removeEventListener(dragEndEvent, handleDragEnd);
+    };
+  }, [taskId]);
 
   function moveDragPreview(clientX: number, clientY: number) {
     if (clientX === 0 && clientY === 0) return;
@@ -280,9 +269,27 @@ export function DraggableTaskLink({
       pointerDragging.current = true;
       suppressNextClick.current = true;
       clearLongPress();
+      event.preventDefault();
       moveDragPreview(event.clientX, event.clientY);
       markDragStarted(event.clientX, event.clientY);
+      announceHoverTarget(event.clientX, event.clientY);
     }
+  }
+
+  function announceHoverTarget(clientX: number, clientY: number) {
+    const element = document.elementFromPoint(clientX, clientY);
+    const taskTarget = element?.closest<HTMLElement>("[data-task-id]");
+    const targetParentKey = taskTarget?.dataset.taskParentId ?? "";
+    const targetTaskId =
+      taskTarget?.dataset.taskId === taskId ||
+      targetParentKey !== currentParentKey
+        ? null
+        : taskTarget?.dataset.taskId;
+    const dropTarget = element?.closest<HTMLElement>("[data-drop-date]");
+    announceTaskDragHover({
+      targetTaskId: targetTaskId ?? null,
+      dropKey: dropTarget?.dataset.dropKey ?? null,
+    });
   }
 
   async function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -299,24 +306,30 @@ export function DraggableTaskLink({
     const taskTarget = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>("[data-task-id]");
-    const targetTaskId = taskTarget?.dataset.taskId;
+    const targetParentKey = taskTarget?.dataset.taskParentId ?? "";
+    const targetTaskId =
+      targetParentKey === currentParentKey ? taskTarget?.dataset.taskId : null;
     const dropTarget = taskTarget
       ? null
       : document
           .elementFromPoint(event.clientX, event.clientY)
           ?.closest<HTMLElement>("[data-drop-date]");
+    const targetKind = dropTarget?.dataset.dropKind as TaskDropKind | undefined;
     const targetDateValue = dropTarget?.dataset.dropDate;
-    const targetDate = targetDateValue === "none" ? null : targetDateValue;
     markDragEnded();
-    if (!targetTaskId && targetDate === undefined) return;
+    if (!targetTaskId && !targetKind) return;
 
     event.preventDefault();
     setDragPending(true);
     try {
       if (targetTaskId && targetTaskId !== taskId) {
         await updateTaskOrder(taskId, { targetTaskId });
+      } else if (targetKind === "someday") {
+        await updateTaskSchedule(taskId, { someday: true });
       } else {
-        await updateTaskSchedule(taskId, { dueDate: targetDate });
+        await updateTaskSchedule(taskId, {
+          dueDate: targetKind === "date" ? (targetDateValue ?? null) : null,
+        });
       }
       startTransition(() => router.refresh());
     } finally {
@@ -324,72 +337,25 @@ export function DraggableTaskLink({
     }
   }
 
-  function handleMouseDown(event: MouseEvent<HTMLDivElement>) {
-    if (!isDragHandle(event.target)) return;
-    setMenuOpen(false);
-    mouseStart.current = { x: event.clientX, y: event.clientY };
-    activeMouseDragTaskId = null;
-  }
-
-  function handleMouseMove(event: MouseEvent<HTMLDivElement>) {
-    if (!mouseStart.current) return;
-    const distance = Math.hypot(
-      event.clientX - mouseStart.current.x,
-      event.clientY - mouseStart.current.y,
-    );
-    if (distance > 8) {
-      activeMouseDragTaskId = taskId;
-      suppressNextClick.current = true;
-      clearLongPress();
-      moveDragPreview(event.clientX, event.clientY);
-      markDragStarted(event.clientX, event.clientY);
-    }
-  }
-
-  function handleMouseUp() {
-    mouseStart.current = null;
-    window.setTimeout(() => {
-      if (activeMouseDragTaskId === taskId) {
-        markDragEnded();
-      }
-    }, 0);
-  }
-
   return (
     <>
       <div
         data-task-id={taskId}
-        draggable={nativeDragEnabled}
-        onDragStart={(event) => {
-          if (!nativeDragEnabled) {
-            event.preventDefault();
-            return;
-          }
-          markDragStarted(event.clientX, event.clientY);
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("application/x-home-base-task-id", taskId);
-          event.dataTransfer.setData("text/plain", taskId);
-          if (nativeDragImageRef.current) {
-            event.dataTransfer.setDragImage(nativeDragImageRef.current, 16, 16);
-          }
-        }}
-        onDrag={(event) => moveDragPreview(event.clientX, event.clientY)}
-        onDragEnd={markDragEnded}
+        data-task-parent-id={currentParentKey}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-[10px] p-1 transition active:cursor-grabbing hover:bg-[#F7F9F5] ${
+        className={`-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-[10px] p-1 transition hover:bg-[#F7F9F5] ${
           dragPending ? "opacity-60" : ""
-        } ${dragPreviewPosition ? "opacity-50" : ""}`}
+        } ${dragPreviewPosition ? "opacity-50" : ""} ${
+          isDropTarget ? "bg-teal-700/5 ring-1 ring-teal-700/40" : ""
+        }`}
       >
         <span
           aria-label="Drag task"
           data-task-drag-handle
-          className="mt-0.5 grid h-8 w-8 shrink-0 touch-none place-items-center rounded-full text-[#B0B7AD] sm:h-auto sm:w-auto"
+          className="mt-0.5 grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-full text-[#B0B7AD] active:cursor-grabbing sm:h-auto sm:w-auto"
         >
           <GripVertical aria-hidden="true" size={16} />
         </span>
@@ -417,13 +383,6 @@ export function DraggableTaskLink({
           tomorrow={tomorrow}
           open={menuOpen}
           setOpen={setMenuOpen}
-        />
-      </div>
-      <div className="pointer-events-none fixed -left-[9999px] top-0 w-72">
-        <TaskFloatingPreview
-          ref={nativeDragImageRef}
-          title={title}
-          detail={detail}
         />
       </div>
       {dragPreviewPosition ? (

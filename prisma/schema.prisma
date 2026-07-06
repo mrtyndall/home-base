@@ -279,6 +279,7 @@ model Task {
   id              String     @id @default(uuid())
   title           String
   notes           String?
+  tags            String[]   @default([])
   status          TaskStatus @default(open)
   dueDate         DateTime?  @map("due_date") @db.Date
   dueTime         String?    @map("due_time")

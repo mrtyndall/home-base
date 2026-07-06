@@ -8,6 +8,7 @@ import { TaskStarButton } from "@/components/task-star-button";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { formatRecurrenceRule } from "@/lib/recurrence";
 import { parseReminderOffsets } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
   const { task, domains, projects } = result;
   const reminderOffsets = parseReminderOffsets(task.reminderOffsets).join(", ");
   const parsedReminderOffsets = parseReminderOffsets(task.reminderOffsets);
+  const labelsText = task.tags.join(", ");
   const facts: Array<[string, string]> = [];
   if (task.dueDate) {
     facts.push([
@@ -59,7 +61,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     ]);
   }
   if (task.recurrenceRule) {
-    facts.push(["Repeats", task.recurrenceRule]);
+    facts.push(["Repeats", formatRecurrenceRule(task.recurrenceRule)]);
   }
   if (task.status === "completed" && task.completedAt) {
     facts.push(["Completed", formatDateOnly(task.completedAt)]);
@@ -109,14 +111,30 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
         </section>
       ) : null}
 
-      {task.notes ? (
-        <section className="space-y-2">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-            Notes
-          </h2>
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
-            {task.notes}
-          </p>
+      {task.notes || task.tags.length > 0 ? (
+        <section className="space-y-3">
+          {task.notes ? (
+            <div className="space-y-2">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                Description
+              </h2>
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-stone-800">
+                {task.notes}
+              </p>
+            </div>
+          ) : null}
+          {task.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {task.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex h-8 items-center rounded-full border border-[#DDE5DD] bg-[#F7FAF5] px-3 text-[13px] font-medium text-stone-700"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -195,6 +213,13 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                     <option value="high">High</option>
                   </select>
                 </Field>
+                <Field label="Labels">
+                  <input
+                    name="labels"
+                    defaultValue={labelsText}
+                    className={inputClassName}
+                  />
+                </Field>
                 <Field label="Area">
                   <select
                     name="areaId"
@@ -235,7 +260,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                 </Field>
               </div>
 
-              <Field label="Notes">
+              <Field label="Description">
                 <textarea
                   name="notes"
                   defaultValue={task.notes ?? ""}
@@ -244,12 +269,26 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                 />
               </Field>
 
-              <Field label="RRULE">
-                <input
+              <Field label="Repeats">
+                <select
                   name="recurrenceRule"
                   defaultValue={task.recurrenceRule ?? ""}
                   className={inputClassName}
-                />
+                >
+                  <option value="">Does not repeat</option>
+                  <option value="FREQ=DAILY">Daily</option>
+                  <option value="FREQ=WEEKLY">Weekly</option>
+                  <option value="FREQ=MONTHLY">Monthly</option>
+                  <option value="FREQ=YEARLY">Yearly</option>
+                  {task.recurrenceRule &&
+                  !["FREQ=DAILY", "FREQ=WEEKLY", "FREQ=MONTHLY", "FREQ=YEARLY"].includes(
+                    task.recurrenceRule,
+                  ) ? (
+                    <option value={task.recurrenceRule}>
+                      {formatRecurrenceRule(task.recurrenceRule)}
+                    </option>
+                  ) : null}
+                </select>
               </Field>
 
               <div className="flex justify-end">

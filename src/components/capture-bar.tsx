@@ -18,6 +18,22 @@ type CaptureResponse = {
 
 type CaptureIntent = "auto" | "task" | "note" | "idea" | "reference";
 
+type CaptureOptions = {
+  domains: Array<{
+    id: string;
+    name: string;
+    isSystem: boolean;
+    areas: Array<{ id: string; name: string; domainId: string }>;
+  }>;
+  projects: Array<{
+    id: string;
+    name: string;
+    areaId: string;
+    areaName: string;
+    domainName: string;
+  }>;
+};
+
 const captureIntents: Array<{ value: CaptureIntent; label: string }> = [
   { value: "auto", label: "Auto" },
   { value: "task", label: "Task" },
@@ -60,6 +76,11 @@ export function CaptureBar() {
   );
   const [captureIntent, setCaptureIntent] = useState<CaptureIntent>("auto");
   const [captureDueDate, setCaptureDueDate] = useState("");
+  const [captureAreaId, setCaptureAreaId] = useState("");
+  const [captureProjectId, setCaptureProjectId] = useState("");
+  const [captureOptions, setCaptureOptions] = useState<CaptureOptions | null>(
+    null,
+  );
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -81,7 +102,19 @@ export function CaptureBar() {
     focused ||
     rawText.trim().length > 0 ||
     captureIntent !== "auto" ||
-    captureDueDate.length > 0;
+    captureDueDate.length > 0 ||
+    captureAreaId.length > 0 ||
+    captureProjectId.length > 0;
+
+  const selectedProject = captureOptions?.projects.find(
+    (project) => project.id === captureProjectId,
+  );
+  const visibleProjects =
+    captureAreaId.length > 0
+      ? (captureOptions?.projects.filter(
+          (project) => project.areaId === captureAreaId,
+        ) ?? [])
+      : (captureOptions?.projects ?? []);
 
   const placeholder =
     captureIntent === "task"
@@ -117,6 +150,9 @@ export function CaptureBar() {
           captureIntent === "task" && captureDueDate
             ? captureDueDate
             : undefined,
+        captureAreaId:
+          selectedProject?.areaId ?? (captureAreaId ? captureAreaId : undefined),
+        captureProjectId: captureProjectId || undefined,
         deviceContext: {
           userAgent: navigator.userAgent,
         },
@@ -138,6 +174,8 @@ export function CaptureBar() {
     setRawText("");
     setCaptureIntent("auto");
     setCaptureDueDate("");
+    setCaptureAreaId("");
+    setCaptureProjectId("");
     router.refresh();
   }
 
@@ -209,6 +247,18 @@ export function CaptureBar() {
     recognition.start();
   }
 
+  async function loadCaptureOptions() {
+    if (captureOptions) {
+      return;
+    }
+
+    const response = await fetch("/api/capture/options");
+    if (!response.ok) {
+      return;
+    }
+    setCaptureOptions((await response.json()) as CaptureOptions);
+  }
+
   return (
     <div className="rounded-[28px] border border-white/65 bg-[#FAFBF9]/60 p-2 shadow-[0_8px_28px_rgba(28,25,23,0.14)] backdrop-blur-xl backdrop-saturate-150">
       <form onSubmit={onSubmit} className="flex w-full items-center gap-2">
@@ -233,7 +283,10 @@ export function CaptureBar() {
           value={rawText}
           placeholder={placeholder}
           onChange={(event) => setRawText(event.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true);
+            void loadCaptureOptions();
+          }}
           onBlur={() => setFocused(false)}
           className={`h-11 min-w-0 flex-1 rounded-full border px-4 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:bg-white ${
             listening
@@ -273,6 +326,71 @@ export function CaptureBar() {
                 {intent.label}
               </button>
             ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                Area
+              </span>
+              <select
+                value={captureAreaId}
+                onChange={(event) => {
+                  const nextAreaId = event.target.value;
+                  setCaptureAreaId(nextAreaId);
+                  setCaptureProjectId((currentProjectId) => {
+                    const currentProject = captureOptions?.projects.find(
+                      (project) => project.id === currentProjectId,
+                    );
+                    return currentProject &&
+                      (!nextAreaId || currentProject.areaId === nextAreaId)
+                      ? currentProjectId
+                      : "";
+                  });
+                }}
+                onFocus={() => void loadCaptureOptions()}
+                className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none"
+              >
+                <option value="">Inbox</option>
+                {captureOptions?.domains
+                  .filter((domain) => !domain.isSystem)
+                  .map((domain) => (
+                    <optgroup key={domain.id} label={domain.name}>
+                      {domain.areas.map((area) => (
+                        <option key={area.id} value={area.id}>
+                          {area.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+              </select>
+            </label>
+            <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                Project
+              </span>
+              <select
+                value={captureProjectId}
+                onChange={(event) => {
+                  const nextProjectId = event.target.value;
+                  setCaptureProjectId(nextProjectId);
+                  const project = captureOptions?.projects.find(
+                    (candidate) => candidate.id === nextProjectId,
+                  );
+                  if (project) {
+                    setCaptureAreaId(project.areaId);
+                  }
+                }}
+                onFocus={() => void loadCaptureOptions()}
+                className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none"
+              >
+                <option value="">No project</option>
+                {visibleProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} / {project.areaName}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           {captureIntent === "task" ? (
             <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">

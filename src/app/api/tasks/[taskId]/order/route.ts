@@ -21,7 +21,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const [task, targetTask] = await Promise.all([
     prisma.task.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, parentTaskId: true },
     }),
     prisma.task.findUnique({
       where: { id: targetTaskId },
@@ -37,6 +37,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!task || !targetTask || task.status !== "open" || targetTask.status !== "open") {
     return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  }
+
+  if (task.parentTaskId !== targetTask.parentTaskId) {
+    return NextResponse.json(
+      { error: "Tasks can only be reordered inside the same group." },
+      { status: 409 },
+    );
   }
 
   const siblings = await prisma.task.findMany({
@@ -72,6 +79,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   revalidatePath("/tasks");
   revalidatePath("/today");
+  revalidatePath("/");
 
   return NextResponse.json({ ok: true });
 }

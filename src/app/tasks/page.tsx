@@ -9,7 +9,6 @@ import {
 import { TaskCompleteButton } from "@/components/task-complete-button";
 import { TaskStarButton } from "@/components/task-star-button";
 import { DraggableTaskLink, TaskDropZone } from "@/components/task-scheduling";
-import { TaskQuickAdd } from "@/components/task-quick-add";
 import { RoutinesView } from "@/components/routines-view";
 import { SetupNotice } from "@/components/setup-notice";
 import { getRoutinesWithState } from "@/lib/routines";
@@ -130,15 +129,10 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   return (
     <div className="space-y-5">
-      <header className="space-y-3 lg:flex lg:items-start lg:justify-between lg:gap-5 lg:space-y-0">
+      <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Tasks
         </h1>
-        <TaskQuickAdd
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          className="lg:w-[400px] lg:shrink-0"
-        />
       </header>
       <div className="flex flex-wrap items-center gap-2">
         <ViewControl
@@ -226,6 +220,22 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               slipDays={slipDays}
             />
           ) : null}
+          {selectedSection === "all" ? (
+            <TaskSection
+              title="Someday"
+              empty="No someday tasks."
+              anchor="someday"
+              targetDate={null}
+              targetKind="someday"
+              tasks={sections.someday}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projectOptions}
+              slipDays={slipDays}
+              className="lg:col-start-2"
+            />
+          ) : null}
         </div>
       ) : null}
       {selectedView === "schedule" &&
@@ -240,12 +250,13 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         />
       ) : null}
       {selectedView === "schedule" &&
-      (selectedSection === "all" || selectedSection === "someday") ? (
+      selectedSection === "someday" ? (
         <TaskSection
           title="Someday"
           empty="No someday tasks."
           anchor="someday"
           targetDate={null}
+          targetKind="someday"
           tasks={sections.someday}
           today={today}
           tomorrow={tomorrow}
@@ -682,32 +693,37 @@ function TaskSection({
   empty,
   anchor,
   targetDate,
+  targetKind,
   tasks,
   today,
   tomorrow,
   areaGroups,
   projects,
   slipDays,
+  className = "",
 }: {
   title: string;
   empty: string;
   anchor: string;
   targetDate: string | null;
+  targetKind?: "date" | "someday" | "unscheduled";
   tasks: TaskListItem[];
   today: string;
   tomorrow: string;
   areaGroups: TaskAreaGroup[];
   projects: TaskProjectOption[];
   slipDays: number;
+  className?: string;
 }) {
   return (
-    <section id={anchor} className="scroll-mt-4 space-y-3">
+    <section id={anchor} className={`scroll-mt-4 space-y-3 ${className}`}>
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         {title}{" "}
         <span className="font-medium text-[#B0ACA2]">{tasks.length}</span>
       </h2>
       <TaskDropZone
         targetDate={targetDate}
+        targetKind={targetKind}
         label={title}
         isEmpty={tasks.length === 0}
         emptyText={empty}
@@ -922,6 +938,7 @@ function TaskCard({
           title={task.title}
           detail={formatTaskDetail(task, slipDays)}
           currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+          currentParentTaskId={task.parentTaskId}
           currentAreaId={task.areaId}
           currentProjectId={task.projectId}
           areaGroups={areaGroups}
@@ -935,6 +952,7 @@ function TaskCard({
         </div>
       </div>
       <SubtaskList
+        parentTitle={task.title}
         subtasks={task.subtasks}
         today={today}
         tomorrow={tomorrow}
@@ -946,12 +964,14 @@ function TaskCard({
 }
 
 function SubtaskList({
+  parentTitle,
   subtasks,
   today,
   tomorrow,
   areaGroups,
   projects,
 }: {
+  parentTitle: string;
   subtasks: TaskListItem["subtasks"];
   today: string;
   tomorrow: string;
@@ -963,30 +983,43 @@ function SubtaskList({
   }
 
   return (
-    <div className="mt-3 divide-y divide-[#EEF1EC] border-t border-[#EEF1EC] pt-2">
-      {subtasks.map((subtask) => (
-        <div
-          key={subtask.id}
-          className="flex items-center justify-between gap-3 py-2"
-        >
-          <DraggableTaskLink
-            taskId={subtask.id}
-            href={`/tasks/${subtask.id}`}
-            title={subtask.title}
-            detail={
-              subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"
-            }
-            currentDueDate={subtask.dueDate?.toISOString().slice(0, 10) ?? null}
-            currentAreaId={subtask.areaId}
-            currentProjectId={subtask.projectId}
-            areaGroups={areaGroups}
-            projects={projects}
-            today={today}
-            tomorrow={tomorrow}
-          />
-          <TaskCompleteButton taskId={subtask.id} />
-        </div>
-      ))}
+    <div className="mt-3 border-t border-[#EEF1EC] pt-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B0ACA2]">
+          Subtasks for {parentTitle}
+        </p>
+        <p className="text-[11px] text-[#9AA096]">
+          {subtasks.length} item{subtasks.length === 1 ? "" : "s"}
+        </p>
+      </div>
+      <div className="space-y-1.5 border-l-2 border-teal-700/20 pl-3">
+        {subtasks.map((subtask) => (
+          <div
+            key={subtask.id}
+            className="flex items-center justify-between gap-3 rounded-[12px] border border-[#E9EDE7] bg-[#F7F9F5] px-2 py-2"
+          >
+            <DraggableTaskLink
+              taskId={subtask.id}
+              href={`/tasks/${subtask.id}`}
+              title={subtask.title}
+              detail={
+                subtask.dueDate ? formatDateOnly(subtask.dueDate) : "Subtask"
+              }
+              currentDueDate={
+                subtask.dueDate?.toISOString().slice(0, 10) ?? null
+              }
+              currentParentTaskId={subtask.parentTaskId}
+              currentAreaId={subtask.areaId}
+              currentProjectId={subtask.projectId}
+              areaGroups={areaGroups}
+              projects={projects}
+              today={today}
+              tomorrow={tomorrow}
+            />
+            <TaskCompleteButton taskId={subtask.id} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

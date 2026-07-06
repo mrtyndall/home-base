@@ -95,15 +95,26 @@ export function HomeRoutineCheck({
   return (
     <button
       type="button"
+      aria-pressed={completed}
       title={completed ? `Uncheck ${name}` : `Complete ${name}`}
       disabled={pending}
       onClick={toggle}
-      className={`inline-flex h-8 items-center rounded-full border bg-white px-3 text-sm transition disabled:pointer-events-none disabled:opacity-60 ${
+      className={`inline-flex h-8 items-center gap-2 rounded-full border bg-white py-1 pl-2 pr-3 text-sm transition disabled:pointer-events-none disabled:opacity-60 ${
         completed
-          ? "border-teal-700/30 text-teal-800 hover:border-teal-700"
+          ? "border-teal-700/35 bg-teal-50/70 text-teal-800 hover:border-teal-700"
           : "border-[#E2E6DF] text-stone-700 hover:border-teal-700/50 hover:text-teal-700"
       }`}
     >
+      <span
+        className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+          completed
+            ? "border-teal-700 bg-teal-700 text-white"
+            : "border-stone-300 bg-white"
+        }`}
+        aria-hidden="true"
+      >
+        {completed ? <Check size={11} strokeWidth={3} /> : null}
+      </span>
       {name}
     </button>
   );

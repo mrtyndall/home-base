@@ -183,7 +183,9 @@ export default async function ReferenceDetailPage({
                         &ldquo;{snippet.quote}&rdquo;
                       </blockquote>
                       <p className="text-[11px] text-[#B0ACA2]">
-                        {snippet.kind === "note" ? "Note" : "Highlight"}
+                        {snippet.kind === "note"
+                          ? "BookLore note"
+                          : "BookLore highlight"}
                         {snippet.location ? ` · ${snippet.location}` : ""}
                       </p>
                       {snippet.note ? (

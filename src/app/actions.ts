@@ -159,6 +159,7 @@ export async function updateTaskDetail(formData: FormData) {
   const dueTime = getTrimmedString(formData, "dueTime");
   const priority = getTrimmedString(formData, "priority");
   const notes = getTrimmedString(formData, "notes");
+  const tags = parseTagsInput(getTrimmedString(formData, "labels"));
   const recurrenceRule = getTrimmedString(formData, "recurrenceRule");
   const reminderOffsets = parseReminderOffsetsInput(
     getTrimmedString(formData, "reminderOffsets"),
@@ -173,6 +174,7 @@ export async function updateTaskDetail(formData: FormData) {
       areaId: validProject?.areaId ?? areaId,
       projectId: validProject?.id ?? null,
       notes: notes || null,
+      tags,
       recurrenceRule: recurrenceRule || null,
       reminderOffsets:
         reminderOffsets.length > 0 ? reminderOffsets : Prisma.JsonNull,
@@ -714,6 +716,22 @@ function parseStringArray(value: string) {
   } catch {
     return [];
   }
+}
+
+function parseTagsInput(value: string) {
+  if (!value) return [];
+  const seen = new Set<string>();
+  return value
+    .split(",")
+    .map((item) => item.trim().replace(/^#/, ""))
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 12);
 }
 
 function parseJsonObject(value: string): Prisma.InputJsonObject {

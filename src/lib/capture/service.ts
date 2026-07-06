@@ -213,6 +213,9 @@ function buildActorContext(input: CaptureInput) {
 }
 
 function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
+  const areaId = input.captureAreaId;
+  const projectId = input.captureProjectId;
+
   switch (input.captureIntent) {
     case "task":
       return [
@@ -220,13 +223,17 @@ function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
           type: "create_task",
           title: input.rawText,
           due_date: input.captureDueDate,
+          area_id: areaId,
+          project_id: projectId,
         },
       ];
     case "note":
       return [
         {
           type: "create_entity_note",
-          parent_type: "area",
+          parent_type: projectId ? "project" : "area",
+          area_id: areaId,
+          project_id: projectId,
           body_md: input.rawText,
         },
       ];
@@ -236,6 +243,8 @@ function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
           type: "create_idea",
           title: input.rawText,
           body: input.rawText,
+          area_id: areaId,
+          project_id: projectId,
         },
       ];
     case "reference":
@@ -243,6 +252,8 @@ function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
         {
           type: "create_reference",
           body: input.rawText,
+          area_id: areaId,
+          project_id: projectId,
         },
       ];
     case "auto":
@@ -466,12 +477,10 @@ async function createTask(
   action: Extract<ExecutableAction, { type: "create_task" }>,
   context: ExecutionContext,
 ) {
-  const project = action.project_match
-    ? await matchProject(action.project_match)
-    : undefined;
+  const project = await resolveProject(action.project_id, action.project_match);
   const areaId =
     project?.areaId ??
-    matchAreaId(action.area_match, context.areas) ??
+    (await resolveAreaId(action.area_id, action.area_match, context)) ??
     context.inboxAreaId;
 
   const task = await prisma.task.create({
@@ -753,18 +762,17 @@ async function createIdea(
   action: Extract<ExecutableAction, { type: "create_idea" }>,
   context: ExecutionContext,
 ) {
-  const project = action.project_match
-    ? await matchProject(action.project_match)
-    : undefined;
+  const project = await resolveProject(action.project_id, action.project_match);
+  const areaId =
+    project?.areaId ??
+    (await resolveAreaId(action.area_id, action.area_match, context)) ??
+    context.inboxAreaId;
   const idea = await prisma.idea.create({
     data: {
       title: action.title,
       body: action.body,
       tags: action.tags ?? [],
-      areaId:
-        project?.areaId ??
-        matchAreaId(action.area_match, context.areas) ??
-        context.inboxAreaId,
+      areaId,
       projectId: project?.id,
       source: context.writeSource,
       captureId: context.captureId,
@@ -881,18 +889,17 @@ async function createReference(
   action: Extract<ExecutableAction, { type: "create_reference" }>,
   context: ExecutionContext,
 ) {
-  const project = action.project_match
-    ? await matchProject(action.project_match)
-    : undefined;
+  const project = await resolveProject(action.project_id, action.project_match);
+  const areaId =
+    project?.areaId ??
+    (await resolveAreaId(action.area_id, action.area_match, context)) ??
+    context.inboxAreaId;
   const reference = await prisma.reference.create({
     data: {
       body: action.body,
       url: action.url,
       tags: action.tags ?? [],
-      areaId:
-        project?.areaId ??
-        matchAreaId(action.area_match, context.areas) ??
-        context.inboxAreaId,
+      areaId,
       projectId: project?.id,
       relatedType: action.related_match ? "unknown" : undefined,
       relatedId: action.related_match,
@@ -916,7 +923,9 @@ async function createEntityNote(
 ) {
   const parent = await resolveEntityParent(
     action.parent_type,
+    action.area_id,
     action.area_match,
+    action.project_id,
     action.project_match,
     context,
   );
@@ -945,7 +954,9 @@ async function createEntityDoc(
 ) {
   const parent = await resolveEntityParent(
     action.parent_type,
+    action.area_id,
     action.area_match,
+    action.project_id,
     action.project_match,
     context,
   );
@@ -1222,7 +1233,9 @@ async function executeCheckIn(
   if (action.parent_type) {
     parent = await resolveEntityParent(
       action.parent_type,
+      undefined,
       action.area_match,
+      undefined,
       action.project_match,
       context,
     );
@@ -1269,34 +1282,69 @@ async function executeCheckIn(
 
 async function resolveEntityParent(
   parentType: "area" | "project",
+  areaId: string | undefined,
   areaMatch: string | undefined,
+  projectId: string | undefined,
   projectMatch: string | undefined,
   context: ExecutionContext,
 ) {
   if (parentType === "project") {
-    if (!projectMatch) {
-      throw new Error("Project note/doc requires project_match.");
-    }
-
-    const project = await matchProject(projectMatch);
+    const project = await resolveProject(projectId, projectMatch);
     if (!project) {
-      throw new Error(`No project matched "${projectMatch}".`);
+      throw new Error("Project note/doc requires a valid project.");
     }
 
     return { type: "project" as const, id: project.id, label: project.name };
   }
 
-  if (!areaMatch) {
+  if (!areaId && !areaMatch) {
     return { type: "area" as const, id: context.inboxAreaId, label: "Inbox" };
   }
 
-  const areaId = matchAreaId(areaMatch, context.areas);
-  if (!areaId) {
+  const resolvedAreaId = await resolveAreaId(areaId, areaMatch, context);
+  if (!resolvedAreaId) {
     throw new Error(`No area matched "${areaMatch ?? ""}".`);
   }
 
-  const area = context.areas.find((candidate) => candidate.id === areaId);
-  return { type: "area" as const, id: areaId, label: area?.name ?? "area" };
+  const area = context.areas.find((candidate) => candidate.id === resolvedAreaId);
+  return { type: "area" as const, id: resolvedAreaId, label: area?.name ?? "area" };
+}
+
+async function resolveAreaId(
+  areaId: string | undefined,
+  areaMatch: string | undefined,
+  context: ExecutionContext,
+) {
+  if (areaId) {
+    const area = await prisma.area.findFirst({
+      where: { id: areaId, status: { in: ["active", "parked"] } },
+      select: { id: true },
+    });
+    if (!area) {
+      throw new Error("Selected area no longer exists.");
+    }
+    return area.id;
+  }
+
+  return matchAreaId(areaMatch, context.areas);
+}
+
+async function resolveProject(
+  projectId: string | undefined,
+  projectMatch: string | undefined,
+) {
+  if (projectId) {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, status: { in: ["active", "someday", "parked"] } },
+      select: { id: true, areaId: true, name: true },
+    });
+    if (!project) {
+      throw new Error("Selected project no longer exists.");
+    }
+    return project;
+  }
+
+  return projectMatch ? matchProject(projectMatch) : undefined;
 }
 
 function normalizeMatch(value: string) {

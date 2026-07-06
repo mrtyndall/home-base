@@ -5,6 +5,7 @@ import {
   HomeRoutineCheck,
   HomeTaskActions,
 } from "@/components/home-action-buttons";
+import { HomeTodayList } from "@/components/home-today-list";
 import { prisma } from "@/lib/db";
 import {
   formatDateOnly,
@@ -50,7 +51,7 @@ export default async function HomePage() {
       </header>
 
       <StatusLine
-        dueTodayCount={todayData.dueToday.length + todayData.todayEvents.length}
+        dueTodayCount={todayData.dueToday.length}
         clearThroughTomorrow={
           todayData.dueToday.length === 0 &&
           todayData.dueTomorrow.length === 0 &&
@@ -85,8 +86,26 @@ export default async function HomePage() {
 
         <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4 lg:order-1">
           <SectionHeader title="Today" href="/today" />
-          <div className="mt-3 divide-y divide-[#EEF1EC]">
-            <TodayRows data={todayData} />
+          <div className="mt-3">
+            <HomeTodayList
+              events={todayData.todayEvents.map((event) => ({
+                id: event.id,
+                title: event.title,
+                time: formatTime(event.start),
+              }))}
+              tasks={todayData.dueToday.map((task) => ({
+                id: task.id,
+                title: task.title,
+                detail: [
+                  task.area.name,
+                  task.project?.name,
+                  task.dueDate ? formatDateOnly(task.dueDate) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" / "),
+                starred: task.starred,
+              }))}
+            />
           </div>
         </section>
       </div>
@@ -119,7 +138,7 @@ function StatusLine({
       : `${slippingProjectCount} project${slippingProjectCount === 1 ? "" : "s"} slipping.`;
 
   return (
-    <section className="py-9">
+    <section className="py-3 sm:py-4">
       <div className="flex items-start gap-3">
         {clearThroughTomorrow ? (
           <CheckCircle2 className="mt-1 shrink-0 text-teal-700" size={22} />
@@ -145,58 +164,6 @@ function StatusLine({
         </div>
       </div>
     </section>
-  );
-}
-
-function TodayRows({ data }: { data: ReadyToday }) {
-  const rows = [
-    ...data.todayEvents.map((event) => ({
-      id: `event-${event.id}`,
-      sort: event.start.getTime(),
-      content: (
-        <Link
-          href="/today"
-          className="block py-3 transition hover:text-teal-700"
-        >
-          <p className="text-[15px] font-medium text-stone-950">
-            {event.title}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#6B7268]">
-            {formatTime(event.start)}
-          </p>
-        </Link>
-      ),
-    })),
-    ...data.dueToday.map((task) => ({
-      id: `task-${task.id}`,
-      sort: task.dueTime
-        ? Number(new Date(`1970-01-01T${task.dueTime}:00.000Z`))
-        : Number.MAX_SAFE_INTEGER,
-      content: <TaskReceiptRow task={task} />,
-    })),
-  ].sort((left, right) => left.sort - right.sort);
-
-  if (rows.length === 0) {
-    return <p className="py-3 text-sm text-stone-500">No commitments today.</p>;
-  }
-
-  const visibleRows = rows.slice(0, 5);
-  const remaining = rows.length - visibleRows.length;
-
-  return (
-    <>
-      {visibleRows.map((row) => (
-        <div key={row.id}>{row.content}</div>
-      ))}
-      {remaining > 0 ? (
-        <Link
-          href="/today"
-          className="block py-3 text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-teal-700 hover:underline"
-        >
-          and {remaining} more → Today
-        </Link>
-      ) : null}
-    </>
   );
 }
 

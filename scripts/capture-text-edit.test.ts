@@ -19,6 +19,6 @@ assert.ok(
   "Filing should use the latest edited capture text when present.",
 );
 assert.ok(
-  areaPage.includes("Edit text") && areaPage.includes("Review later"),
-  "Inbox triage should expose text editing and clearer review-later copy.",
+  areaPage.includes("Edit text") && areaPage.includes("Snooze 1 day"),
+  "Inbox triage should expose text editing and explicit one-day snooze copy.",
 );

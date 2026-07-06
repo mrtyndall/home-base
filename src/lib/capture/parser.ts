@@ -87,22 +87,77 @@ Rules:
 - Area/project notes and docs use markdown body fields.
 - Resolve dates and times to ISO strings in America/New_York using the provided current time.`;
 
+const inboxRouterPrompt = `${parserSystemPrompt}
+
+You are the final cheap Inbox router for captures the first parser could not confidently classify.
+Your job is to make a narrow filing decision only when the text clearly fits the action vocabulary.
+Prefer create_entity_note, create_reference, create_idea, schedule_review, and create_task over creating new projects.
+Do not force a task. If the text is genuinely vague, incomplete, joking, or context-free, return exactly:
+[{ "needs_disambiguation": true, "candidates": [], "reason": "Still needs Matt to sort." }]`;
+
 export async function parseCaptureWithContext(
   rawText: string,
   context: ParserContext,
 ): Promise<ParserAction[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.ANTHROPIC_PARSE_MODEL;
+  const routerModel = process.env.ANTHROPIC_INBOX_ROUTER_MODEL;
 
   if (!apiKey || !model) {
     return fallbackParse(rawText);
   }
 
   const anthropic = new Anthropic({ apiKey });
+  let actions: ParserAction[];
+  try {
+    actions = await parseWithAnthropic(
+      anthropic,
+      model,
+      parserSystemPrompt,
+      rawText,
+      context,
+    );
+  } catch (error) {
+    if (routerModel) {
+      return parseWithAnthropic(
+        anthropic,
+        routerModel,
+        inboxRouterPrompt,
+        rawText,
+        context,
+      );
+    }
+    throw error;
+  }
+
+  if (routerModel && hasOnlyPendingActions(actions)) {
+    try {
+      return await parseWithAnthropic(
+        anthropic,
+        routerModel,
+        inboxRouterPrompt,
+        rawText,
+        context,
+      );
+    } catch {
+      return actions;
+    }
+  }
+
+  return actions;
+}
+
+async function parseWithAnthropic(
+  anthropic: Anthropic,
+  model: string,
+  system: string,
+  rawText: string,
+  context: ParserContext,
+) {
   const response = await anthropic.messages.create({
     model,
     max_tokens: 1200,
-    system: parserSystemPrompt,
+    system,
     messages: [
       {
         role: "user",
@@ -122,6 +177,13 @@ export async function parseCaptureWithContext(
 
   const parsed = JSON.parse(text);
   return parserActionsSchema.parse(parsed);
+}
+
+function hasOnlyPendingActions(actions: ParserAction[]) {
+  return (
+    actions.length === 0 ||
+    actions.every((action) => "needs_disambiguation" in action || "error" in action)
+  );
 }
 
 function fallbackParse(rawText: string): ParserAction[] {
