@@ -21,6 +21,7 @@ const GOOGLE_ENV_VARS = [
 ] as const;
 const PUSHOVER_ENV_VARS = ["PUSHOVER_APP_TOKEN", "PUSHOVER_USER_KEY"] as const;
 const TMDB_ENV_VARS = ["TMDB_ACCESS_TOKEN", "TMDB_API_KEY"] as const;
+const BOOKLORE_ENV_VARS = ["BOOKLORE_BASE_URL", "BOOKLORE_TOKEN"] as const;
 // Sync runs on a 15-minute cron; four skipped windows means something is wrong.
 const SYNC_STALE_AFTER_MS = 60 * 60_000;
 
@@ -44,6 +45,10 @@ export default async function SettingsPage() {
   );
   const tmdbConfigured = TMDB_ENV_VARS.some((name) => Boolean(process.env[name]));
   const tmdbMissing = tmdbConfigured ? [] : TMDB_ENV_VARS;
+  const bookLoreMissing = BOOKLORE_ENV_VARS.filter(
+    (name) => !process.env[name],
+  );
+  const bookLoreConfigured = bookLoreMissing.length === 0;
   const redirectUriMismatch = Boolean(
     process.env.GOOGLE_REDIRECT_URI &&
     process.env.GOOGLE_REDIRECT_URI !== REQUIRED_REDIRECT_URI,
@@ -148,9 +153,15 @@ export default async function SettingsPage() {
             <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <ProviderStatus
                 label="Books"
-                status="Open Library"
+                status={
+                  bookLoreConfigured ? "BookLore + Open Library" : "Open Library"
+                }
                 tone="good"
-                detail="Book search uses Open Library. No API key is required."
+                detail={
+                  bookLoreConfigured
+                    ? "Book search can join your BookLore library and fill gaps from Open Library."
+                    : "Book search uses Open Library. Add BookLore variables to join your homelab library."
+                }
                 href="/ideas/books"
                 hrefLabel="Open books"
               />
@@ -167,6 +178,15 @@ export default async function SettingsPage() {
                 hrefLabel="Open movies"
               />
             </div>
+            {!bookLoreConfigured ? (
+              <div className="min-w-0 space-y-1.5 border-t border-[#EEF1EC] pt-3">
+                <p className="text-xs text-[#9AA096]">
+                  BookLore needs both variables. Values live in 1Password,
+                  never in the repo.
+                </p>
+                <MissingVariables names={bookLoreMissing} />
+              </div>
+            ) : null}
             {!tmdbConfigured ? (
               <div className="min-w-0 space-y-1.5 border-t border-[#EEF1EC] pt-3">
                 <p className="text-xs text-[#9AA096]">

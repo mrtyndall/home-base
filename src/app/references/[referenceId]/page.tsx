@@ -1,6 +1,11 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw, Star } from "lucide-react";
+import {
+  setReferenceSnippetStarred,
+  syncBookLoreSnippetsAction,
+} from "@/app/actions";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatShortDate } from "@/lib/dates";
@@ -66,16 +71,110 @@ export default async function ReferenceDetailPage({
       </header>
 
       <section className="rounded-[18px] border border-[#E2E6DF] bg-white p-5">
-        <MarkdownPreview body={reference.body} mentions={mentions} />
-        {reference.url ? (
-          <a
-            href={reference.url}
-            className="mt-4 inline-flex text-sm font-medium text-teal-700 transition hover:text-teal-900"
-          >
-            Open source
-          </a>
-        ) : null}
+        <div className="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)]">
+          {metadataCoverUrl(reference) ? (
+            <Image
+              src={metadataCoverUrl(reference) ?? ""}
+              alt=""
+              width={112}
+              height={168}
+              className="w-28 rounded-[10px] border border-[#E2E6DF] object-cover shadow-sm"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <MarkdownPreview body={reference.body} mentions={mentions} />
+            {reference.url ? (
+              <a
+                href={reference.url}
+                className="mt-4 inline-flex text-sm font-medium text-teal-700 transition hover:text-teal-900"
+              >
+                Open source
+              </a>
+            ) : null}
+          </div>
+        </div>
       </section>
+
+      {hasBookLoreSource(reference) || reference.snippets.length > 0 ? (
+        <section className="rounded-[18px] border border-[#E2E6DF] bg-white p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+              Highlights & notes
+            </h2>
+            {hasBookLoreSource(reference) ? (
+              <form action={syncBookLoreSnippetsAction}>
+                <input type="hidden" name="referenceId" value={reference.id} />
+                <button
+                  type="submit"
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-[#DDE3DA] bg-white px-3 text-sm font-medium text-stone-700 transition hover:border-teal-700 hover:text-teal-800"
+                >
+                  <RefreshCw size={14} />
+                  Sync BookLore
+                </button>
+              </form>
+            ) : null}
+          </div>
+          {reference.snippets.length > 0 ? (
+            <div className="mt-3 divide-y divide-[#EEF1EC]">
+              {reference.snippets.map((snippet) => (
+                <article
+                  key={snippet.id}
+                  id={`snippet-${snippet.id}`}
+                  className="scroll-mt-24 py-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                        {snippet.kind === "note"
+                          ? "BookLore note"
+                          : "BookLore highlight"}
+                        {snippet.location ? ` · ${snippet.location}` : ""}
+                      </p>
+                      <blockquote className="border-l-2 border-teal-700/40 pl-3 text-base leading-7 text-stone-950">
+                        {snippet.quote}
+                      </blockquote>
+                      {snippet.note ? (
+                        <p className="text-sm leading-6 text-stone-700">
+                          {snippet.note}
+                        </p>
+                      ) : null}
+                    </div>
+                    <form action={setReferenceSnippetStarred}>
+                      <input type="hidden" name="snippetId" value={snippet.id} />
+                      <input
+                        type="hidden"
+                        name="starred"
+                        value={snippet.starred ? "false" : "true"}
+                      />
+                      <button
+                        type="submit"
+                        aria-label={
+                          snippet.starred
+                            ? "Unstar highlight"
+                            : "Star highlight"
+                        }
+                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-[#DDE3DA] bg-white text-stone-500 transition hover:border-teal-700 hover:text-teal-800"
+                      >
+                        <Star
+                          size={17}
+                          fill={snippet.starred ? "currentColor" : "none"}
+                          className={
+                            snippet.starred ? "text-teal-700" : undefined
+                          }
+                        />
+                      </button>
+                    </form>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-[#9AA096]">
+              No BookLore highlights synced.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <section className="rounded-[18px] border border-[#E2E6DF] bg-white p-4">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -98,6 +197,15 @@ async function loadReference(referenceId: string) {
   try {
     const reference = await prisma.reference.findUnique({
       where: { id: referenceId },
+      include: {
+        snippets: {
+          orderBy: [
+            { starred: "desc" },
+            { sourceCreatedAt: "desc" },
+            { createdAt: "desc" },
+          ],
+        },
+      },
     });
     if (!reference) {
       return { ok: true as const, reference: null, mentions: [] };
@@ -120,6 +228,23 @@ function metadataRecord(reference: { metadata: unknown }) {
     !Array.isArray(reference.metadata)
     ? (reference.metadata as Record<string, unknown>)
     : {};
+}
+
+function metadataCoverUrl(reference: { metadata: unknown }) {
+  const coverUrl = metadataRecord(reference).coverUrl;
+  return typeof coverUrl === "string" && coverUrl.trim() ? coverUrl : null;
+}
+
+function hasBookLoreSource(reference: {
+  metadata: unknown;
+  sourcePath: string | null;
+}) {
+  const metadata = metadataRecord(reference);
+  return (
+    metadata.source === "BookLore" ||
+    typeof metadata.bookloreId === "string" ||
+    reference.sourcePath?.startsWith("booklore:")
+  );
 }
 
 function displayValue(value: unknown) {

@@ -378,12 +378,41 @@ model Reference {
   capture Capture? @relation(fields: [captureId], references: [id])
   area    Area?    @relation(fields: [areaId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
+  snippets ReferenceSnippet[]
 
   @@index([areaId])
   @@index([projectId])
   @@index([kind])
   @@index([captureId])
   @@map("references")
+}
+
+model ReferenceSnippet {
+  id              String    @id @default(uuid())
+  referenceId     String    @map("reference_id")
+  provider        String    @default("manual")
+  providerId      String?   @map("provider_id")
+  kind            String    @default("highlight")
+  quote           String
+  note            String?
+  location        String?
+  color           String?
+  tags            String[]  @default([])
+  starred         Boolean   @default(false)
+  metadata        Json?
+  sourceCreatedAt DateTime? @map("source_created_at")
+  sourceUpdatedAt DateTime? @map("source_updated_at")
+  syncedAt        DateTime? @map("synced_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  reference Reference @relation(fields: [referenceId], references: [id])
+
+  @@unique([provider, providerId])
+  @@index([referenceId])
+  @@index([kind])
+  @@index([starred])
+  @@map("reference_snippets")
 }
 
 model ReferenceMention {

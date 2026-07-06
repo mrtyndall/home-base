@@ -14,6 +14,16 @@ assert.ok(
   "Book lookup should use Open Library search.",
 );
 assert.ok(
+  lookup.includes("cover_i") && lookup.includes("covers.openlibrary.org"),
+  "Book lookup should preserve Open Library cover images.",
+);
+assert.ok(
+  lookup.includes("BOOKLORE_BASE_URL") &&
+    lookup.includes("BOOKLORE_TOKEN") &&
+    lookup.includes("/api/v1/books"),
+  "Book lookup should be ready to join against the configured BookLore instance.",
+);
+assert.ok(
   lookup.includes("api.themoviedb.org/3/search/movie"),
   "Movie lookup should use TMDB movie search.",
 );
@@ -33,6 +43,7 @@ assert.ok(
 assert.ok(
   settingsPage.includes("Reference lookup") &&
     settingsPage.includes("Open Library") &&
+    settingsPage.includes("BookLore") &&
     settingsPage.includes("TMDB"),
   "Settings should expose the book/movie lookup providers.",
 );

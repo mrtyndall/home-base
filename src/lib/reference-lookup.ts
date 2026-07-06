@@ -1,7 +1,7 @@
 export type ReferenceLookupKind = "book" | "movie";
 
 export type ReferenceLookupCandidate = {
-  source: "open_library" | "tmdb";
+  source: "open_library" | "booklore" | "tmdb";
   sourceId: string;
   kind: ReferenceLookupKind;
   title: string;
@@ -36,13 +36,15 @@ async function searchBooks(query: string): Promise<ReferenceLookupResult> {
     q: query,
     limit: "8",
     fields:
-      "key,title,author_name,first_publish_year,isbn,subject,number_of_pages_median",
+      "key,title,author_name,first_publish_year,isbn,subject,number_of_pages_median,cover_i",
   });
-  const response = await fetch(
-    `https://openlibrary.org/search.json?${params.toString()}`,
-    { headers: { "User-Agent": "Home Base personal library lookup" } },
-  );
-  if (!response.ok) {
+  const [openLibraryResult, bookLoreCandidates] = await Promise.all([
+    fetch(`https://openlibrary.org/search.json?${params.toString()}`, {
+      headers: { "User-Agent": "Home Base personal library lookup" },
+    }),
+    searchBookLoreBooks(query),
+  ]);
+  if (!openLibraryResult.ok) {
     return {
       ok: false,
       reason: "Open Library lookup failed.",
@@ -50,7 +52,7 @@ async function searchBooks(query: string): Promise<ReferenceLookupResult> {
     };
   }
 
-  const body = (await response.json()) as {
+  const body = (await openLibraryResult.json()) as {
     docs?: Array<Record<string, unknown>>;
   };
   const candidates = (body.docs ?? [])
@@ -58,8 +60,10 @@ async function searchBooks(query: string): Promise<ReferenceLookupResult> {
     .filter(isLookupCandidate);
   return {
     ok: true,
-    candidates,
-    sourceLabel: "Open Library",
+    candidates: [...bookLoreCandidates, ...candidates].slice(0, 12),
+    sourceLabel: bookLoreCandidates.length
+      ? "BookLore + Open Library"
+      : "Open Library",
   };
 }
 
@@ -75,6 +79,10 @@ function bookCandidate(
   const isbn = stringArray(value.isbn)[0] ?? null;
   const subjects = stringArray(value.subject).slice(0, 6);
   const pages = numberOrString(value.number_of_pages_median);
+  const coverId = numberOrString(value.cover_i);
+  const coverUrl = coverId
+    ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+    : null;
 
   return {
     source: "open_library",
@@ -92,11 +100,93 @@ function bookCandidate(
       year: firstPublishYear,
       isbn,
       pages,
+      coverId,
+      coverUrl,
       status: "to read",
       source: "Open Library",
       sourceId: key,
     },
   };
+}
+
+async function searchBookLoreBooks(
+  query: string,
+): Promise<ReferenceLookupCandidate[]> {
+  const baseUrl = process.env.BOOKLORE_BASE_URL?.replace(/\/$/, "");
+  const token = process.env.BOOKLORE_TOKEN;
+  if (!baseUrl || !token) return [];
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/api/v1/books?withDescription=true`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!response.ok) return [];
+
+    const books = (await response.json()) as Array<Record<string, unknown>>;
+    return books
+      .map((book) => bookLoreCandidate(book))
+      .filter(isLookupCandidate)
+      .filter((book) => bookLoreMatches(book, query))
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+function bookLoreCandidate(
+  value: Record<string, unknown>,
+): ReferenceLookupCandidate | null {
+  const id = numberOrString(value.id);
+  const metadata = objectValue(value.metadata);
+  const title = stringValue(metadata.title) ?? stringValue(value.title);
+  if (!id || !title) return null;
+
+  const authors = stringArray(metadata.authors);
+  const categories = stringArray(metadata.categories);
+  const rating =
+    numberOrString(value.personalRating) ??
+    numberOrString(metadata.rating) ??
+    numberOrString(metadata.goodreadsRating) ??
+    numberOrString(metadata.hardcoverRating);
+  const status = stringValue(value.readStatus) ?? "in library";
+  const pages = numberOrString(metadata.pageCount);
+  const year = stringValue(metadata.publishedDate)?.slice(0, 4) ?? null;
+  const coverUpdatedOn = stringValue(metadata.coverUpdatedOn);
+
+  return {
+    source: "booklore",
+    sourceId: String(id),
+    kind: "book",
+    title,
+    subtitle: authors.join(", ") || null,
+    body:
+      stringValue(metadata.description) ??
+      [title, authors.join(", "), year].filter(Boolean).join(" · "),
+    url: null,
+    tags: categories,
+    metadata: {
+      author: authors.join(", ") || null,
+      year,
+      isbn: stringValue(metadata.isbn13) ?? stringValue(metadata.isbn10),
+      pages,
+      rating,
+      status,
+      genre: categories,
+      source: "BookLore",
+      sourceId: id,
+      bookloreId: id,
+      coverUpdatedOn,
+      coverUrl: `/api/reference-covers/booklore/${id}`,
+    },
+  };
+}
+
+function bookLoreMatches(candidate: ReferenceLookupCandidate, query: string) {
+  const normalized = query.toLocaleLowerCase();
+  return [candidate.title, candidate.subtitle, candidate.body]
+    .filter(Boolean)
+    .some((value) => value?.toLocaleLowerCase().includes(normalized));
 }
 
 async function searchMovies(query: string): Promise<ReferenceLookupResult> {
@@ -191,6 +281,12 @@ function stringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function objectValue(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function numberOrString(value: unknown) {

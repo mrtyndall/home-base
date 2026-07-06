@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SearchIcon } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatShortDate } from "@/lib/dates";
@@ -18,7 +19,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   let results:
-    | Array<{ type: string; id: string; title: string; detail?: string }>
+    | Array<{
+        type: string;
+        id: string;
+        title: string;
+        detail?: string;
+        href?: string;
+      }>
     | undefined;
 
   if (query.length > 0) {
@@ -51,24 +58,39 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <p className="text-sm text-[#6B7268]">No results.</p>
         ) : (
           <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-            {results?.map((result) => (
-              <article
-                key={`${result.type}-${result.id}`}
-                className="px-4 py-3"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                  {result.type}
-                </p>
-                <h2 className="mt-0.5 line-clamp-2 text-sm font-medium text-stone-950">
-                  {result.title}
-                </h2>
-                {result.detail ? (
-                  <p className="mt-0.5 text-xs text-[#9AA096]">
-                    {result.detail}
+            {results?.map((result) => {
+              const content = (
+                <>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+                    {result.type}
                   </p>
-                ) : null}
-              </article>
-            ))}
+                  <h2 className="mt-0.5 line-clamp-2 text-sm font-medium text-stone-950">
+                    {result.title}
+                  </h2>
+                  {result.detail ? (
+                    <p className="mt-0.5 text-xs text-[#9AA096]">
+                      {result.detail}
+                    </p>
+                  ) : null}
+                </>
+              );
+              return result.href ? (
+                <Link
+                  key={`${result.type}-${result.id}`}
+                  href={result.href}
+                  className="block px-4 py-3 transition hover:bg-[#F6F7F4]"
+                >
+                  {content}
+                </Link>
+              ) : (
+                <article
+                  key={`${result.type}-${result.id}`}
+                  className="px-4 py-3"
+                >
+                  {content}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
@@ -84,6 +106,7 @@ async function runSearch(query: string) {
       projects,
       ideas,
       references,
+      referenceSnippets,
       entityNotes,
       entityDocs,
       checkIns,
@@ -135,6 +158,17 @@ async function runSearch(query: string) {
           ],
         },
         orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.referenceSnippet.findMany({
+        where: {
+          OR: [
+            { quote: { contains: query, mode: "insensitive" } },
+            { note: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        include: { reference: { select: { title: true, body: true } } },
+        orderBy: [{ starred: "desc" }, { createdAt: "desc" }],
         take: 20,
       }),
       prisma.entityNote.findMany({
@@ -212,6 +246,14 @@ async function runSearch(query: string) {
         id: reference.id,
         title: reference.body,
         detail: reference.url ?? undefined,
+        href: `/references/${reference.id}`,
+      })),
+      ...referenceSnippets.map((snippet) => ({
+        type: "Highlight",
+        id: snippet.id,
+        title: snippet.quote,
+        detail: snippet.reference.title ?? snippet.reference.body,
+        href: `/references/${snippet.referenceId}#snippet-${snippet.id}`,
       })),
       ...entityNotes.map((note) => ({
         type: "Note",

@@ -1,5 +1,6 @@
 import type { Reference } from "@prisma/client";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -11,6 +12,7 @@ import {
   searchReferenceCandidates,
   type ReferenceLookupCandidate,
 } from "@/lib/reference-lookup";
+import { ReferenceFilters } from "./reference-filters";
 
 export const dynamic = "force-dynamic";
 
@@ -109,13 +111,24 @@ export default async function LibraryDatabasePage({
             className="block px-4 py-3 transition hover:bg-[#F7F9F5]"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[15px] font-medium text-stone-950">
-                  {reference.title ?? reference.body}
-                </p>
-                <p className="mt-0.5 text-sm text-[#6B7268]">
-                  {referenceMetaLine(reference)}
-                </p>
+              <div className="flex min-w-0 gap-3">
+                {metadataCoverUrl(reference) ? (
+                  <Image
+                    src={metadataCoverUrl(reference) ?? ""}
+                    alt=""
+                    width={44}
+                    height={64}
+                    className="h-16 w-11 shrink-0 rounded-[6px] border border-[#E2E6DF] object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  <p className="text-[15px] font-medium text-stone-950">
+                    {reference.title ?? reference.body}
+                  </p>
+                  <p className="mt-0.5 text-sm text-[#6B7268]">
+                    {referenceMetaLine(reference)}
+                  </p>
+                </div>
               </div>
               {metadataRating(reference) ? (
                 <span className="shrink-0 rounded-full border border-[#E2E6DF] px-2 py-0.5 text-xs font-medium text-stone-600">
@@ -210,15 +223,27 @@ function ReferenceLookupCandidateRow({
 }) {
   return (
     <div className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-stone-950">{candidate.title}</p>
-        <p className="mt-0.5 text-sm text-[#6B7268]">
-          {candidate.subtitle ?? candidate.body}
-        </p>
-        <p className="mt-0.5 text-xs text-[#B0ACA2]">
-          Source:{" "}
-          {candidate.source === "open_library" ? "Open Library" : "TMDB"}
-        </p>
+      <div className="flex min-w-0 gap-3">
+        {candidateCoverUrl(candidate) ? (
+          <Image
+            src={candidateCoverUrl(candidate) ?? ""}
+            alt=""
+            width={44}
+            height={64}
+            className="h-16 w-11 shrink-0 rounded-[6px] border border-[#E2E6DF] object-cover"
+          />
+        ) : null}
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-stone-950">
+            {candidate.title}
+          </p>
+          <p className="mt-0.5 text-sm text-[#6B7268]">
+            {candidate.subtitle ?? candidate.body}
+          </p>
+          <p className="mt-0.5 text-xs text-[#B0ACA2]">
+            Source: {candidateSourceLabel(candidate.source)}
+          </p>
+        </div>
       </div>
       <form action={createReferenceFromLookup}>
         <input type="hidden" name="kind" value={candidate.kind} />
@@ -245,82 +270,14 @@ function ReferenceLookupCandidateRow({
   );
 }
 
-function ReferenceFilters({
-  database,
-  filters,
-  statuses,
-  genres,
-}: {
-  database: string;
-  filters: { status?: string; genre?: string; rating?: string; sort?: string };
-  statuses: string[];
-  genres: string[];
-}) {
-  return (
-    <form className="grid gap-2 rounded-[18px] border border-[#E2E6DF] bg-white p-3 sm:grid-cols-4">
-      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        Status
-        <select
-          name="status"
-          defaultValue={filters.status ?? ""}
-          className="h-9 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950"
-        >
-          <option value="">All</option>
-          {statuses.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        Genre
-        <select
-          name="genre"
-          defaultValue={filters.genre ?? ""}
-          className="h-9 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950"
-        >
-          <option value="">All</option>
-          {genres.map((genre) => (
-            <option key={genre} value={genre}>
-              {genre}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        Rating
-        <select
-          name="rating"
-          defaultValue={filters.rating ?? ""}
-          className="h-9 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950"
-        >
-          <option value="">Any</option>
-          <option value="8">8+</option>
-          <option value="7">7+</option>
-          <option value="5">5+</option>
-        </select>
-      </label>
-      <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-        Sort
-        <select
-          name="sort"
-          defaultValue={filters.sort ?? "title"}
-          className="h-9 rounded-full border border-[#E2E6DF] bg-white px-3 text-sm font-normal normal-case tracking-normal text-stone-950"
-        >
-          <option value="title">Title</option>
-          <option value="rating">Rating</option>
-          <option value="newest">Newest</option>
-        </select>
-      </label>
-      <button
-        className="h-9 rounded-full bg-teal-700 px-4 text-sm font-medium text-white sm:col-span-4 sm:w-fit"
-        formAction={`/ideas/${database}`}
-      >
-        Apply filters
-      </button>
-    </form>
-  );
+function candidateCoverUrl(candidate: ReferenceLookupCandidate) {
+  return stringValue(candidate.metadata.coverUrl);
+}
+
+function candidateSourceLabel(source: ReferenceLookupCandidate["source"]) {
+  if (source === "open_library") return "Open Library";
+  if (source === "booklore") return "BookLore";
+  return "TMDB";
 }
 
 async function loadPeople() {
@@ -464,6 +421,10 @@ function metadataRating(reference: ReferenceRow) {
   return typeof rating === "number" || typeof rating === "string"
     ? `${rating}`
     : null;
+}
+
+function metadataCoverUrl(reference: ReferenceRow) {
+  return stringValue(metadataRecord(reference).coverUrl);
 }
 
 function stringValue(value: unknown) {

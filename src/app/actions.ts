@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
 import { normalizeJournalUpdateInput } from "@/lib/journal";
@@ -564,6 +565,76 @@ export async function createReferenceFromLookup(formData: FormData) {
     `/ideas/${kind === "book" ? "books" : kind === "movie" ? "movies" : "references"}`,
   );
   redirect(`/references/${reference.id}`);
+}
+
+export async function syncBookLoreSnippetsAction(formData: FormData) {
+  const referenceId = getTrimmedString(formData, "referenceId");
+  if (!referenceId) return;
+
+  const result = await syncBookLoreSnippetsForReference(referenceId);
+  if (result.ok) {
+    await prisma.notification.create({
+      data: {
+        type: "booklore_snippets_synced",
+        title: "BookLore highlights synced",
+        body: `${result.synced} snippets synced`,
+        sourceRef: {
+          type: "reference",
+          id: referenceId,
+          provider: "booklore",
+          source: "manual",
+        },
+      },
+    });
+  }
+
+  revalidatePath("/ideas");
+  revalidatePath("/ideas/books");
+  revalidatePath(`/references/${referenceId}`);
+}
+
+export async function setReferenceSnippetStarred(formData: FormData) {
+  const snippetId = getTrimmedString(formData, "snippetId");
+  const nextValue = getTrimmedString(formData, "starred") === "true";
+  if (!snippetId) return;
+
+  const snippet = await prisma.referenceSnippet.findUnique({
+    where: { id: snippetId },
+    select: {
+      id: true,
+      referenceId: true,
+      quote: true,
+      starred: true,
+    },
+  });
+  if (!snippet || snippet.starred === nextValue) return;
+
+  const updated = await prisma.referenceSnippet.update({
+    where: { id: snippet.id },
+    data: { starred: nextValue },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: nextValue
+        ? "reference_snippet_starred"
+        : "reference_snippet_unstarred",
+      title: nextValue ? "Reference snippet starred" : "Reference snippet unstarred",
+      body:
+        updated.quote.length > 120
+          ? `${updated.quote.slice(0, 117)}...`
+          : updated.quote,
+      sourceRef: {
+        type: "reference_snippet",
+        id: updated.id,
+        referenceId: updated.referenceId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath("/ideas");
+  revalidatePath(`/references/${updated.referenceId}`);
 }
 
 function getTrimmedString(formData: FormData, key: string) {
