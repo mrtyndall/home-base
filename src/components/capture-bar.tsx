@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
+  Check,
+  ChevronDown,
   Mic,
   Send,
   Square,
@@ -17,6 +19,7 @@ type CaptureResponse = {
 };
 
 type CaptureIntent = "auto" | "task" | "note" | "idea" | "reference";
+type CapturePickerId = "area" | "project";
 
 type CaptureOptions = {
   domains: Array<{
@@ -81,8 +84,10 @@ export function CaptureBar() {
   const [captureOptions, setCaptureOptions] = useState<CaptureOptions | null>(
     null,
   );
+  const [openPicker, setOpenPicker] = useState<CapturePickerId | null>(null);
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceDraftRef = useRef("");
   const voiceErrorRef = useRef(false);
@@ -104,17 +109,58 @@ export function CaptureBar() {
     captureIntent !== "auto" ||
     captureDueDate.length > 0 ||
     captureAreaId.length > 0 ||
-    captureProjectId.length > 0;
+    captureProjectId.length > 0 ||
+    openPicker !== null;
 
   const selectedProject = captureOptions?.projects.find(
     (project) => project.id === captureProjectId,
   );
+  const selectedAreaName =
+    captureAreaId.length > 0
+      ? captureOptions?.domains
+          .flatMap((domain) => domain.areas)
+          .find((area) => area.id === captureAreaId)?.name
+      : "Inbox";
   const visibleProjects =
     captureAreaId.length > 0
       ? (captureOptions?.projects.filter(
           (project) => project.areaId === captureAreaId,
         ) ?? [])
       : (captureOptions?.projects ?? []);
+  const areaPickerGroups: PickerGroup[] = [
+    {
+      label: "System",
+      options: [{ value: "", label: "Inbox" }],
+    },
+    ...(captureOptions?.domains
+      .filter((domain) => !domain.isSystem)
+      .map((domain) => ({
+        label: domain.name,
+        options: domain.areas.map((area) => ({
+          value: area.id,
+          label: area.name,
+        })),
+      })) ?? []),
+  ].filter((group) => group.options.length > 0);
+  const projectPickerGroups: PickerGroup[] = [
+    {
+      label: "Project",
+      options: [{ value: "", label: "No project" }],
+    },
+    ...Array.from(
+      visibleProjects.reduce((groups, project) => {
+        const key = project.domainName;
+        const options = groups.get(key) ?? [];
+        options.push({
+          value: project.id,
+          label: project.name,
+          detail: project.areaName,
+        });
+        groups.set(key, options);
+        return groups;
+      }, new Map<string, PickerOption[]>()),
+    ).map(([label, options]) => ({ label, options })),
+  ];
 
   const placeholder =
     captureIntent === "task"
@@ -259,8 +305,32 @@ export function CaptureBar() {
     setCaptureOptions((await response.json()) as CaptureOptions);
   }
 
+  useEffect(() => {
+    function closePickerOnOutsidePointer(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpenPicker(null);
+      }
+    }
+
+    function closePickerOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenPicker(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", closePickerOnOutsidePointer);
+    document.addEventListener("keydown", closePickerOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closePickerOnOutsidePointer);
+      document.removeEventListener("keydown", closePickerOnEscape);
+    };
+  }, []);
+
   return (
-    <div className="rounded-[28px] border border-white/65 bg-[#FAFBF9]/60 p-2 shadow-[0_8px_28px_rgba(28,25,23,0.14)] backdrop-blur-xl backdrop-saturate-150">
+    <div
+      ref={rootRef}
+      className="rounded-[28px] border border-white/65 bg-[#FAFBF9]/60 p-2 shadow-[0_8px_28px_rgba(28,25,23,0.14)] backdrop-blur-xl backdrop-saturate-150"
+    >
       <form onSubmit={onSubmit} className="flex w-full items-center gap-2">
         <button
           type="button"
@@ -328,14 +398,17 @@ export function CaptureBar() {
             ))}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                Area
-              </span>
-              <select
-                value={captureAreaId}
-                onChange={(event) => {
-                  const nextAreaId = event.target.value;
+            <CapturePicker
+              label="Area"
+              valueLabel={selectedAreaName ?? "Inbox"}
+              selectedValue={captureAreaId}
+              groups={areaPickerGroups}
+              open={openPicker === "area"}
+              onToggle={() => {
+                void loadCaptureOptions();
+                setOpenPicker(openPicker === "area" ? null : "area");
+              }}
+              onSelect={(nextAreaId) => {
                   setCaptureAreaId(nextAreaId);
                   setCaptureProjectId((currentProjectId) => {
                     const currentProject = captureOptions?.projects.find(
@@ -346,32 +419,20 @@ export function CaptureBar() {
                       ? currentProjectId
                       : "";
                   });
-                }}
-                onFocus={() => void loadCaptureOptions()}
-                className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none"
-              >
-                <option value="">Inbox</option>
-                {captureOptions?.domains
-                  .filter((domain) => !domain.isSystem)
-                  .map((domain) => (
-                    <optgroup key={domain.id} label={domain.name}>
-                      {domain.areas.map((area) => (
-                        <option key={area.id} value={area.id}>
-                          {area.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-              </select>
-            </label>
-            <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-                Project
-              </span>
-              <select
-                value={captureProjectId}
-                onChange={(event) => {
-                  const nextProjectId = event.target.value;
+                setOpenPicker(null);
+              }}
+            />
+            <CapturePicker
+              label="Project"
+              valueLabel={selectedProject?.name ?? "No project"}
+              selectedValue={captureProjectId}
+              groups={projectPickerGroups}
+              open={openPicker === "project"}
+              onToggle={() => {
+                void loadCaptureOptions();
+                setOpenPicker(openPicker === "project" ? null : "project");
+              }}
+              onSelect={(nextProjectId) => {
                   setCaptureProjectId(nextProjectId);
                   const project = captureOptions?.projects.find(
                     (candidate) => candidate.id === nextProjectId,
@@ -379,18 +440,9 @@ export function CaptureBar() {
                   if (project) {
                     setCaptureAreaId(project.areaId);
                   }
-                }}
-                onFocus={() => void loadCaptureOptions()}
-                className="min-w-0 flex-1 bg-transparent text-stone-900 outline-none"
-              >
-                <option value="">No project</option>
-                {visibleProjects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name} / {project.areaName}
-                  </option>
-                ))}
-              </select>
-            </label>
+                setOpenPicker(null);
+              }}
+            />
           </div>
           {captureIntent === "task" ? (
             <label className="flex h-10 items-center gap-2 rounded-full border border-[#E2E6DF] bg-white/75 px-3 text-sm text-stone-600">
@@ -417,6 +469,116 @@ export function CaptureBar() {
             <CheckCircle2 className="mt-0.5 shrink-0 text-teal-700" size={15} />
           )}
           <span>{message}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type PickerOption = {
+  value: string;
+  label: string;
+  detail?: string;
+};
+
+type PickerGroup = {
+  label: string;
+  options: PickerOption[];
+};
+
+function CapturePicker({
+  label,
+  valueLabel,
+  selectedValue,
+  groups,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  valueLabel: string;
+  selectedValue: string;
+  groups: PickerGroup[];
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onToggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`flex h-10 w-full items-center gap-2 rounded-full border bg-white/75 px-3 text-sm transition ${
+          open
+            ? "border-teal-700 text-teal-800"
+            : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50"
+        }`}
+      >
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+          {label}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-left text-stone-900">
+          {valueLabel}
+        </span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute bottom-12 left-0 z-50 max-h-72 w-full min-w-[18rem] overflow-y-auto rounded-[22px] border border-white/70 bg-[#FAFBF9]/90 p-2 text-sm shadow-[0_18px_50px_rgba(28,25,23,0.22)] backdrop-blur-2xl backdrop-saturate-150"
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          {groups.map((group) => (
+            <div key={group.label} className="py-1">
+              <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9AA096]">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {group.options.map((option) => {
+                  const selected = option.value === selectedValue;
+                  return (
+                    <button
+                      key={`${group.label}-${option.value || "empty"}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => onSelect(option.value)}
+                      className={`flex min-h-10 w-full items-center gap-2 rounded-[14px] px-3 py-2 text-left transition ${
+                        selected
+                          ? "bg-teal-50 text-teal-900"
+                          : "text-stone-800 hover:bg-white"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {option.label}
+                        </span>
+                        {option.detail ? (
+                          <span className="mt-0.5 block truncate text-xs text-[#7B8178]">
+                            {option.detail}
+                          </span>
+                        ) : null}
+                      </span>
+                      {selected ? (
+                        <Check
+                          size={16}
+                          aria-hidden="true"
+                          className="shrink-0 text-teal-700"
+                        />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>
