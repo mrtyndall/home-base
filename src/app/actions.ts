@@ -637,6 +637,66 @@ export async function setReferenceSnippetStarred(formData: FormData) {
   revalidatePath(`/references/${updated.referenceId}`);
 }
 
+export async function setReferenceRating(formData: FormData) {
+  const referenceId = getTrimmedString(formData, "referenceId");
+  const nextValue = Number(getTrimmedString(formData, "value"));
+  if (!referenceId || !Number.isInteger(nextValue) || nextValue < 1 || nextValue > 5) {
+    return;
+  }
+
+  const reference = await prisma.reference.findUnique({
+    where: { id: referenceId },
+    select: { id: true, title: true, body: true, kind: true, metadata: true },
+  });
+  if (!reference) return;
+
+  const metadata =
+    typeof reference.metadata === "object" &&
+    reference.metadata !== null &&
+    !Array.isArray(reference.metadata)
+      ? { ...(reference.metadata as Record<string, unknown>) }
+      : {};
+  const currentValue = Number(metadata.myRating);
+  if (currentValue === nextValue) {
+    delete metadata.myRating;
+  } else {
+    metadata.myRating = nextValue;
+  }
+
+  await prisma.reference.update({
+    where: { id: reference.id },
+    data: {
+      metadata:
+        Object.keys(metadata).length > 0
+          ? (metadata as Prisma.InputJsonObject)
+          : Prisma.JsonNull,
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: metadata.myRating
+        ? "reference_rating_set"
+        : "reference_rating_cleared",
+      title: metadata.myRating ? "Reference rating set" : "Reference rating cleared",
+      body: reference.title ?? reference.body,
+      sourceRef: {
+        type: "reference",
+        id: reference.id,
+        kind: reference.kind,
+        rating: metadata.myRating ?? null,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath("/ideas");
+  revalidatePath(
+    `/ideas/${reference.kind === "book" ? "books" : reference.kind === "movie" ? "movies" : "references"}`,
+  );
+  revalidatePath(`/references/${reference.id}`);
+}
+
 function getTrimmedString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
