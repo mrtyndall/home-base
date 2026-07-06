@@ -92,6 +92,7 @@ export default async function ReferenceDetailPage({
             <ReferenceRating
               referenceId={reference.id}
               rating={personalRating(reference)}
+              scale={manualRatingScale(reference)}
             />
             {metadataGenres(reference) ? (
               <p className="mt-2.5 text-[13px] leading-normal text-stone-600">
@@ -287,7 +288,8 @@ function metadataRecord(reference: { metadata: unknown }) {
 }
 
 function metadataCoverUrl(reference: { metadata: unknown }) {
-  const coverUrl = metadataRecord(reference).coverUrl;
+  const record = metadataRecord(reference);
+  const coverUrl = record.coverUrl ?? record.cover;
   return typeof coverUrl === "string" && coverUrl.trim() ? coverUrl : null;
 }
 
@@ -325,8 +327,10 @@ function metadataRating(reference: { metadata: unknown }) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function metadataRatingScale(reference: { metadata: unknown }) {
+function metadataRatingScale(reference: { kind?: string; metadata: unknown }) {
+  if (reference.kind === "book") return 10;
   const value = metadataRating(reference);
+  if (reference.kind === "movie") return value && value > 5 ? 10 : 5;
   return value && value > 5 ? 10 : 5;
 }
 
@@ -348,9 +352,14 @@ function metadataRatingLabel(reference: {
   return value ? `${formatRating(value)}/${scale} ${source}` : source;
 }
 
-function personalRating(reference: { metadata: unknown }) {
+function personalRating(reference: { kind?: string; metadata: unknown }) {
   const value = Number(metadataRecord(reference).myRating);
-  return Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
+  const scale = manualRatingScale(reference);
+  return Number.isInteger(value) && value >= 1 && value <= scale ? value : null;
+}
+
+function manualRatingScale(reference: { kind?: string }) {
+  return reference.kind === "book" ? 10 : 5;
 }
 
 function formatRating(value: number) {

@@ -640,7 +640,7 @@ export async function setReferenceSnippetStarred(formData: FormData) {
 export async function setReferenceRating(formData: FormData) {
   const referenceId = getTrimmedString(formData, "referenceId");
   const nextValue = Number(getTrimmedString(formData, "value"));
-  if (!referenceId || !Number.isInteger(nextValue) || nextValue < 1 || nextValue > 5) {
+  if (!referenceId || !Number.isInteger(nextValue) || nextValue < 1) {
     return;
   }
 
@@ -649,6 +649,8 @@ export async function setReferenceRating(formData: FormData) {
     select: { id: true, title: true, body: true, kind: true, metadata: true },
   });
   if (!reference) return;
+  const maxRating = reference.kind === "book" ? 10 : 5;
+  if (nextValue > maxRating) return;
 
   const metadata =
     typeof reference.metadata === "object" &&

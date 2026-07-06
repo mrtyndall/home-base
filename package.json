@@ -14,6 +14,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "backup:db": "tsx scripts/backup-database.ts",
+    "references:artwork": "DOTENV_CONFIG_PATH=.env.local tsx -r dotenv/config scripts/enrich-reference-artwork.ts",
     "import:reminders": "tsx scripts/import-apple-reminders.ts",
     "calendar:sync": "tsx scripts/sync-google-calendar.ts",
     "reminders:send": "tsx scripts/send-reminders.ts",

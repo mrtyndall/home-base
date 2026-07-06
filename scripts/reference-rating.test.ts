@@ -21,14 +21,17 @@ assert.ok(
 assert.ok(
   component.includes("setReferenceRating") &&
     component.includes('name="value"') &&
+    component.includes("scale: 5 | 10") &&
+    component.includes("Array.from({ length: scale }") &&
     component.includes('aria-label={value === rating ? "Clear rating"') &&
     component.includes("my rating"),
-  "Reference detail should expose a five-star rating control that can assign, change, or clear the manual rating.",
+  "Reference detail should expose a scale-aware rating control that can assign, change, or clear the manual rating.",
 );
 
 assert.ok(
   referencePage.includes("<ReferenceRating") &&
     referencePage.includes("personalRating(reference)") &&
+    referencePage.includes("manualRatingScale(reference)") &&
     referencePage.includes("import { ReferenceRating }"),
   "Reference detail should use the editable ReferenceRating component in the hero.",
 );

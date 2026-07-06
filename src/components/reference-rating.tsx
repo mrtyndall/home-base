@@ -4,14 +4,18 @@ import { setReferenceRating } from "@/app/actions";
 export function ReferenceRating({
   referenceId,
   rating,
+  scale,
 }: {
   referenceId: string;
   rating: number | null;
+  scale: 5 | 10;
 }) {
+  const values = Array.from({ length: scale }, (_, index) => index + 1);
+
   return (
     <div className="mt-2.5 flex items-center gap-2">
       <div className="inline-flex gap-0.5" aria-label="My rating">
-        {[1, 2, 3, 4, 5].map((value) => (
+        {values.map((value) => (
           <form key={value} action={setReferenceRating}>
             <input type="hidden" name="referenceId" value={referenceId} />
             <input type="hidden" name="value" value={value} />
@@ -31,7 +35,9 @@ export function ReferenceRating({
         ))}
       </div>
       {rating ? (
-        <span className="text-xs text-[#9AA096]">{rating}/5 my rating</span>
+        <span className="text-xs text-[#9AA096]">
+          {rating}/{scale} my rating
+        </span>
       ) : null}
     </div>
   );

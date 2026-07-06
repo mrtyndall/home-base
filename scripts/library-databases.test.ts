@@ -38,18 +38,34 @@ assert.ok(
   "Book/movie metadata filters should apply live when changed.",
 );
 assert.ok(
+  databasePage.includes("Add a book") &&
+    databasePage.includes("Add a movie") &&
+    databasePage.includes("open={Boolean(query)}") &&
+    !databasePage.includes("Source: {candidateSourceLabel"),
+  "Book/movie lookup should live behind an add disclosure and use concise source labels.",
+);
+assert.ok(
+  referenceFilters.includes("StatusChip") &&
+    referenceFilters.includes("buildHref") &&
+    referenceFilters.includes("statusCounts") &&
+    referenceFilters.includes("Sort: Title"),
+  "Book/movie database filters should use status chips with live pill selects.",
+);
+assert.ok(
   databasePage.includes("href={`/references/${reference.id}`}"),
   "Database rows should open a reference detail page.",
 );
 assert.ok(
   databasePage.includes("metadataCoverUrl") &&
     databasePage.includes('alt=""') &&
+    databasePage.includes("grid grid-cols-3") &&
     referencePage.includes("metadataCoverUrl"),
-  "Book references should render stored cover images on list and detail pages.",
+  "Book references should render covers in rows and movies should render a poster grid.",
 );
 assert.ok(
-  referencePage.includes("Reference detail") &&
-    referencePage.includes("Metadata"),
+  referencePage.includes("All metadata") &&
+    referencePage.includes("kindLabel(reference.kind)") &&
+    referencePage.includes("backHref"),
   "References need their own detail pages.",
 );
 assert.ok(
