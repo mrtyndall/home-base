@@ -454,6 +454,9 @@ function isCreatedItem(
 }
 
 function isPendingCapture(capture: RecentCapture) {
+  if (capture.status === "dismissed") {
+    return false;
+  }
   if (capture.parseStatus === "ambiguous" || capture.parseStatus === "failed") {
     return true;
   }

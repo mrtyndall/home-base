@@ -500,6 +500,7 @@ async function loadProjects() {
       }),
       prisma.capture.count({
         where: {
+          status: "active",
           OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
         },
       }),

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Ellipsis } from "lucide-react";
 import {
+  dismissCapture,
   parkAreaById,
   retireAreaById,
   updateCaptureText,
@@ -403,12 +404,21 @@ function PendingCapturesPanel({
         {captures.map((capture) => (
           <div key={capture.id} className="p-4">
             <EditableCaptureText capture={capture} />
-            <div className="mt-2.5">
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <CaptureFileActions
                 captureId={capture.id}
                 domains={domains}
                 label="File as..."
               />
+              <form action={dismissCapture}>
+                <input type="hidden" name="captureId" value={capture.id} />
+                <button
+                  type="submit"
+                  className="h-[30px] px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
+                >
+                  Dismiss
+                </button>
+              </form>
             </div>
           </div>
         ))}
@@ -571,6 +581,7 @@ async function loadArea(areaId: string) {
           area.id === "area_inbox"
             ? prisma.capture.findMany({
                 where: {
+                  status: "active",
                   OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
                 },
                 include: {

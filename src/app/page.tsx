@@ -341,7 +341,10 @@ async function getHomeData() {
       taskActivity,
     ] = await Promise.all([
       prisma.capture.count({
-        where: { parseStatus: { in: ["ambiguous", "failed"] } },
+        where: {
+          status: "active",
+          parseStatus: { in: ["ambiguous", "failed"] },
+        },
       }),
       prisma.scheduledReview.count({
         where: {

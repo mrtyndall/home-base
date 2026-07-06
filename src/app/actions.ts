@@ -1121,6 +1121,40 @@ export async function updateCaptureText(formData: FormData) {
   revalidatePath("/search");
 }
 
+export async function dismissCapture(formData: FormData) {
+  const captureId = getTrimmedString(formData, "captureId");
+  if (!captureId) return;
+
+  const capture = await prisma.capture.findUnique({
+    where: { id: captureId },
+    select: { id: true, rawText: true, status: true },
+  });
+  if (!capture || capture.status === "dismissed") return;
+
+  await prisma.capture.update({
+    where: { id: capture.id },
+    data: { status: "dismissed" },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "capture_dismissed",
+      title: "Capture dismissed",
+      body:
+        capture.rawText.length > 120
+          ? `${capture.rawText.slice(0, 117)}...`
+          : capture.rawText,
+      sourceRef: { type: "capture", id: capture.id, source: "manual" },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/today");
+  revalidatePath("/projects");
+  revalidatePath("/areas/area_inbox");
+  revalidatePath("/search");
+}
+
 export async function convertPendingCapture(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
   const areaId = getTrimmedString(formData, "areaId");
@@ -1374,19 +1408,32 @@ export async function addMilestone(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
 }
 
-export async function completeMilestone(formData: FormData) {
+export async function toggleMilestone(formData: FormData) {
   const milestoneId = getTrimmedString(formData, "milestoneId");
   if (!milestoneId) return;
 
-  const milestone = await prisma.milestone.update({
+  const existing = await prisma.milestone.findUnique({
     where: { id: milestoneId },
-    data: { status: "completed", completedAt: new Date() },
+    select: { id: true, projectId: true, title: true, status: true },
+  });
+  if (!existing) return;
+
+  const nextStatus = existing.status === "completed" ? "open" : "completed";
+  const milestone = await prisma.milestone.update({
+    where: { id: existing.id },
+    data: {
+      status: nextStatus,
+      completedAt: nextStatus === "completed" ? new Date() : null,
+    },
   });
 
   await prisma.projectActivity.create({
     data: {
       projectId: milestone.projectId,
-      entry: `Milestone completed: ${milestone.title}.`,
+      entry:
+        nextStatus === "completed"
+          ? `Milestone completed: ${milestone.title}.`
+          : `Milestone reopened: ${milestone.title}.`,
       source: "manual",
     },
   });

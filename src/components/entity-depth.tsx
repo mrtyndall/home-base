@@ -2,10 +2,10 @@ import {
   addEntityNote,
   addMilestone,
   archiveEntityDoc,
-  completeMilestone,
   createEntityDoc,
   importEntityDocMarkdown,
   moveMilestone,
+  toggleMilestone,
   updateEntityDoc,
   updateEntityNote,
 } from "@/app/actions";
@@ -562,17 +562,17 @@ export function MilestonesPanel({
         <div className="space-y-[7px]">
           {orderedMilestones.map((milestone) => (
             <div key={milestone.id} className="flex items-center gap-2.5">
-              <form action={completeMilestone}>
+              <form action={toggleMilestone}>
                 <input type="hidden" name="milestoneId" value={milestone.id} />
                 <button
                   title={
                     milestone.status === "completed"
-                      ? "Completed"
+                      ? "Reopen milestone"
                       : "Complete milestone"
                   }
                   aria-label={
                     milestone.status === "completed"
-                      ? "Completed"
+                      ? "Reopen milestone"
                       : "Complete milestone"
                   }
                   className={
@@ -580,7 +580,6 @@ export function MilestonesPanel({
                       ? "grid h-6 w-6 place-items-center rounded-full bg-teal-700 text-white"
                       : "grid h-6 w-6 place-items-center rounded-full border-[1.5px] border-[#C9CFC5] bg-white text-transparent transition hover:border-teal-700/50 hover:text-teal-700"
                   }
-                  disabled={milestone.status === "completed"}
                 >
                   <Check size={12} />
                 </button>

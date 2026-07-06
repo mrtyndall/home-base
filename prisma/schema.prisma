@@ -20,6 +20,11 @@ enum CaptureParseStatus {
   failed
 }
 
+enum CaptureStatus {
+  active
+  dismissed
+}
+
 enum ProjectStatus {
   someday
   active
@@ -154,6 +159,7 @@ model Capture {
   id            String              @id @default(uuid())
   rawText       String              @map("raw_text")
   source        CaptureSource
+  status        CaptureStatus       @default(active)
   deviceContext Json?               @map("device_context")
   parseStatus   CaptureParseStatus? @map("parse_status")
   parsedActions Json?               @map("parsed_actions")
@@ -177,6 +183,7 @@ model Capture {
 
   @@index([createdAt])
   @@index([parseStatus])
+  @@index([status, parseStatus, createdAt])
   @@map("captures")
 }
 
