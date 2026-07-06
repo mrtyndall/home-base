@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MessageCircle, Search, Settings } from "lucide-react";
 import { AppDock } from "@/components/app-dock";
+import { AppLogo } from "@/components/app-logo";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -8,9 +9,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pt-4 sm:px-6">
         <Link
           href="/"
-          className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700"
+          className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700"
+          aria-label="Home Base home"
         >
-          Home Base
+          <AppLogo />
         </Link>
         <div className="flex items-center gap-2">
           <Link
