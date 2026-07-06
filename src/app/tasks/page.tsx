@@ -191,7 +191,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         <RoutinesView routines={routines} />
       ) : null}
       {selectedView === "schedule" ? (
-        <div className="grid gap-7 lg:grid-cols-2">
+        <div className="space-y-7">
           {selectedSection === "all" || selectedSection === "today" ? (
             <TaskSection
               title="Today"
@@ -220,7 +220,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               slipDays={slipDays}
             />
           ) : null}
-          {selectedSection === "all" ? (
+          {selectedSection === "all" || selectedSection === "someday" ? (
             <TaskSection
               title="Someday"
               empty="No someday tasks."
@@ -233,52 +233,33 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
               areaGroups={areaGroups}
               projects={projectOptions}
               slipDays={slipDays}
-              className="lg:col-start-2"
+            />
+          ) : null}
+          {selectedSection === "all" || selectedSection === "upcoming" ? (
+            <UpcomingSection
+              groups={sections.upcoming}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projectOptions}
+              slipDays={slipDays}
+            />
+          ) : null}
+          {selectedSection === "all" || selectedSection === "unscheduled" ? (
+            <TaskSection
+              title="Unscheduled"
+              empty="No unscheduled tasks."
+              anchor="unscheduled"
+              targetDate={null}
+              tasks={sections.noDate}
+              today={today}
+              tomorrow={tomorrow}
+              areaGroups={areaGroups}
+              projects={projectOptions}
+              slipDays={slipDays}
             />
           ) : null}
         </div>
-      ) : null}
-      {selectedView === "schedule" &&
-      (selectedSection === "all" || selectedSection === "upcoming") ? (
-        <UpcomingSection
-          groups={sections.upcoming}
-          today={today}
-          tomorrow={tomorrow}
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          slipDays={slipDays}
-        />
-      ) : null}
-      {selectedView === "schedule" &&
-      selectedSection === "someday" ? (
-        <TaskSection
-          title="Someday"
-          empty="No someday tasks."
-          anchor="someday"
-          targetDate={null}
-          targetKind="someday"
-          tasks={sections.someday}
-          today={today}
-          tomorrow={tomorrow}
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          slipDays={slipDays}
-        />
-      ) : null}
-      {selectedView === "schedule" &&
-      (selectedSection === "all" || selectedSection === "unscheduled") ? (
-        <TaskSection
-          title="Unscheduled"
-          empty="No unscheduled tasks."
-          anchor="unscheduled"
-          targetDate={null}
-          tasks={sections.noDate}
-          today={today}
-          tomorrow={tomorrow}
-          areaGroups={areaGroups}
-          projects={projectOptions}
-          slipDays={slipDays}
-        />
       ) : null}
     </div>
   );

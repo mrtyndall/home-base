@@ -184,7 +184,6 @@ export function DraggableTaskLink({
   tomorrow,
 }: DraggableTaskLinkProps) {
   const router = useRouter();
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const pointerDragging = useRef(false);
   const dragAnnounced = useRef(false);
@@ -233,30 +232,31 @@ export function DraggableTaskLink({
     announceTaskDragEnd();
   }
 
-  function clearLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }
-
-  function isDragHandle(target: EventTarget | null) {
+  function isTaskDragHandle(target: EventTarget | null) {
     return target instanceof HTMLElement
       ? Boolean(target.closest("[data-task-drag-handle]"))
       : false;
   }
 
+  function isInteractiveTaskControl(target: EventTarget | null) {
+    return target instanceof HTMLElement
+      ? Boolean(
+          target.closest(
+            "button,input,select,textarea,summary,[data-task-control]",
+          ),
+        )
+      : false;
+  }
+
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!isDragHandle(event.target)) return;
-    clearLongPress();
+    if (isInteractiveTaskControl(event.target)) return;
+    if (event.pointerType === "touch" && !isTaskDragHandle(event.target)) {
+      return;
+    }
     setMenuOpen(false);
     pointerStart.current = { x: event.clientX, y: event.clientY };
     pointerDragging.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
-    longPressTimer.current = setTimeout(() => {
-      suppressNextClick.current = true;
-      setMenuOpen(true);
-    }, 450);
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
@@ -268,7 +268,6 @@ export function DraggableTaskLink({
     if (distance > 8) {
       pointerDragging.current = true;
       suppressNextClick.current = true;
-      clearLongPress();
       event.preventDefault();
       moveDragPreview(event.clientX, event.clientY);
       markDragStarted(event.clientX, event.clientY);
@@ -296,7 +295,6 @@ export function DraggableTaskLink({
     const wasDragging = pointerDragging.current;
     pointerStart.current = null;
     pointerDragging.current = false;
-    clearLongPress();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -318,6 +316,7 @@ export function DraggableTaskLink({
     const targetDateValue = dropTarget?.dataset.dropDate;
     markDragEnded();
     if (!targetTaskId && !targetKind) return;
+    if (targetTaskId === taskId) return;
 
     event.preventDefault();
     setDragPending(true);
@@ -339,6 +338,9 @@ export function DraggableTaskLink({
 
   return (
     <>
+      {isDropTarget ? (
+        <div className="mb-1 h-1.5 rounded-full bg-teal-700/70" />
+      ) : null}
       <div
         data-task-id={taskId}
         data-task-parent-id={currentParentKey}
@@ -346,7 +348,7 @@ export function DraggableTaskLink({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className={`-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-[10px] p-1 transition hover:bg-[#F7F9F5] ${
+        className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-[10px] p-1 transition hover:bg-[#F7F9F5] active:cursor-grabbing ${
           dragPending ? "opacity-60" : ""
         } ${dragPreviewPosition ? "opacity-50" : ""} ${
           isDropTarget ? "bg-teal-700/5 ring-1 ring-teal-700/40" : ""
@@ -355,7 +357,7 @@ export function DraggableTaskLink({
         <span
           aria-label="Drag task"
           data-task-drag-handle
-          className="mt-0.5 grid h-8 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-full text-[#B0B7AD] active:cursor-grabbing sm:h-auto sm:w-auto"
+          className="mt-0.5 grid h-9 w-9 shrink-0 cursor-grab touch-none place-items-center rounded-full text-[#B0B7AD] transition hover:bg-[#EEF1EC] hover:text-teal-700 active:cursor-grabbing sm:h-8 sm:w-8"
         >
           <GripVertical aria-hidden="true" size={16} />
         </span>
@@ -506,20 +508,19 @@ function ScheduleMenu({
   }
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0" data-task-control>
       <button
         type="button"
-        title="Move, schedule, or assign task"
+        title="Schedule or assign task"
         onClick={() => setOpen(!open)}
-        aria-label="Move, schedule, or assign task"
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[13px] font-medium transition sm:w-auto sm:gap-1.5 sm:px-3 ${
+        aria-label="Schedule or assign task"
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[13px] font-medium transition ${
           open
             ? "border-teal-700/40 text-teal-800"
             : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
         }`}
       >
         <CalendarDays size={15} />
-        <span className="hidden sm:inline">Move</span>
       </button>
       {open ? (
         <div className="absolute right-0 top-10 z-30 w-56 rounded-[20px] border border-white/65 bg-[#FAFBF9]/80 p-2 text-sm shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
