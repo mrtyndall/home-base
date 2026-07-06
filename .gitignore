@@ -39,6 +39,9 @@ yarn-error.log*
 *.dump
 /.data
 
+# local linked worktrees
+/.worktrees
+
 # vercel
 .vercel
 
