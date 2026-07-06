@@ -12,7 +12,9 @@ export async function POST(request: Request) {
   const size = Number(body?.size ?? 0);
 
   if (
-    (parentType !== "area" && parentType !== "project") ||
+    (parentType !== "area" &&
+      parentType !== "project" &&
+      parentType !== "journal_entry") ||
     !parentId ||
     !filename ||
     !Number.isFinite(size) ||

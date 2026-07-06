@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Prisma } from "@prisma/client";
+import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
@@ -1432,13 +1432,13 @@ export async function moveMilestone(formData: FormData) {
   revalidatePath(`/projects/${milestone.projectId}`);
 }
 
-function revalidateEntityParent(
-  parentType: "area" | "project",
-  parentId: string,
-) {
-  revalidatePath(
-    parentType === "area" ? `/areas/${parentId}` : `/projects/${parentId}`,
-  );
+function revalidateEntityParent(parentType: EntityParentType, parentId: string) {
+  if (parentType === "area") {
+    revalidatePath(`/areas/${parentId}`);
+  }
+  if (parentType === "project") {
+    revalidatePath(`/projects/${parentId}`);
+  }
 }
 
 export async function updateDomainDescription(formData: FormData) {

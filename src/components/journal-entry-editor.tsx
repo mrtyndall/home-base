@@ -1,6 +1,7 @@
 "use client";
 
 import { updateJournalEntry } from "@/app/actions";
+import { AttachmentUpload } from "@/components/attachment-upload";
 
 export function JournalEntryEditor({
   entryId,
@@ -60,6 +61,14 @@ export function JournalEntryEditor({
           Save journal entry
         </button>
       </form>
+      <div className="mt-3 border-t border-[#E2E6DF] pt-3">
+        <AttachmentUpload
+          parentType="journal_entry"
+          parentId={entryId}
+          accept="image/*"
+          label="Add photo"
+        />
+      </div>
     </details>
   );
 }

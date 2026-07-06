@@ -1,4 +1,4 @@
-import type { JournalEntry, Person, Reference } from "@prisma/client";
+import type { Document, JournalEntry, Person, Reference } from "@prisma/client";
 import Image from "next/image";
 import Link from "next/link";
 import { JournalEntryEditor } from "@/components/journal-entry-editor";
@@ -387,8 +387,12 @@ function ReferenceSection({
   );
 }
 
-function JournalSection({ entries }: { entries: JournalEntry[] }) {
-  const groups = new Map<string, JournalEntry[]>();
+type JournalEntryWithAttachments = JournalEntry & {
+  attachments: Document[];
+};
+
+function JournalSection({ entries }: { entries: JournalEntryWithAttachments[] }) {
+  const groups = new Map<string, JournalEntryWithAttachments[]>();
   for (const entry of entries) {
     const key = entry.entryDate.toISOString().slice(0, 10);
     const group = groups.get(key) ?? [];
@@ -433,6 +437,26 @@ function JournalSection({ entries }: { entries: JournalEntry[] }) {
                       body={entry.bodyMd}
                       className="font-serif text-[18px] leading-[1.65] text-stone-800"
                     />
+                    {entry.attachments.filter(isJournalImage).length > 0 ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {entry.attachments.filter(isJournalImage).map((attachment) => (
+                          <a
+                            key={attachment.id}
+                            href={`/api/documents/${attachment.id}/download`}
+                            className="group relative aspect-[4/3] overflow-hidden rounded-[14px] border border-[#E2E6DF] bg-[#F7F9F5]"
+                          >
+                            <Image
+                              src={`/api/documents/${attachment.id}/download`}
+                              alt={attachment.filename}
+                              fill
+                              sizes="(min-width: 640px) 180px, 45vw"
+                              unoptimized
+                              className="object-cover transition duration-200 group-hover:scale-[1.02]"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#B0ACA2]">
                       <span>{entry.source}</span>
                       {entry.tags.length > 0 ? (
@@ -494,7 +518,7 @@ function ReferenceCover({ reference }: { reference: LibraryReference }) {
 
 async function loadIdeas() {
   try {
-    const [ideas, journalEntries, people, books, movies, references] =
+    const [ideas, rawJournalEntries, people, books, movies, references] =
       await Promise.all([
         prisma.idea.findMany({
           where: { status: { in: ["seed", "developing"] } },
@@ -533,6 +557,26 @@ async function loadIdeas() {
           take: 12,
         }),
       ]);
+    const journalAttachments =
+      rawJournalEntries.length > 0
+        ? await prisma.document.findMany({
+            where: {
+              parentType: "journal_entry",
+              parentId: { in: rawJournalEntries.map((entry) => entry.id) },
+            },
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
+    const attachmentsByEntry = new Map<string, Document[]>();
+    for (const attachment of journalAttachments) {
+      const group = attachmentsByEntry.get(attachment.parentId) ?? [];
+      group.push(attachment);
+      attachmentsByEntry.set(attachment.parentId, group);
+    }
+    const journalEntries = rawJournalEntries.map((entry) => ({
+      ...entry,
+      attachments: attachmentsByEntry.get(entry.id) ?? [],
+    }));
 
     return {
       ok: true as const,
@@ -546,6 +590,10 @@ async function loadIdeas() {
   } catch {
     return { ok: false as const };
   }
+}
+
+function isJournalImage(attachment: Document) {
+  return attachment.mime.startsWith("image/");
 }
 
 function referenceMetaLine(reference: LibraryReference) {

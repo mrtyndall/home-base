@@ -6,10 +6,14 @@ import { useRouter } from "next/navigation";
 export function AttachmentUpload({
   parentType,
   parentId,
+  accept,
+  label = "Upload file",
   variant = "pill",
 }: {
-  parentType: "area" | "project";
+  parentType: "area" | "journal_entry" | "project";
   parentId: string;
+  accept?: string;
+  label?: string;
   variant?: "pill" | "quiet";
 }) {
   const router = useRouter();
@@ -73,8 +77,13 @@ export function AttachmentUpload({
             : "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-[#E2E6DF] bg-white px-3.5 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
         }
       >
-        {pending ? "Uploading" : "Upload file"}
-        <input type="file" className="sr-only" onChange={upload} />
+        {pending ? "Uploading" : label}
+        <input
+          type="file"
+          accept={accept}
+          className="sr-only"
+          onChange={upload}
+        />
       </label>
       {message ? (
         <p
