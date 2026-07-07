@@ -448,9 +448,10 @@ function NeedsReviewPanel({
                 <input type="hidden" name="reviewId" value={review.id} />
                 <button
                   type="submit"
+                  title="Archive capture"
                   className="h-[30px] px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
                 >
-                  Dismiss
+                  Archive
                 </button>
               </form>
             </div>

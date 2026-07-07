@@ -1140,7 +1140,7 @@ export async function dismissCapture(formData: FormData) {
   await prisma.notification.create({
     data: {
       type: "capture_dismissed",
-      title: "Capture dismissed",
+      title: "Capture archived",
       body:
         capture.rawText.length > 120
           ? `${capture.rawText.slice(0, 117)}...`
