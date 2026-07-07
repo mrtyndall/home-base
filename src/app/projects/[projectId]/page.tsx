@@ -202,14 +202,26 @@ function ProjectTasksSection({ project }: { project: LoadedProject }) {
         ) : null}
       </div>
       {project.tasks.length === 0 ? null : (
-        <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+        <div className="space-y-2">
           {project.tasks.map((task) => (
             <Link
               key={task.id}
               href={`/tasks/${task.id}`}
-              className="block px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5]"
+              className="block rounded-[14px] border border-[#E2E6DF] bg-white p-4 transition hover:border-teal-700/35 hover:bg-[#F7F9F5]"
             >
-              {task.title}
+              <p className="text-sm font-medium text-stone-900">
+                {task.title}
+              </p>
+              <p className="mt-0.5 text-xs text-[#6B7268]">
+                {[
+                  project.area.domain.name,
+                  project.area.name,
+                  task.dueDate ? formatDateOnly(task.dueDate) : null,
+                  task.recurrenceRule ? "repeats" : null,
+                ]
+                  .filter((item): item is string => Boolean(item))
+                  .join(" / ")}
+              </p>
             </Link>
           ))}
         </div>
