@@ -911,7 +911,10 @@ function TaskCard({
   slipDays: number;
 }) {
   return (
-    <article className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+    <article
+      data-task-card-id={task.id}
+      className="rounded-[14px] border border-[#E2E6DF] bg-white p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <DraggableTaskLink
           taskId={task.id}
@@ -977,6 +980,7 @@ function SubtaskList({
         {subtasks.map((subtask) => (
           <div
             key={subtask.id}
+            data-task-card-id={subtask.id}
             className="flex items-center justify-between gap-3 rounded-[12px] border border-[#E9EDE7] bg-[#F7F9F5] px-2 py-2"
           >
             <DraggableTaskLink

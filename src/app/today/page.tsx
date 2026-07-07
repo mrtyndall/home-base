@@ -231,6 +231,7 @@ function TodayTaskRow({
 
   return (
     <div
+      data-task-card-id={task.id}
       className={
         grouped
           ? "flex items-start justify-between gap-3 p-4"

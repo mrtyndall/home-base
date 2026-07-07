@@ -43,7 +43,7 @@ export default async function HomePage() {
   }).format(new Date());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           {masthead}
@@ -138,7 +138,7 @@ function StatusLine({
       : `${slippingProjectCount} project${slippingProjectCount === 1 ? "" : "s"} slipping.`;
 
   return (
-    <section className="py-3 sm:py-4">
+    <section className="py-1 sm:py-2">
       <div className="flex items-start gap-3">
         {clearThroughTomorrow ? (
           <CheckCircle2 className="mt-1 shrink-0 text-teal-700" size={22} />
@@ -156,7 +156,7 @@ function StatusLine({
           </p>
           <Link
             href="/today"
-            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 underline-offset-4 transition hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-teal-700 underline-offset-4 transition hover:underline"
           >
             Open Today
             <ArrowRight size={14} />

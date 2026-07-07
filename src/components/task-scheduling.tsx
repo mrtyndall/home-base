@@ -158,7 +158,10 @@ export function TaskDropZone({
           <p className="mt-0.5 text-xs text-[#9AA096]">{preview.detail}</p>
         </div>
       ) : null}
-      <div className={`${draggingTask ? "space-y-2" : ""}`}>
+      <div
+        data-task-drop-list
+        className={`${draggingTask ? "space-y-2" : ""}`}
+      >
         {isEmpty ? (
           <p className="px-2.5 py-2 text-sm text-[#6B7268]">{emptyText}</p>
         ) : (
@@ -314,11 +317,17 @@ export function DraggableTaskLink({
           ?.closest<HTMLElement>("[data-drop-date]");
     const targetKind = dropTarget?.dataset.dropKind as TaskDropKind | undefined;
     const targetDateValue = dropTarget?.dataset.dropDate;
+    const targetDropKey = dropTarget?.dataset.dropKey;
     markDragEnded();
     if (!targetTaskId && !targetKind) return;
     if (targetTaskId === taskId) return;
 
     event.preventDefault();
+    if (targetTaskId && targetTaskId !== taskId) {
+      moveTaskCardOptimistically(taskId, targetTaskId);
+    } else if (targetDropKey) {
+      moveTaskCardToDropZoneOptimistically(taskId, targetDropKey);
+    }
     setDragPending(true);
     try {
       if (targetTaskId && targetTaskId !== taskId) {
@@ -350,7 +359,7 @@ export function DraggableTaskLink({
         onPointerCancel={handlePointerUp}
         className={`-m-1 flex min-w-0 flex-1 cursor-grab items-start gap-2 rounded-[10px] p-1 transition hover:bg-[#F7F9F5] active:cursor-grabbing ${
           dragPending ? "opacity-60" : ""
-        } ${dragPreviewPosition ? "opacity-50" : ""} ${
+        } ${dragPreviewPosition ? "pointer-events-none opacity-50" : ""} ${
           isDropTarget ? "bg-teal-700/5 ring-1 ring-teal-700/40" : ""
         }`}
       >
@@ -701,4 +710,29 @@ async function updateTaskAssignment(
   if (!response.ok) {
     throw new Error("Task assignment update failed.");
   }
+}
+
+function findTaskCard(taskId: string) {
+  return document
+    .querySelector<HTMLElement>(`[data-task-id="${CSS.escape(taskId)}"]`)
+    ?.closest<HTMLElement>("[data-task-card-id]");
+}
+
+function moveTaskCardOptimistically(taskId: string, targetTaskId: string) {
+  const card = findTaskCard(taskId);
+  const targetCard = findTaskCard(targetTaskId);
+  if (!card || !targetCard || card === targetCard) return;
+
+  targetCard.parentElement?.insertBefore(card, targetCard);
+}
+
+function moveTaskCardToDropZoneOptimistically(taskId: string, dropKey: string) {
+  const card = findTaskCard(taskId);
+  const dropZone = document.querySelector<HTMLElement>(
+    `[data-drop-key="${CSS.escape(dropKey)}"]`,
+  );
+  const list = dropZone?.querySelector<HTMLElement>("[data-task-drop-list]");
+  if (!card || !list) return;
+
+  list.append(card);
 }

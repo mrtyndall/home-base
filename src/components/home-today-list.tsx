@@ -33,27 +33,51 @@ export function HomeTodayList({
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [overTaskId, setOverTaskId] = useState<string | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const taskSignature = JSON.stringify(
+    tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      detail: task.detail,
+      starred: task.starred,
+    })),
+  );
+  const [optimisticOrder, setOptimisticOrder] = useState<{
+    signature: string;
+    tasks: HomeTodayTask[];
+  } | null>(null);
+  const orderedTasks =
+    optimisticOrder?.signature === taskSignature ? optimisticOrder.tasks : tasks;
 
   const eventRows = events.slice(0, maxRows);
   const taskSlots = Math.max(0, maxRows - eventRows.length);
-  const taskRows = tasks.slice(0, taskSlots);
-  const remaining = Math.max(0, events.length + tasks.length - maxRows);
+  const taskRows = orderedTasks.slice(0, taskSlots);
+  const remaining = Math.max(0, events.length + orderedTasks.length - maxRows);
 
   async function reorderTask(targetTaskId: string) {
     if (!draggingTaskId || draggingTaskId === targetTaskId) {
       return;
     }
 
-    setPendingTaskId(draggingTaskId);
+    const movedTaskId = draggingTaskId;
+    const previousTasks = orderedTasks;
+    setPendingTaskId(movedTaskId);
+    setOptimisticOrder({
+      signature: taskSignature,
+      tasks: moveTaskBefore(orderedTasks, movedTaskId, targetTaskId),
+    });
     try {
-      const response = await fetch(`/api/tasks/${draggingTaskId}/order`, {
+      const response = await fetch(`/api/tasks/${movedTaskId}/order`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ targetTaskId }),
       });
       if (response.ok) {
         startTransition(() => router.refresh());
+      } else {
+        setOptimisticOrder({ signature: taskSignature, tasks: previousTasks });
       }
+    } catch {
+      setOptimisticOrder({ signature: taskSignature, tasks: previousTasks });
     } finally {
       setPendingTaskId(null);
       setDraggingTaskId(null);
@@ -73,7 +97,7 @@ export function HomeTodayList({
             <Link
               key={event.id}
               href="/today"
-              className="flex items-start gap-3 rounded-[12px] border border-teal-700/15 bg-[#F4FBF7] px-3 py-2.5 transition hover:border-teal-700/35 hover:bg-[#EFF8F3]"
+              className="flex items-start gap-3 rounded-[12px] border border-teal-700/15 border-l-4 border-l-teal-700/45 bg-[#F4FBF7] px-3 py-2.5 transition hover:border-teal-700/35 hover:bg-[#EFF8F3]"
             >
               <CalendarClock
                 size={17}
@@ -102,6 +126,7 @@ export function HomeTodayList({
             return (
               <div
                 key={task.id}
+                data-task-card-id={task.id}
                 draggable
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = "move";
@@ -175,4 +200,23 @@ export function HomeTodayList({
       ) : null}
     </div>
   );
+}
+
+function moveTaskBefore(
+  tasks: HomeTodayTask[],
+  movedTaskId: string,
+  targetTaskId: string,
+) {
+  const moved = tasks.find((task) => task.id === movedTaskId);
+  if (!moved) return tasks;
+
+  const withoutMoved = tasks.filter((task) => task.id !== movedTaskId);
+  const targetIndex = withoutMoved.findIndex((task) => task.id === targetTaskId);
+  if (targetIndex === -1) return tasks;
+
+  return [
+    ...withoutMoved.slice(0, targetIndex),
+    moved,
+    ...withoutMoved.slice(targetIndex),
+  ];
 }

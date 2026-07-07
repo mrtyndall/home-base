@@ -27,3 +27,10 @@ assert.ok(
     scheduling.includes("Drag task"),
   "Task rows should expose a touch-friendly drag handle that persists reorder.",
 );
+
+assert.ok(
+  scheduling.includes("pointer-events-none") &&
+    scheduling.includes("data-task-card-id") &&
+    scheduling.includes("moveTaskCardOptimistically"),
+  "Dragging should preview the card over real drop targets and move it immediately before the server refresh.",
+);
