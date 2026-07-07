@@ -10,6 +10,7 @@ type CaptureItem = {
 };
 
 type CaptureHrefSource = {
+  id: string;
   rawText: string;
   createdItems: unknown;
 };
@@ -37,7 +38,7 @@ export function getRecentCaptureAction(
 
 export function getRecentCaptureHref(capture: CaptureHrefSource) {
   const item = getLatestActionableItem(capture.createdItems);
-  if (!item) return "/areas/area_inbox#pending-captures";
+  if (!item) return `/captures/${capture.id}`;
 
   const type = normalizeCaptureItemType(item);
   if (type === "task") return `/tasks/${item.id}`;
@@ -51,8 +52,8 @@ export function getRecentCaptureHref(capture: CaptureHrefSource) {
   if (type === "calendar_event") return `/calendar-events/${item.id}`;
   if (type === "journal_entry") return "/ideas";
   if (type === "person") return `/people/${item.id}`;
-  if (type === "pending_capture") return "/areas/area_inbox#pending-captures";
-  return "/areas/area_inbox#pending-captures";
+  if (type === "pending_capture") return `/captures/${capture.id}`;
+  return `/captures/${capture.id}`;
 }
 
 function getLatestActionableItem(createdItems: unknown) {

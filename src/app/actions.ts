@@ -1119,6 +1119,7 @@ export async function updateCaptureText(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/search");
+  revalidatePath(`/captures/${capture.id}`);
 }
 
 export async function dismissCapture(formData: FormData) {
@@ -1153,6 +1154,7 @@ export async function dismissCapture(formData: FormData) {
   revalidatePath("/projects");
   revalidatePath("/areas/area_inbox");
   revalidatePath("/search");
+  revalidatePath(`/captures/${capture.id}`);
 }
 
 export async function convertPendingCapture(formData: FormData) {
@@ -1160,6 +1162,7 @@ export async function convertPendingCapture(formData: FormData) {
   const areaId = getTrimmedString(formData, "areaId");
   const targetType = getTrimmedString(formData, "targetType");
   const reviewId = getTrimmedString(formData, "reviewId");
+  const proposalId = getTrimmedString(formData, "proposalId");
   if (
     !captureId ||
     !areaId ||
@@ -1295,11 +1298,103 @@ export async function convertPendingCapture(formData: FormData) {
     }
   }
 
+  if (proposalId) {
+    const proposal = await prisma.captureReviewProposal.findFirst({
+      where: {
+        id: proposalId,
+        captureId: capture.id,
+        status: { in: ["pending", "snoozed"] },
+      },
+      select: { id: true },
+    });
+    if (proposal) {
+      await prisma.captureReviewProposal.update({
+        where: { id: proposal.id },
+        data: { status: "accepted", resolvedAt: new Date() },
+      });
+      await prisma.notification.create({
+        data: {
+          type: "capture_review_accepted",
+          title: "Capture review accepted",
+          body: item.label,
+          sourceRef: {
+            type: "capture_review_proposal",
+            id: proposal.id,
+            captureId: capture.id,
+            source: "manual",
+          },
+        },
+      });
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/search");
+  revalidatePath(`/captures/${capture.id}`);
   revalidatePath(`/areas/${area.id}`);
   revalidatePath("/areas/area_inbox");
+}
+
+export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {
+  const proposalId = getTrimmedString(formData, "proposalId");
+  if (!proposalId) return;
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const proposal = await prisma.captureReviewProposal.update({
+    where: { id: proposalId },
+    data: { status: "snoozed", snoozedUntil: tomorrow },
+    include: { capture: { select: { rawText: true } } },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "capture_review_snoozed",
+      title: "Capture review snoozed",
+      body: proposal.capture.rawText,
+      sourceRef: {
+        type: "capture_review_proposal",
+        id: proposal.id,
+        captureId: proposal.captureId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/areas/area_inbox");
+  revalidatePath(`/captures/${proposal.captureId}`);
+}
+
+export async function dismissCaptureReviewProposal(formData: FormData) {
+  const proposalId = getTrimmedString(formData, "proposalId");
+  if (!proposalId) return;
+
+  const proposal = await prisma.captureReviewProposal.update({
+    where: { id: proposalId },
+    data: { status: "dismissed", resolvedAt: new Date() },
+    include: { capture: { select: { rawText: true } } },
+  });
+
+  await prisma.notification.create({
+    data: {
+      type: "capture_review_dismissed",
+      title: "Capture review dismissed",
+      body: proposal.capture.rawText,
+      sourceRef: {
+        type: "capture_review_proposal",
+        id: proposal.id,
+        captureId: proposal.captureId,
+        source: "manual",
+      },
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/areas/area_inbox");
+  revalidatePath(`/captures/${proposal.captureId}`);
 }
 
 export async function createEntityDoc(formData: FormData) {

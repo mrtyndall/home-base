@@ -16,18 +16,26 @@ type TargetType = keyof typeof targetLabels;
 export function CaptureFileActions({
   captureId,
   reviewId,
+  proposalId,
   domains,
   align = "left",
   label = "File",
+  defaultAreaId = "",
+  defaultType = null,
 }: {
   captureId: string;
   reviewId?: string;
+  proposalId?: string;
   domains: Array<Domain & { areas: Area[] }>;
   align?: "left" | "right";
   label?: string;
+  defaultAreaId?: string;
+  defaultType?: TargetType | null;
 }) {
-  const [areaId, setAreaId] = useState("");
-  const [selectedType, setSelectedType] = useState<TargetType | null>(null);
+  const [areaId, setAreaId] = useState(defaultAreaId);
+  const [selectedType, setSelectedType] = useState<TargetType | null>(
+    defaultType,
+  );
 
   const selectedAreaName = useMemo(() => {
     if (!areaId) return null;
@@ -53,9 +61,13 @@ export function CaptureFileActions({
         {reviewId ? (
           <input type="hidden" name="reviewId" value={reviewId} />
         ) : null}
+        {proposalId ? (
+          <input type="hidden" name="proposalId" value={proposalId} />
+        ) : null}
         {selectedType ? (
           <input type="hidden" name="targetType" value={selectedType} />
         ) : null}
+        {areaId ? <input type="hidden" name="areaId" value={areaId} /> : null}
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           File as
         </p>
@@ -73,27 +85,34 @@ export function CaptureFileActions({
         <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Into
         </p>
-        <label className="mt-1.5 block">
-          <span className="sr-only">Area</span>
-          <select
-            name="areaId"
-            value={areaId}
-            required
-            onChange={(event) => setAreaId(event.target.value)}
-            className="h-[30px] min-w-0 rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[13px] outline-none focus:border-teal-700"
-          >
-            <option value="">Choose area</option>
-            {domains.map((domain) => (
-              <optgroup key={domain.id} label={domain.name}>
+        <div className="mt-1.5 max-h-44 overflow-y-auto rounded-[14px] border border-[#E2E6DF] bg-white p-1.5">
+          {domains.map((domain) => (
+            <div key={domain.id} className="py-1">
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B0ACA2]">
+                {domain.name}
+              </p>
+              <div className="grid gap-1">
                 {domain.areas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
+                  <button
+                    key={area.id}
+                    type="button"
+                    onClick={() => setAreaId(area.id)}
+                    className={`flex min-h-8 items-center justify-between rounded-[10px] px-2.5 py-1.5 text-left text-[13px] font-medium transition ${
+                      areaId === area.id
+                        ? "bg-[#E8F5F0] text-teal-800"
+                        : "text-stone-700 hover:bg-[#F7F9F5] hover:text-stone-950"
+                    }`}
+                  >
+                    <span>{area.name}</span>
+                    {areaId === area.id ? (
+                      <span className="text-[11px] text-teal-700">Selected</span>
+                    ) : null}
+                  </button>
                 ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+              </div>
+            </div>
+          ))}
+        </div>
         {selectedType ? (
           <div className="mt-3 rounded-[14px] border border-teal-700/20 bg-white px-3 py-2">
             <p className="text-[13px] leading-snug text-stone-700">

@@ -55,6 +55,7 @@ assert.deepEqual(
 
 assert.equal(
   getRecentCaptureHref({
+    id: "c0",
     rawText: "Test 3",
     createdItems: [
       { type: "created_task", id: "t2", label: "Task in Inbox: Test 3" },
@@ -65,16 +66,18 @@ assert.equal(
 
 assert.equal(
   getRecentCaptureHref({
+    id: "c1",
     rawText: "loose thought",
     createdItems: [
       { type: "pending_capture", id: "c1", label: "Saved to Inbox" },
     ],
   }),
-  "/areas/area_inbox#pending-captures",
+  "/captures/c1",
 );
 
 assert.equal(
   getRecentCaptureHref({
+    id: "c2",
     rawText: "note for project",
     createdItems: [{ type: "entity_note", id: "n1", label: "Note added" }],
   }),
@@ -83,6 +86,7 @@ assert.equal(
 
 assert.equal(
   getRecentCaptureHref({
+    id: "c3",
     rawText: "weekly check-in",
     createdItems: [{ type: "check_in", id: "ci1", label: "Check-in added" }],
   }),
@@ -91,6 +95,7 @@ assert.equal(
 
 assert.equal(
   getRecentCaptureHref({
+    id: "c4",
     rawText: "club net is Tuesday",
     createdItems: [{ type: "reference", id: "r1", label: "Reference saved" }],
   }),
@@ -99,6 +104,7 @@ assert.equal(
 
 assert.ok(
   !getRecentCaptureHref({
+    id: "c5",
     rawText: "unknown parsed thing",
     createdItems: [{ type: "unknown", id: "x1", label: "Saved" }],
   }).startsWith("/search"),

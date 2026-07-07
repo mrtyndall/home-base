@@ -1,12 +1,20 @@
 import type { ReactNode } from "react";
-import type { Area, Capture, Domain, ScheduledReview } from "@prisma/client";
+import type {
+  Area,
+  Capture,
+  CaptureReviewProposal,
+  Domain,
+  ScheduledReview,
+} from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Ellipsis } from "lucide-react";
 import {
   dismissCapture,
+  dismissCaptureReviewProposal,
   parkAreaById,
   retireAreaById,
+  snoozeCaptureReviewProposalOneDay,
   updateCaptureText,
   unparkAreaById,
 } from "@/app/actions";
@@ -50,7 +58,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
     notFound();
   }
 
-  const { area, pendingCaptures, reviews, domains } = result;
+  const { area, pendingCaptures, reviewProposals, reviews, domains } = result;
 
   const latestCheckIn = area.checkIns[0] ?? null;
 
@@ -95,7 +103,11 @@ export default async function AreaPage({ params }: AreaPageProps) {
 
       {area.id === "area_inbox" ? (
         <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <NeedsReviewPanel reviews={reviews} domains={domains} />
+          <NeedsReviewPanel
+            reviews={reviews}
+            reviewProposals={reviewProposals}
+            domains={domains}
+          />
           <PendingCapturesPanel captures={pendingCaptures} domains={domains} />
         </section>
       ) : null}
@@ -268,6 +280,12 @@ type ReviewRow = ScheduledReview & {
     textEdits: Array<{ text: string }>;
   };
 };
+type CaptureReviewProposalRow = CaptureReviewProposal & {
+  capture: Pick<Capture, "id" | "rawText"> & {
+    textEdits: Array<{ text: string }>;
+  };
+  suggestedArea: (Area & { domain: Domain }) | null;
+};
 
 function effectiveCaptureText(
   capture: Pick<Capture, "rawText"> & { textEdits?: Array<{ text: string }> },
@@ -317,12 +335,15 @@ function EditableCaptureText({
 
 function NeedsReviewPanel({
   reviews,
+  reviewProposals,
   domains,
 }: {
   reviews: ReviewRow[];
+  reviewProposals: CaptureReviewProposalRow[];
   domains: Array<Domain & { areas: Area[] }>;
 }) {
-  if (reviews.length === 0) {
+  const total = reviews.length + reviewProposals.length;
+  if (total === 0) {
     return null;
   }
 
@@ -330,9 +351,66 @@ function NeedsReviewPanel({
     <section id="needs-review" className="scroll-mt-24 space-y-2.5">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Needs review{" "}
-        <span className="font-medium text-[#B0ACA2]">{reviews.length}</span>
+        <span className="font-medium text-[#B0ACA2]">{total}</span>
       </h2>
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+        {reviewProposals.map((proposal) => {
+          const suggestedType = isCaptureTargetType(proposal.suggestedType)
+            ? proposal.suggestedType
+            : null;
+          const suggestedArea = proposal.suggestedArea;
+          return (
+            <div key={proposal.id} className="p-4">
+              <EditableCaptureText capture={proposal.capture} />
+              <div className="mt-2 rounded-[12px] bg-[#F2FAF7] px-3 py-2">
+                <p className="text-[13px] font-medium text-stone-800">
+                  Suggested:{" "}
+                  {suggestedType ? targetLabel(suggestedType) : "Review"}{" "}
+                  {suggestedArea ? (
+                    <>
+                      into {suggestedArea.domain.name} / {suggestedArea.name}
+                    </>
+                  ) : (
+                    "into Inbox"
+                  )}
+                </p>
+                {proposal.reason ? (
+                  <p className="mt-1 text-xs leading-5 text-[#6B7268]">
+                    {proposal.reason}
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <CaptureFileActions
+                  captureId={proposal.captureId}
+                  proposalId={proposal.id}
+                  domains={domains}
+                  label="File as..."
+                  defaultType={suggestedType}
+                  defaultAreaId={suggestedArea?.id ?? "area_inbox"}
+                />
+                <form action={snoozeCaptureReviewProposalOneDay}>
+                  <input type="hidden" name="proposalId" value={proposal.id} />
+                  <button
+                    type="submit"
+                    className="h-[30px] rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
+                  >
+                    Snooze 1 day
+                  </button>
+                </form>
+                <form action={dismissCaptureReviewProposal}>
+                  <input type="hidden" name="proposalId" value={proposal.id} />
+                  <button
+                    type="submit"
+                    className="h-[30px] px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
+                  >
+                    Dismiss
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+        })}
         {reviews.map((review) => (
           <div key={review.id} className="p-4">
             <EditableCaptureText capture={review.capture} />
@@ -381,6 +459,22 @@ function NeedsReviewPanel({
       </div>
     </section>
   );
+}
+
+function isCaptureTargetType(value: string): value is "task" | "idea" | "note" | "reference" {
+  return (
+    value === "task" ||
+    value === "idea" ||
+    value === "note" ||
+    value === "reference"
+  );
+}
+
+function targetLabel(value: "task" | "idea" | "note" | "reference") {
+  if (value === "task") return "Task";
+  if (value === "idea") return "Idea";
+  if (value === "note") return "Note";
+  return "Reference";
 }
 
 function PendingCapturesPanel({
@@ -551,6 +645,7 @@ async function loadArea(areaId: string) {
       checkIns,
       latestProjectCheckIns,
       pendingCaptures,
+      reviewProposals,
       reviews,
     ] = area
       ? await Promise.all([
@@ -583,6 +678,11 @@ async function loadArea(areaId: string) {
                 where: {
                   status: "active",
                   OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
+                  reviewProposals: {
+                    none: {
+                      status: { in: ["pending", "snoozed"] },
+                    },
+                  },
                 },
                 include: {
                   textEdits: {
@@ -593,6 +693,32 @@ async function loadArea(areaId: string) {
                 },
                 orderBy: { createdAt: "desc" },
                 take: 20,
+              })
+            : Promise.resolve([]),
+          area.id === "area_inbox"
+            ? prisma.captureReviewProposal.findMany({
+                where: {
+                  OR: [
+                    { status: "pending" },
+                    { status: "snoozed", snoozedUntil: { lte: new Date() } },
+                  ],
+                },
+                include: {
+                  capture: {
+                    select: {
+                      id: true,
+                      rawText: true,
+                      textEdits: {
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                        select: { text: true },
+                      },
+                    },
+                  },
+                  suggestedArea: { include: { domain: true } },
+                },
+                orderBy: { createdAt: "asc" },
+                take: 30,
               })
             : Promise.resolve([]),
           area.id === "area_inbox"
@@ -630,6 +756,7 @@ async function loadArea(areaId: string) {
           new Map<string, { bodyMd: string; createdAt: Date }>(),
           [],
           [],
+          [],
         ];
 
     const noteMentions =
@@ -664,6 +791,7 @@ async function loadArea(areaId: string) {
           }
         : null,
       pendingCaptures,
+      reviewProposals,
       reviews,
       domains,
     };

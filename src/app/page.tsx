@@ -334,7 +334,8 @@ async function getHomeData() {
 
     const [
       pendingCaptureCount,
-      reviewDueCount,
+      scheduledReviewDueCount,
+      captureReviewProposalCount,
       freshCheckIns,
       activeProjects,
       latestCheckIns,
@@ -344,6 +345,9 @@ async function getHomeData() {
         where: {
           status: "active",
           parseStatus: { in: ["ambiguous", "failed"] },
+          reviewProposals: {
+            none: { status: { in: ["pending", "snoozed"] } },
+          },
         },
       }),
       prisma.scheduledReview.count({
@@ -352,6 +356,14 @@ async function getHomeData() {
             { status: "surfaced" },
             { status: "pending", reviewAt: { lte: today } },
             { status: "pending", reviewAt: null },
+          ],
+        },
+      }),
+      prisma.captureReviewProposal.count({
+        where: {
+          OR: [
+            { status: "pending" },
+            { status: "snoozed", snoozedUntil: { lte: new Date() } },
           ],
         },
       }),
@@ -423,7 +435,7 @@ async function getHomeData() {
     return {
       ok: true as const,
       pendingCaptureCount,
-      reviewDueCount,
+      reviewDueCount: scheduledReviewDueCount + captureReviewProposalCount,
       freshCheckInCount: freshCheckIns.length,
       slippingProjectCount,
     };

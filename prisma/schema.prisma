@@ -128,6 +128,13 @@ enum ScheduledReviewStatus {
   dismissed
 }
 
+enum CaptureReviewProposalStatus {
+  pending
+  accepted
+  dismissed
+  snoozed
+}
+
 enum RoutineStatus {
   active
   paused
@@ -171,6 +178,7 @@ model Capture {
   journalEntries     JournalEntry[]
   textEdits          CaptureTextEdit[]
   scheduledReviews   ScheduledReview[]
+  reviewProposals    CaptureReviewProposal[]
   personFacts        PersonFact[]
   personInteractions PersonInteraction[]
   entityDocs         EntityDoc[]
@@ -227,13 +235,14 @@ model Area {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  domain     Domain      @relation(fields: [domainId], references: [id])
-  ideas      Idea[]
-  people     Person[]
-  projects   Project[]
-  references Reference[]
-  routines   Routine[]
-  tasks      Task[]
+  domain          Domain                  @relation(fields: [domainId], references: [id])
+  ideas           Idea[]
+  people          Person[]
+  projects        Project[]
+  references      Reference[]
+  routines        Routine[]
+  reviewProposals CaptureReviewProposal[]
+  tasks           Task[]
 
   @@index([domainId, status, sortOrder])
   @@index([status, sortOrder])
@@ -384,9 +393,9 @@ model Reference {
   captureId   String?  @map("capture_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  capture Capture? @relation(fields: [captureId], references: [id])
-  area    Area?    @relation(fields: [areaId], references: [id])
-  project Project? @relation(fields: [projectId], references: [id])
+  capture  Capture?           @relation(fields: [captureId], references: [id])
+  area     Area?              @relation(fields: [areaId], references: [id])
+  project  Project?           @relation(fields: [projectId], references: [id])
   snippets ReferenceSnippet[]
 
   @@index([areaId])
@@ -567,6 +576,27 @@ model ScheduledReview {
   @@index([status, reviewAt])
   @@index([captureId])
   @@map("scheduled_reviews")
+}
+
+model CaptureReviewProposal {
+  id              String                      @id @default(uuid())
+  captureId       String                      @map("capture_id")
+  status          CaptureReviewProposalStatus @default(pending)
+  suggestedType   String                      @map("suggested_type")
+  suggestedAreaId String?                     @map("suggested_area_id")
+  reason          String?
+  model           String?
+  snoozedUntil    DateTime?                   @map("snoozed_until")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  resolvedAt      DateTime?                   @map("resolved_at")
+
+  capture       Capture @relation(fields: [captureId], references: [id])
+  suggestedArea Area?   @relation(fields: [suggestedAreaId], references: [id])
+
+  @@index([status, snoozedUntil, createdAt])
+  @@index([captureId, status])
+  @@index([suggestedAreaId])
+  @@map("capture_review_proposals")
 }
 
 model ResurfacingSeen {
