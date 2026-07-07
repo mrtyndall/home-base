@@ -11,9 +11,12 @@ import {
   EntityDocAction,
   MilestonesPanel,
 } from "@/components/entity-depth";
+import { TaskCompleteButton } from "@/components/task-complete-button";
+import { TaskStarButton } from "@/components/task-star-button";
 import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { loadReferenceMentions } from "@/lib/reference-mentions";
+import { formatRecurrenceRule } from "@/lib/recurrence";
 
 export const dynamic = "force-dynamic";
 
@@ -204,25 +207,35 @@ function ProjectTasksSection({ project }: { project: LoadedProject }) {
       {project.tasks.length === 0 ? null : (
         <div className="space-y-2">
           {project.tasks.map((task) => (
-            <Link
+            <article
               key={task.id}
-              href={`/tasks/${task.id}`}
-              className="block rounded-[14px] border border-[#E2E6DF] bg-white p-4 transition hover:border-teal-700/35 hover:bg-[#F7F9F5]"
+              className="flex items-start justify-between gap-3 rounded-[14px] border border-[#E2E6DF] bg-white p-4 transition hover:border-teal-700/35 hover:bg-[#F7F9F5]"
             >
-              <p className="text-sm font-medium text-stone-900">
-                {task.title}
-              </p>
-              <p className="mt-0.5 text-xs text-[#6B7268]">
-                {[
-                  project.area.domain.name,
-                  project.area.name,
-                  task.dueDate ? formatDateOnly(task.dueDate) : null,
-                  task.recurrenceRule ? "repeats" : null,
-                ]
-                  .filter((item): item is string => Boolean(item))
-                  .join(" / ")}
-              </p>
-            </Link>
+              <Link
+                href={`/tasks/${task.id}`}
+                className="-m-1 min-w-0 flex-1 rounded-[10px] p-1 transition hover:bg-[#F7F9F5] hover:text-teal-700"
+              >
+                <p className="text-sm font-medium text-stone-900">
+                  {task.title}
+                </p>
+                <p className="mt-0.5 text-xs text-[#6B7268]">
+                  {[
+                    project.area.domain.name,
+                    project.area.name,
+                    task.dueDate ? formatDateOnly(task.dueDate) : null,
+                    task.recurrenceRule
+                      ? formatRecurrenceRule(task.recurrenceRule)
+                      : null,
+                  ]
+                    .filter((item): item is string => Boolean(item))
+                    .join(" / ")}
+                </p>
+              </Link>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <TaskStarButton taskId={task.id} starred={task.starred} />
+                <TaskCompleteButton taskId={task.id} />
+              </div>
+            </article>
           ))}
         </div>
       )}
