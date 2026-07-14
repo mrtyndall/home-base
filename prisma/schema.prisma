@@ -217,9 +217,12 @@ model Area {
   tendingCadence String?    @map("tending_cadence")
   sortOrder      Int        @default(0) @map("sort_order")
   isSystem       Boolean    @default(false) @map("is_system")
+  parentAreaId   String?    @map("parent_area_id")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
+  parentArea      Area?                   @relation("AreaHierarchy", fields: [parentAreaId], references: [id], onDelete: Restrict)
+  childAreas      Area[]                  @relation("AreaHierarchy")
   ideas           Idea[]
   people          Person[]
   projects        Project[]
@@ -229,13 +232,14 @@ model Area {
   tasks           Task[]
 
   @@index([status, sortOrder])
+  @@index([parentAreaId, status, sortOrder])
   @@map("areas")
 }
 
 model Project {
   id                String        @id @default(uuid())
   name              String
-  areaId            String        @map("area_id")
+  areaId            String?       @map("area_id")
   status            ProjectStatus @default(active)
   currentState      String?       @map("current_state")
   nextStep          String?       @map("next_step")
@@ -246,7 +250,7 @@ model Project {
   killedAt          DateTime?     @map("killed_at")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  area       Area              @relation(fields: [areaId], references: [id])
+  area       Area?             @relation(fields: [areaId], references: [id])
   activity   ProjectActivity[]
   ideas      Idea[]
   references Reference[]
