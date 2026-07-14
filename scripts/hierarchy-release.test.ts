@@ -33,6 +33,11 @@ const completeReadLaterProtection = {
   readLaterActiveUrlIndexPredicate:
     "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
   readLaterActiveUrlIndexIsUnique: true,
+  readLaterActiveUrlIndexIsValid: true,
+  readLaterActiveUrlIndexIsReady: true,
+  readLaterActiveUrlIndexKeyDefinition: "normalized_url",
+  readLaterActiveUrlIndexKeyCount: 1,
+  readLaterActiveUrlIndexAttributeCount: 1,
 };
 
 const strictArgs = [
@@ -217,6 +222,8 @@ test("preflight remains safe on a partial schema with columns but no protections
             readLaterActiveUrlIndexDefinition: null,
             readLaterActiveUrlIndexPredicate: null,
             readLaterActiveUrlIndexIsUnique: false,
+            readLaterActiveUrlIndexIsValid: false,
+            readLaterActiveUrlIndexIsReady: false,
           }],
         };
       }
@@ -257,11 +264,37 @@ test("strict postflight rejects a non-unique active URL index", async () => {
   );
 });
 
+test("strict postflight rejects an invalid active URL index", async () => {
+  await assert.rejects(
+    runStrictWithProtection({ readLaterActiveUrlIndexIsValid: false }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects an unready active URL index", async () => {
+  await assert.rejects(
+    runStrictWithProtection({ readLaterActiveUrlIndexIsReady: false }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
 test("strict postflight rejects a named active URL index on the wrong key", async () => {
   await assert.rejects(
     runStrictWithProtection({
       readLaterActiveUrlIndexDefinition:
         "CREATE UNIQUE INDEX references_active_read_later_normalized_url_key ON public.references USING btree (url) WHERE ((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
+      readLaterActiveUrlIndexKeyDefinition: "url",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects an active URL index with additional key columns", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexKeyDefinition: "normalized_url, id",
+      readLaterActiveUrlIndexKeyCount: 2,
+      readLaterActiveUrlIndexAttributeCount: 2,
     }),
     /Read Later active URL index is missing or invalid/,
   );
@@ -272,6 +305,26 @@ test("strict postflight rejects an active URL index with the wrong predicate", a
     runStrictWithProtection({
       readLaterActiveUrlIndexPredicate:
         "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = 'unread'::text))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects a negated status clause that contains the expected substrings", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (NOT (read_status = ANY (ARRAY['unread'::text, 'read'::text]))))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects an otherwise-correct predicate with an extra clause", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])) AND (url IS NOT NULL))",
     }),
     /Read Later active URL index is missing or invalid/,
   );

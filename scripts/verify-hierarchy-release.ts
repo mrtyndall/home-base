@@ -36,6 +36,11 @@ type ReleaseSchemaCapabilities = {
   readLaterActiveUrlIndexDefinition: string | null;
   readLaterActiveUrlIndexPredicate: string | null;
   readLaterActiveUrlIndexIsUnique: boolean;
+  readLaterActiveUrlIndexIsValid: boolean;
+  readLaterActiveUrlIndexIsReady: boolean;
+  readLaterActiveUrlIndexKeyDefinition: string | null;
+  readLaterActiveUrlIndexKeyCount: number;
+  readLaterActiveUrlIndexAttributeCount: number;
 };
 
 const baselineFields = [
@@ -117,6 +122,25 @@ function normalizedSql(definition: string) {
     .replace(/\s+/g, "");
 }
 
+function withoutRedundantOuterParentheses(expression: string) {
+  let normalized = expression;
+  while (normalized.startsWith("(") && normalized.endsWith(")")) {
+    let depth = 0;
+    let wrapsWholeExpression = true;
+    for (let index = 0; index < normalized.length; index += 1) {
+      if (normalized[index] === "(") depth += 1;
+      if (normalized[index] === ")") depth -= 1;
+      if (depth === 0 && index < normalized.length - 1) {
+        wrapsWholeExpression = false;
+        break;
+      }
+    }
+    if (!wrapsWholeExpression) break;
+    normalized = normalized.slice(1, -1);
+  }
+  return normalized;
+}
+
 function hasExactLiterals(definition: string, expected: readonly string[]) {
   return sqlLiterals(definition).sort().join("\0") === [...expected].sort().join("\0");
 }
@@ -134,21 +158,30 @@ function hasValidReadLaterStatusConstraint(definition: string | null) {
 function hasValidReadLaterActiveUrlIndex(capabilities: ReleaseSchemaCapabilities) {
   const definition = capabilities.readLaterActiveUrlIndexDefinition;
   const predicate = capabilities.readLaterActiveUrlIndexPredicate;
-  if (!definition || !predicate || !capabilities.readLaterActiveUrlIndexIsUnique) return false;
+  if (
+    !definition
+    || !predicate
+    || !capabilities.readLaterActiveUrlIndexIsUnique
+    || !capabilities.readLaterActiveUrlIndexIsValid
+    || !capabilities.readLaterActiveUrlIndexIsReady
+    || normalizedSql(capabilities.readLaterActiveUrlIndexKeyDefinition ?? "") !== "normalized_url"
+    || capabilities.readLaterActiveUrlIndexKeyCount !== 1
+    || capabilities.readLaterActiveUrlIndexAttributeCount !== 1
+  ) return false;
 
   const normalizedDefinition = normalizedSql(definition);
   const hasExpectedKey = /^createuniqueindexreferences_active_read_later_normalized_url_keyon(?:[a-z0-9_]+\.)?referencesusingbtree\(normalized_url\)where/.test(
     normalizedDefinition,
   );
-  if (!hasExpectedKey || /\bOR\b/i.test(predicate)) return false;
+  if (!hasExpectedKey) return false;
 
-  const normalizedPredicate = normalizedSql(predicate).replace(/[()]/g, "");
-  const conjunctions = predicate.match(/\bAND\b/gi)?.length ?? 0;
-  return conjunctions === 2
-    && hasExactLiterals(predicate, ["read_later", "unread", "read"])
-    && normalizedPredicate.includes("kind='read_later'")
-    && normalizedPredicate.includes("normalized_urlisnotnull")
-    && normalizedPredicate.includes("read_status=anyarray[");
+  const canonicalPredicate = withoutRedundantOuterParentheses(normalizedSql(predicate));
+  const expectedPredicate = withoutRedundantOuterParentheses(normalizedSql(`
+    ("kind" = 'read_later'::text)
+    AND ("normalized_url" IS NOT NULL)
+    AND ("read_status" = ANY (ARRAY['unread'::text, 'read'::text]))
+  `));
+  return canonicalPredicate === expectedPredicate;
 }
 
 function readLaterProtectionFailures(capabilities: ReleaseSchemaCapabilities) {
@@ -219,7 +252,62 @@ async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
           AND table_row.relname = 'references'
           AND index_class.relname = 'references_active_read_later_normalized_url_key'
         LIMIT 1
-      ), false) AS "readLaterActiveUrlIndexIsUnique"
+      ), false) AS "readLaterActiveUrlIndexIsUnique",
+      COALESCE((
+        SELECT index_catalog.indisvalid
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ), false) AS "readLaterActiveUrlIndexIsValid",
+      COALESCE((
+        SELECT index_catalog.indisready
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ), false) AS "readLaterActiveUrlIndexIsReady",
+      (
+        SELECT pg_catalog.pg_get_indexdef(index_catalog.indexrelid, 1, true)
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ) AS "readLaterActiveUrlIndexKeyDefinition",
+      COALESCE((
+        SELECT index_catalog.indnkeyatts::integer
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ), 0) AS "readLaterActiveUrlIndexKeyCount",
+      COALESCE((
+        SELECT index_catalog.indnatts::integer
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ), 0) AS "readLaterActiveUrlIndexAttributeCount"
   `);
   const row = result.rows[0] as {
     hasParentAreaId?: boolean;
@@ -228,6 +316,11 @@ async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
     readLaterActiveUrlIndexDefinition?: string | null;
     readLaterActiveUrlIndexPredicate?: string | null;
     readLaterActiveUrlIndexIsUnique?: boolean;
+    readLaterActiveUrlIndexIsValid?: boolean;
+    readLaterActiveUrlIndexIsReady?: boolean;
+    readLaterActiveUrlIndexKeyDefinition?: string | null;
+    readLaterActiveUrlIndexKeyCount?: number;
+    readLaterActiveUrlIndexAttributeCount?: number;
   } | undefined;
   return {
     hasParentAreaId: row?.hasParentAreaId === true,
@@ -236,6 +329,11 @@ async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
     readLaterActiveUrlIndexDefinition: row?.readLaterActiveUrlIndexDefinition ?? null,
     readLaterActiveUrlIndexPredicate: row?.readLaterActiveUrlIndexPredicate ?? null,
     readLaterActiveUrlIndexIsUnique: row?.readLaterActiveUrlIndexIsUnique === true,
+    readLaterActiveUrlIndexIsValid: row?.readLaterActiveUrlIndexIsValid === true,
+    readLaterActiveUrlIndexIsReady: row?.readLaterActiveUrlIndexIsReady === true,
+    readLaterActiveUrlIndexKeyDefinition: row?.readLaterActiveUrlIndexKeyDefinition ?? null,
+    readLaterActiveUrlIndexKeyCount: row?.readLaterActiveUrlIndexKeyCount ?? 0,
+    readLaterActiveUrlIndexAttributeCount: row?.readLaterActiveUrlIndexAttributeCount ?? 0,
   };
 }
 
