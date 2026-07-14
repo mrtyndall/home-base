@@ -13,8 +13,8 @@ assert.doesNotMatch(
 );
 assert.match(
   dockerfile,
-  /COPY --from=deps \/app\/node_modules \.\/node_modules/,
-  "The runner must reuse the lockfile-pinned dependency installation.",
+  /COPY --from=builder --chown=nextjs:nodejs \/app\/node_modules \.\/node_modules/,
+  "The runner must reuse the lockfile-pinned, post-generation dependency tree.",
 );
 assert.match(
   dockerfile,
