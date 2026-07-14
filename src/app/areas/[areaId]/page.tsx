@@ -226,9 +226,9 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
           ) : null}
           {data.projects.length ? <ProjectInboxGroup projects={data.projects} areas={data.areas} /> : null}
           {data.tasks.length ? <SimpleInboxGroup title="Tasks" items={data.tasks.map((item) => ({ id: item.id, label: item.title, href: `/tasks/${item.id}` }))} /> : null}
-          {data.ideas.length ? <SimpleInboxGroup title="Ideas" items={data.ideas.map((item) => ({ id: item.id, label: item.title, href: "/ideas" }))} /> : null}
+          {data.ideas.length ? <SimpleInboxGroup title="Ideas" items={data.ideas.map((item) => ({ id: item.id, label: item.title, href: `/ideas#idea-${item.id}` }))} /> : null}
           {data.references.length ? <SimpleInboxGroup title="References" items={data.references.map((item) => ({ id: item.id, label: item.title ?? item.body, href: `/references/${item.id}` }))} /> : null}
-          {data.entityDocs.length ? <SimpleInboxGroup title="Docs" items={data.entityDocs.map((item) => ({ id: item.id, label: item.title, href: `/search?q=${encodeURIComponent(item.title)}` }))} /> : null}
+          {data.entityDocs.length ? <SimpleInboxGroup title="Docs" items={data.entityDocs.map((item) => ({ id: item.id, label: item.title, href: `/areas/inbox#doc-${item.id}`, anchorId: `doc-${item.id}` }))} /> : null}
           {data.documents.length ? <SimpleInboxGroup title="Files" items={data.documents.map((item) => ({ id: item.id, label: item.filename, href: `/api/documents/${item.id}/download` }))} /> : null}
           {data.notes.length ? (
             <InboxPanel title="Notes" count={data.notes.length}>{data.notes.map((note) => <p key={note.id} className="line-clamp-3 p-4 text-sm leading-relaxed text-stone-700">{note.bodyMd}</p>)}</InboxPanel>
@@ -279,8 +279,8 @@ function InboxPanel({ title, count, id, children }: { title: string; count: numb
   return <section id={id} className="scroll-mt-24 space-y-2.5"><h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">{title} <span className="font-medium text-[#B0ACA2]">{count}</span></h2><div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">{children}</div></section>;
 }
 
-function SimpleInboxGroup({ title, items }: { title: string; items: Array<{ id: string; label: string; href: string }> }) {
-  return <InboxPanel title={title} count={items.length}>{items.map((item) => <Link key={item.id} href={item.href} className="block truncate px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5] hover:text-teal-700">{item.label}</Link>)}</InboxPanel>;
+function SimpleInboxGroup({ title, items }: { title: string; items: Array<{ id: string; label: string; href: string; anchorId?: string }> }) {
+  return <InboxPanel title={title} count={items.length}>{items.map((item) => <Link key={item.id} id={item.anchorId} href={item.href} className="block scroll-mt-24 truncate px-4 py-3 text-sm font-medium text-stone-900 transition hover:bg-[#F7F9F5] hover:text-teal-700">{item.label}</Link>)}</InboxPanel>;
 }
 
 function SmallAction({ children }: { children: ReactNode }) {

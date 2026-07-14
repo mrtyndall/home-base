@@ -298,7 +298,8 @@ function DocsPanel({
           {docs.map((doc) => (
             <details
               key={doc.id}
-              className="rounded-[12px] border border-[#EEF1EC] p-3"
+              id={`doc-${doc.id}`}
+              className="scroll-mt-24 rounded-[12px] border border-[#EEF1EC] p-3"
             >
               <summary className="cursor-pointer">
                 <span className="text-sm font-semibold text-stone-800">

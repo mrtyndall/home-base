@@ -152,7 +152,7 @@ function IdeasSection({ ideas }: { ideas: IdeaListItem[] }) {
   const olderIdeas = ideas.slice(6);
 
   return (
-    <section className="space-y-2.5">
+    <section id="ideas" className="scroll-mt-24 space-y-2.5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
           Ideas
@@ -173,7 +173,7 @@ function IdeasSection({ ideas }: { ideas: IdeaListItem[] }) {
             ))}
           </div>
           {olderIdeas.length > 0 ? (
-            <details className="rounded-[14px] border border-[#E2E6DF] bg-white/75">
+            <details open className="rounded-[14px] border border-[#E2E6DF] bg-white/75">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-stone-700 transition hover:text-teal-700 [&::-webkit-details-marker]:hidden">
                 <span>Older active ideas</span>
                 <span className="text-xs font-normal text-[#9AA096]">
@@ -202,8 +202,9 @@ function IdeaCard({
 }) {
   return (
     <details
+      id={`idea-${idea.id}`}
       className={`rounded-[14px] border border-[#E2E6DF] bg-white ${
-        compact ? "p-3" : "p-4"
+        compact ? "scroll-mt-24 p-3" : "scroll-mt-24 p-4"
       }`}
     >
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
@@ -438,7 +439,8 @@ function JournalSection({ entries }: { entries: JournalEntryWithAttachments[] })
                 {dateEntries.map((entry) => (
                   <article
                     key={entry.id}
-                    className="rounded-[18px] border border-[#E2E6DF] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]"
+                    id={`journal-${entry.id}`}
+                    className="scroll-mt-24 rounded-[18px] border border-[#E2E6DF] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]"
                   >
                     <MarkdownPreview
                       body={entry.bodyMd}
