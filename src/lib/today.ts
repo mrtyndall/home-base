@@ -8,6 +8,7 @@ import {
 import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getRoutinesWithState } from "@/lib/routines";
 import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
+import { mergeUpcomingCommitments } from "@/lib/upcoming-commitments";
 
 export async function getTodayDashboard() {
   const today = localDateString();
@@ -43,6 +44,8 @@ export async function getTodayDashboard() {
       calendarSync,
       calendarStaleMinutesSetting,
       areas,
+      upcomingTasks,
+      upcomingEvents,
     ] = await Promise.all([
       prisma.task.findMany({
         where: { status: "open", starred: true },
@@ -145,6 +148,24 @@ export async function getTodayDashboard() {
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
+      prisma.task.findMany({
+        where: {
+          status: "open",
+          someday: false,
+          dueDate: { gt: todayDate },
+        },
+        orderBy: [
+          { dueDate: "asc" },
+          { dueTime: { sort: "asc", nulls: "first" } },
+          { createdAt: "asc" },
+        ],
+        take: 3,
+      }),
+      prisma.calendarEvent.findMany({
+        where: { start: { gte: todayCalendarBounds.end } },
+        orderBy: { start: "asc" },
+        take: 3,
+      }),
     ]);
 
     // Daily resurfacing selection is lazy: the first Today load of the day
@@ -187,6 +208,10 @@ export async function getTodayDashboard() {
       taskInbox,
       todayEvents,
       tomorrowEvents,
+      upcomingCommitments: mergeUpcomingCommitments(
+        upcomingTasks,
+        upcomingEvents,
+      ),
       recentCaptures,
       nextTask,
       nextEvent,
