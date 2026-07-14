@@ -74,9 +74,10 @@ export function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "capture_input",
     {
-      description: "Submit ambiguous natural-language input to the lossless capture pipeline.",
+      description: "Submit input to the lossless capture ledger; preserve_only skips parser actions.",
       inputSchema: z.object({
         rawText: z.string().min(1),
+        captureIntent: z.literal("preserve_only").optional(),
         idempotencyKey: z.string().uuid().optional(),
         deviceContext: z.record(z.string(), z.unknown()).optional(),
       }),

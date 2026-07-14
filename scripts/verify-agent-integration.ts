@@ -33,8 +33,28 @@ export const READ_PROBES: ReadonlyArray<ToolRequest> = [
 ];
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const VERIFIED_ORIGINS: Record<string, Set<string>> = {
+  "/api/v1": new Set([
+    "http://127.0.0.1:3002",
+    "http://localhost:3002",
+    "http://[::1]:3002",
+    "https://mac-studio.tail3baa7a.ts.net",
+    "https://home-base-production-e3b7.up.railway.app",
+  ]),
+  "/api/mcp": new Set([
+    "http://127.0.0.1:8081",
+    "http://localhost:8081",
+    "http://[::1]:8081",
+    "https://mac-studio.tail3baa7a.ts.net:8443",
+  ]),
+};
 
-export function safeEndpoint(name: string, value: string | undefined, expectedPath: string) {
+export function safeEndpoint(
+  name: string,
+  value: string | undefined,
+  expectedPath: string,
+  options: { unsafeAllowUnverifiedHost?: boolean } = {},
+) {
   if (!value) throw new Error(`${name} is required`);
 
   let url: URL;
@@ -55,6 +75,13 @@ export function safeEndpoint(name: string, value: string | undefined, expectedPa
   }
   if (url.pathname !== expectedPath) {
     throw new Error(`${name} must end at the exact ${expectedPath} route`);
+  }
+  const verifiedOrigins = VERIFIED_ORIGINS[expectedPath];
+  const unsafeHttpsOverride = url.protocol === "https:" && options.unsafeAllowUnverifiedHost;
+  if (!verifiedOrigins?.has(url.origin) && !unsafeHttpsOverride) {
+    throw new Error(
+      `${name} uses an unverified host; refuse to forward credentials without HOME_BASE_UNSAFE_ALLOW_UNVERIFIED_HOST=1`,
+    );
   }
 
   return url;
@@ -101,22 +128,94 @@ function createdTaskId(result: unknown) {
   return task.id;
 }
 
-export async function runWriteSmoke(callTool: CallTool, now = new Date()) {
-  const marker = `[HERMES-SMOKE] ${now.toISOString()}`;
-  textPayload(await callTool({
-    name: "capture_input",
-    arguments: { rawText: `${marker} integration capture; preserve this audit record` },
-  }));
-  const created = await callTool({
-    name: "create_task",
-    arguments: {
-      title: `${marker} integration verification task`,
-      notes: "Non-destructive integration smoke task. Complete after creation; never delete.",
-    },
+const SMOKE_TASK_TITLE = "[HERMES-SMOKE] Agent integration verification task";
+const SMOKE_CAPTURE_IDEMPOTENCY_KEY = "5b9f23d4-3e09-4f2f-8946-bdd621b4b5b2";
+
+function matchingOpenSmokeTaskIds(result: unknown) {
+  const payload = textPayload(result);
+  if (!Array.isArray(payload.tasks)) throw new Error("list_tasks returned no task list");
+  return payload.tasks.flatMap((task) => {
+    if (!task || typeof task !== "object") return [];
+    const candidate = task as { id?: unknown; title?: unknown; status?: unknown };
+    return candidate.title === SMOKE_TASK_TITLE &&
+      candidate.status === "open" &&
+      typeof candidate.id === "string"
+      ? [candidate.id]
+      : [];
   });
-  const taskId = createdTaskId(created);
-  textPayload(await callTool({ name: "complete_task", arguments: { taskId } }));
-  return { taskId };
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function runWriteSmoke(callTool: CallTool) {
+  const discoveredIds = new Set<string>();
+  const completedIds = new Set<string>();
+  let createdTask: string | undefined;
+  let primaryError: unknown;
+
+  try {
+    const before = await callTool({
+      name: "list_tasks",
+      arguments: { q: SMOKE_TASK_TITLE, view: "open", limit: 100 },
+    });
+    for (const taskId of matchingOpenSmokeTaskIds(before)) discoveredIds.add(taskId);
+
+    textPayload(await callTool({
+      name: "capture_input",
+      arguments: {
+        rawText: "[HERMES-SMOKE] Persistence-only integration capture audit record",
+        captureIntent: "preserve_only",
+        idempotencyKey: SMOKE_CAPTURE_IDEMPOTENCY_KEY,
+      },
+    }));
+    const created = await callTool({
+      name: "create_task",
+      arguments: {
+        title: SMOKE_TASK_TITLE,
+        notes: "Non-destructive integration smoke task. Complete after creation; never delete.",
+      },
+    });
+    createdTask = createdTaskId(created);
+    discoveredIds.add(createdTask);
+    textPayload(await callTool({ name: "complete_task", arguments: { taskId: createdTask } }));
+    completedIds.add(createdTask);
+  } catch (error) {
+    primaryError = error;
+  }
+
+  const cleanupErrors: string[] = [];
+  try {
+    const after = await callTool({
+      name: "list_tasks",
+      arguments: { q: SMOKE_TASK_TITLE, view: "open", limit: 100 },
+    });
+    for (const taskId of matchingOpenSmokeTaskIds(after)) discoveredIds.add(taskId);
+  } catch (error) {
+    cleanupErrors.push(`post-write task discovery: ${errorMessage(error)}`);
+  }
+
+  for (const taskId of discoveredIds) {
+    if (completedIds.has(taskId)) continue;
+    try {
+      textPayload(await callTool({ name: "complete_task", arguments: { taskId } }));
+      completedIds.add(taskId);
+    } catch (error) {
+      cleanupErrors.push(`task ${taskId}: ${errorMessage(error)}`);
+    }
+  }
+
+  if (primaryError && cleanupErrors.length > 0) {
+    throw new Error(
+      `Write smoke failed: ${errorMessage(primaryError)}; cleanup failed: ${cleanupErrors.join("; ")}`,
+    );
+  }
+  if (primaryError) throw primaryError;
+  if (cleanupErrors.length > 0) {
+    throw new Error(`Write smoke cleanup failed: ${cleanupErrors.join("; ")}`);
+  }
+  return { taskId: createdTask };
 }
 
 async function checkHttp(label: string, url: URL) {
@@ -129,8 +228,19 @@ async function checkHttp(label: string, url: URL) {
 }
 
 async function run() {
-  const apiUrl = safeEndpoint("HOME_BASE_API_URL", process.env.HOME_BASE_API_URL, "/api/v1");
-  const mcpUrl = safeEndpoint("HOME_BASE_MCP_URL", process.env.HOME_BASE_MCP_URL, "/api/mcp");
+  const unsafeAllowUnverifiedHost = process.env.HOME_BASE_UNSAFE_ALLOW_UNVERIFIED_HOST === "1";
+  const apiUrl = safeEndpoint(
+    "HOME_BASE_API_URL",
+    process.env.HOME_BASE_API_URL,
+    "/api/v1",
+    { unsafeAllowUnverifiedHost },
+  );
+  const mcpUrl = safeEndpoint(
+    "HOME_BASE_MCP_URL",
+    process.env.HOME_BASE_MCP_URL,
+    "/api/mcp",
+    { unsafeAllowUnverifiedHost },
+  );
   const token = process.env.HOME_BASE_API_TOKEN;
 
   await checkHttp("Home Base app health", new URL("/", apiUrl));

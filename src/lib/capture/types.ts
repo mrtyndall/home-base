@@ -7,7 +7,7 @@ export const captureInputSchema = z.object({
     .enum(["in_app_text", "in_app_voice", "ios_shortcut", "android_shortcut", "api"])
     .default("in_app_text"),
   captureIntent: z
-    .enum(["auto", "task", "note", "idea", "reference"])
+    .enum(["auto", "preserve_only", "task", "note", "idea", "reference"])
     .default("auto"),
   captureDueDate: z
     .string()

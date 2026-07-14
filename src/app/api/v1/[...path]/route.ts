@@ -419,7 +419,7 @@ export async function POST(request: Request, context: RouteCtx) {
         return submitCapture({
           rawText: parsed.rawText,
           source: "api",
-          captureIntent: "auto",
+          captureIntent: parsed.captureIntent ?? "auto",
           idempotencyKey: parsed.idempotencyKey,
           deviceContext: parsed.deviceContext,
         }, { apiKeyLabel: apiKey.label });
@@ -1396,6 +1396,7 @@ const createTaskSchema = z.object({
 
 const apiCaptureSchema = z.object({
   rawText: z.string().min(1),
+  captureIntent: z.literal("preserve_only").optional(),
   idempotencyKey: z.string().uuid().optional(),
   deviceContext: z.record(z.string(), z.unknown()).optional(),
 });

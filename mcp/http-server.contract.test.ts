@@ -8,7 +8,7 @@ import { TOOL_CONTRACTS } from "./http-server.contract-manifest";
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 type ToolRegistration = {
   name: string;
-  config: { description?: string };
+  config: { description?: string; inputSchema?: { safeParse(input: unknown): { success: boolean } } };
   handler: ToolHandler;
 };
 
@@ -94,6 +94,20 @@ test("Home Base MCP uses unique, active, non-destructive contracts for every cap
       `${contract.name} must declare every dynamic path ID for the route-confusion scan`,
     );
   }
+});
+
+test("capture_input exposes the persistence-only idempotent smoke contract", () => {
+  const capture = collectTools().find((tool) => tool.name === "capture_input");
+  assert.ok(capture?.config.inputSchema);
+  assert.equal(capture.config.inputSchema.safeParse({
+    rawText: "Preserve this",
+    captureIntent: "preserve_only",
+    idempotencyKey: "5b9f23d4-3e09-4f2f-8946-bdd621b4b5b2",
+  }).success, true);
+  assert.equal(capture.config.inputSchema.safeParse({
+    rawText: "Do not expose model-selected intent",
+    captureIntent: "task",
+  }).success, false);
 });
 
 test("every Home Base MCP tool matches its expected REST method, path, query, and body", async () => {

@@ -28,7 +28,21 @@ export const TOOL_CONTRACTS: ToolContract[] = [
   c("all_clear_summary", {}, "GET", "/today"),
   c("search", { query: "Needle & thread" }, "GET", "/search?q=Needle%20%26%20thread"),
   c("list_captures", { limit: 5, cursor: "cursor" }, "GET", "/captures?limit=5&cursor=cursor"),
-  c("capture_input", { rawText: "Remember this" }, "POST", "/captures", { rawText: "Remember this" }),
+  c(
+    "capture_input",
+    {
+      rawText: "Remember this",
+      captureIntent: "preserve_only",
+      idempotencyKey: UUID,
+    },
+    "POST",
+    "/captures",
+    {
+      rawText: "Remember this",
+      captureIntent: "preserve_only",
+      idempotencyKey: UUID,
+    },
+  ),
   c("create_task", { title: "Task" }, "POST", "/tasks", { title: "Task" }),
   c("read_task", { taskId: ID }, "GET", `/tasks/${ENCODED_ID}`, undefined, ["taskId"]),
   c("update_task", { taskId: ID, title: "Updated" }, "PATCH", `/tasks/${ENCODED_ID}`, { title: "Updated" }, ["taskId"]),

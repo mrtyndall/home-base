@@ -50,6 +50,17 @@ export async function submitCapture(
   const actorContext = validateCaptureActor(parsedInput, trustedActor);
   const captureId = parsedInput.idempotencyKey ?? randomUUID();
 
+  if (parsedInput.captureIntent === "preserve_only") {
+    return persistCaptureAtomically({
+      captureId,
+      input: parsedInput,
+      actorContext,
+      actions: [],
+      status: "parsed",
+      areas: [],
+    });
+  }
+
   let actions: ParserAction[] = [];
   let status: CaptureParseStatus = "parsed";
   let areas: AreaContext[] = [];
@@ -289,6 +300,7 @@ function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
         },
       ];
     case "auto":
+    case "preserve_only":
       return [];
   }
 }

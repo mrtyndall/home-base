@@ -33,13 +33,14 @@ The identities describe the same current Mac but are not interchangeable configu
 
 ## Environment-only client configuration
 
-Hermes must receive these names from its approved runtime environment:
+The Hermes MCP client needs only the MCP endpoint and bearer reference:
 
-```text
-HOME_BASE_API_URL=http://127.0.0.1:3002/api/v1
-HOME_BASE_MCP_URL=https://mac-studio.tail3baa7a.ts.net:8443/api/mcp
-HOME_BASE_API_TOKEN=<credential supplied by the approved 1Password-backed runtime>
+```bash
+export HOME_BASE_MCP_URL="https://mac-studio.tail3baa7a.ts.net:8443/api/mcp"
+export HOME_BASE_API_TOKEN="$(_op_read 'op://Personal/<Home Base Hermes item>/credential')"
 ```
+
+`HOME_BASE_API_URL` is not a Hermes client setting. It is the MCP server's upstream REST base and an input to the repository verifier so that the verifier can check app health.
 
 The following is a secret-free configuration shape, not a file to save after interpolation. It assumes the Hermes MCP configuration layer expands environment references. If that client does not support expansion, inject the same values into its process environment or generated in-memory configuration; never paste the expanded bearer value into JSON.
 
@@ -78,16 +79,19 @@ When an operator provisions the integration:
    npm run api:key:register -- hermes read,write,capture
    ```
 
-4. Supply `HOME_BASE_API_URL` and `HOME_BASE_MCP_URL` through the Hermes service environment, and pass `HOME_BASE_API_TOKEN` through the same 1Password-backed runtime.
+4. Supply `HOME_BASE_MCP_URL` through the Hermes service environment, and pass `HOME_BASE_API_TOKEN` through the same 1Password-backed runtime. Configure `HOME_BASE_API_URL` only on the Home Base MCP server and when running the verifier.
 5. Run read-only verification first. Enable the write smoke only after confirming the key is dedicated and the three scopes are correct.
 
 The registration script reports label, scopes, and rate limit only. It never prints the token and stores only its hash.
 
 ## Verification command
 
-`npm run verify:agent-integration` validates URL safety, checks app and MCP health, performs MCP initialization and tool discovery, and invokes one representative read for each documented read capability group. It does not print tool payloads or credentials.
+`npm run verify:agent-integration` validates URL safety, checks app and MCP health, performs MCP initialization and tool discovery, and invokes one representative read for each documented read capability group. It does not print tool payloads or credentials. By default it accepts only the verified Home Base API origins and the verified loopback/Tailnet MCP origins documented above; this prevents forwarding a bearer token to an arbitrary HTTPS host.
 
 ```bash
+export HOME_BASE_API_URL="http://127.0.0.1:3002/api/v1"
+export HOME_BASE_MCP_URL="http://127.0.0.1:8081/api/mcp"
+export HOME_BASE_API_TOKEN="$(_op_read 'op://Personal/<Home Base Hermes item>/credential')"
 npm run verify:agent-integration
 ```
 
@@ -99,7 +103,9 @@ The write smoke is off by default. Its only opt-in value is `1`:
 HOME_BASE_ENABLE_WRITE_SMOKE=1 npm run verify:agent-integration
 ```
 
-That smoke preserves a `[HERMES-SMOKE]` capture, creates a `[HERMES-SMOKE]` task, and completes the task. It never deletes either record. Run it only with the dedicated `read,write,capture` key.
+That smoke submits a fixed, idempotent `[HERMES-SMOKE]` capture with `captureIntent: preserve_only`, which writes the sacred capture ledger and pending audit record without invoking model parsing or parser actions. It then lists matching open smoke tasks, creates the fixed-title smoke task, and completes it. A final task lookup completes every matching open residue, including a task whose create response was lost. It never deletes either record. Run it only with the dedicated `read,write,capture` key.
+
+`HOME_BASE_UNSAFE_ALLOW_UNVERIFIED_HOST=1` disables the verified-origin check for HTTPS. This is an emergency diagnostic escape hatch: it can send the bearer credential to an attacker-controlled host. Do not set it in Hermes, LaunchAgents, shell profiles, or routine verification. Prefer adding a newly verified Home Base origin to the source allowlist with tests and review.
 
 ## Runtime checks
 
@@ -124,8 +130,8 @@ Troubleshooting order:
 
 1. If local health fails, check the two LaunchAgent states and loopback listeners before changing Tailnet configuration.
 2. If local health passes but Tailnet fails, trust `tailscale serve status` for the current hostname, port, and proxy target.
-3. HTTP 401 from `/api/mcp` means MCP is reachable but the bearer reference is absent or invalid. HTTP 403 usually means the key lacks a required scope.
-4. If discovery succeeds but a read fails, compare the tool against [home-base-capability-matrix.md](./home-base-capability-matrix.md) and inspect redacted application logs.
+3. HTTP 401 from `/api/mcp` means the MCP boundary bearer is absent or malformed. An invalid or revoked Home Base API key passes that boundary but produces an MCP tool `isError` result containing the redacted structured API error.
+4. A missing `read`, `write`, or `capture` scope also appears as a tool `isError`/structured API error, not as an MCP transport HTTP 403. Compare the failing tool against [home-base-capability-matrix.md](./home-base-capability-matrix.md) and inspect redacted application logs.
 5. If the local runtime is stale after a release, rebuild and restart both LaunchAgents as described in the root architecture guide.
 
 ## Verification boundary
