@@ -13,6 +13,7 @@ const scheduler: Scheduler = {
 export class InboxFilingCoordinator<Value> {
   private readonly channel: MutationChannel<Value>;
   private timer: unknown = null;
+  private disposed = false;
 
   constructor(
     initial: Value,
@@ -27,28 +28,36 @@ export class InboxFilingCoordinator<Value> {
   subscribe = (listener: () => void) => this.channel.subscribe(listener);
 
   async mutate(next: Value, write: (value: Value) => Promise<Value>) {
+    if (this.disposed) return;
     await this.channel.mutate(next, write);
+    if (this.disposed) return;
     this.beginUndoWindow();
   }
 
   async retry(write: (value: Value) => Promise<Value>) {
+    if (this.disposed) return;
     await this.channel.retry(write);
+    if (this.disposed) return;
     this.beginUndoWindow();
   }
 
   async undo(write: (value: Value) => Promise<Value>) {
+    if (this.disposed) return;
     this.clearTimer();
     await this.channel.undo(write);
+    if (this.disposed) return;
     if (this.channel.snapshot().error) return;
     this.channel.clearUndo();
     this.refresh();
   }
 
   dispose() {
+    this.disposed = true;
     this.clearTimer();
   }
 
   private beginUndoWindow() {
+    if (this.disposed) return;
     this.clearTimer();
     if (!this.channel.snapshot().undo) return;
     this.timer = this.clock.setTimeout(() => {

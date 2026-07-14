@@ -137,3 +137,29 @@ test("successful filing refreshes only when the exact six-second Undo window exp
   assert.equal(refreshCount, 1);
   assert.equal(coordinator.snapshot().undo, null);
 });
+
+test("disposing during an in-flight filing prevents a later timer and stale refresh", async () => {
+  type Location = { areaId: string | null; label: string };
+  let resolveWrite: ((value: Location) => void) | undefined;
+  let timerCount = 0;
+  let refreshCount = 0;
+  const coordinator = new InboxFilingCoordinator<Location>(
+    { areaId: null, label: "No area yet" },
+    (left, right) => left.areaId === right.areaId,
+    () => { refreshCount += 1; },
+    {
+      setTimeout: () => { timerCount += 1; return 1; },
+      clearTimeout: () => {},
+    },
+  );
+  const next = { areaId: "area-1", label: "Home" };
+  const pending = coordinator.mutate(next, () => new Promise<Location>((resolve) => {
+    resolveWrite = resolve;
+  }));
+  await Promise.resolve();
+  coordinator.dispose();
+  resolveWrite?.(next);
+  await pending;
+  assert.equal(timerCount, 0);
+  assert.equal(refreshCount, 0);
+});
