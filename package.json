@@ -14,6 +14,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "verify:area-migration": "tsx scripts/verify-area-first-migration.ts",
     "backup:db": "tsx scripts/backup-database.ts",
     "references:artwork": "DOTENV_CONFIG_PATH=.env.local tsx -r dotenv/config scripts/enrich-reference-artwork.ts",
     "import:reminders": "tsx scripts/import-apple-reminders.ts",

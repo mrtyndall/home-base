@@ -208,24 +208,9 @@ model CaptureTextEdit {
   @@map("capture_text_edits")
 }
 
-model Domain {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  description String?
-  sortOrder   Int     @default(0) @map("sort_order")
-  isSystem    Boolean @default(false) @map("is_system")
-  active      Boolean @default(true)
-
-  areas Area[]
-
-  @@index([active, sortOrder])
-  @@map("domains")
-}
-
 model Area {
   id             String     @id @default(uuid())
   name           String
-  domainId       String     @map("domain_id")
   status         AreaStatus @default(active)
   currentState   String?    @map("current_state")
   nextStep       String?    @map("next_step")
@@ -235,7 +220,6 @@ model Area {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  domain          Domain                  @relation(fields: [domainId], references: [id])
   ideas           Idea[]
   people          Person[]
   projects        Project[]
@@ -244,7 +228,6 @@ model Area {
   reviewProposals CaptureReviewProposal[]
   tasks           Task[]
 
-  @@index([domainId, status, sortOrder])
   @@index([status, sortOrder])
   @@map("areas")
 }
@@ -301,7 +284,7 @@ model Task {
   dueDate         DateTime?  @map("due_date") @db.Date
   dueTime         String?    @map("due_time")
   priority        String?
-  areaId          String     @default("area_inbox") @map("area_id")
+  areaId          String?    @map("area_id")
   projectId       String?    @map("project_id")
   parentTaskId    String?    @map("parent_task_id")
   someday         Boolean    @default(false)
@@ -316,7 +299,7 @@ model Task {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   capture            Capture?           @relation(fields: [captureId], references: [id])
-  area               Area               @relation(fields: [areaId], references: [id])
+  area               Area?              @relation(fields: [areaId], references: [id])
   parent             Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
   project            Project?           @relation(fields: [projectId], references: [id])
   reminderDeliveries ReminderDelivery[]
@@ -451,9 +434,9 @@ model ReferenceMention {
 }
 
 model EntityNote {
-  id         String           @id @default(uuid())
-  parentType EntityParentType @map("parent_type")
-  parentId   String           @map("parent_id")
+  id         String            @id @default(uuid())
+  parentType EntityParentType? @map("parent_type")
+  parentId   String?           @map("parent_id")
   bodyMd     String           @map("body_md")
   source     String?
   captureId  String?          @map("capture_id")
@@ -650,9 +633,9 @@ model CheckIn {
 }
 
 model EntityDoc {
-  id         String           @id @default(uuid())
-  parentType EntityParentType @map("parent_type")
-  parentId   String           @map("parent_id")
+  id         String            @id @default(uuid())
+  parentType EntityParentType? @map("parent_type")
+  parentId   String?           @map("parent_id")
   title      String
   bodyMd     String           @map("body_md")
   status     EntityDocStatus  @default(active)
@@ -669,9 +652,9 @@ model EntityDoc {
 }
 
 model Document {
-  id         String           @id @default(uuid())
-  parentType EntityParentType @map("parent_type")
-  parentId   String           @map("parent_id")
+  id         String            @id @default(uuid())
+  parentType EntityParentType? @map("parent_type")
+  parentId   String?           @map("parent_id")
   filename   String
   r2Key      String           @map("r2_key")
   mime       String
