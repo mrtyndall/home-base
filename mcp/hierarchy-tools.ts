@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { apiPath } from "./proxy-path";
 
 const id = z.string().trim().min(1);
 const optionalParentId = z.preprocess(
@@ -49,14 +50,14 @@ export function hierarchyProxyRequest(
   if (tool === "reparent_area") {
     const { areaId, parentAreaId } = hierarchyMcpSchemas.reparentArea.parse(rawInput);
     return {
-      path: `/areas/${areaId}`,
+      path: apiPath("/areas", areaId),
       method: "PATCH" as const,
       body: { parentAreaId },
     };
   }
   const { projectId, areaId } = hierarchyMcpSchemas.fileProject.parse(rawInput);
   return {
-    path: `/projects/${projectId}`,
+    path: apiPath("/projects", projectId),
     method: "PATCH" as const,
     body: { areaId },
   };

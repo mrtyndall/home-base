@@ -18,6 +18,6 @@ The executable registry contract is:
 npx tsx --test mcp/http-server.contract.test.ts
 ```
 
-That check proves registry uniqueness, required capability groups, REST forwarding, bearer preservation, non-destructive naming, and structured error behavior in code. It does **not** prove that the current host, Tailnet route, LaunchAgent, Railway deployment, API key, or production database is healthy.
+That check matches the exact 74-tool registry against a complete expected manifest and invokes every actual handler with a fake REST boundary. It verifies bearer preservation, method/path/query/body forwarding, centralized dynamic-ID rejection and encoding, non-destructive naming, and redacted structured error behavior. It does **not** prove that the current host, Tailnet route, LaunchAgent, Railway deployment, API key, or production database is healthy.
 
 Current-host discovery, secret-free client configuration, and live read/write smoke procedures are intentionally completed in Hermes Task 2 using live host evidence. Do not copy host assumptions from older documentation.

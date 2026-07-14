@@ -39,6 +39,8 @@ import {
 } from "@/lib/api/read-later-router";
 import { toReferenceSearchResult, type SearchableReference } from "@/lib/reference-search-result";
 import { updateEntityNoteForApi } from "@/lib/api/entity-note";
+import { convertIdeaForApi } from "@/lib/api/idea-conversion";
+import { updateMilestoneForApi } from "@/lib/api/milestone";
 
 type RouteCtx = {
   params: Promise<{ path?: string[] }>;
@@ -541,60 +543,11 @@ export async function POST(request: Request, context: RouteCtx) {
             areaId: z.string().optional(),
           })
           .parse(body);
-        const idea = await prisma.idea.findUnique({ where: { id } });
-        if (!idea) return notFound();
-        if (parsed.to === "task") {
-          const task = await createTaskWithAudit(
-            {
-              title: parsed.title ?? idea.title,
-              notes: idea.body,
-              areaId: parsed.areaId ?? idea.areaId,
-              source: `api:${apiKey.label}`,
-            },
-            { source: "api", label: apiKey.label },
-          );
-          await prisma.idea.update({
-            where: { id },
-            data: {
-              status: "converted",
-              convertedToType: "task",
-              convertedToId: task.id,
-            },
-          });
-          return { task };
-        }
-
-        const projectAreaId = parsed.areaId ?? idea.areaId;
-        if (projectAreaId) {
-          await resolveVerifiedDestination({ areaId: projectAreaId });
-        }
-        const project = await prisma.project.create({
-          data: {
-            name: parsed.title ?? idea.title,
-            areaId: projectAreaId,
-            currentState: idea.body ?? "Converted from idea.",
-            activity: {
-              create: {
-                entry: "Converted from idea through API.",
-                source: `api:${apiKey.label}`,
-              },
-            },
-          },
-        });
-        await prisma.idea.update({
-          where: { id },
-          data: {
-            status: "converted",
-            convertedToType: "project",
-            convertedToId: project.id,
-          },
-        });
-        await auditApiWrite(apiKey, "idea_converted", "Idea converted", {
-          type: "idea",
-          id,
-          to: parsed.to,
-        });
-        return { project };
+        const converted = await convertIdeaForApi(id, parsed, apiKey);
+        if (!converted) return notFound();
+        return converted.type === "task"
+          ? { task: converted.value }
+          : { project: converted.value };
       }
 
       if (resource === "ideas") {
@@ -1149,20 +1102,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (resource === "milestones") {
       const parsed = patchMilestoneSchema.parse(body);
-      const milestone = await prisma.milestone.update({
-        where: { id },
-        data: {
-          title: parsed.title,
-          status: parsed.status,
-          sortOrder: parsed.sortOrder,
-          completedAt: parsed.status === "completed" ? new Date() : undefined,
-        },
-      });
-      await auditApiWrite(apiKey, "milestone_updated", "Milestone updated", {
-        type: "milestone",
-        id,
-      });
-      return { milestone };
+      return { milestone: await updateMilestoneForApi(id, parsed, apiKey) };
     }
 
     if (resource === "calendar-events") {

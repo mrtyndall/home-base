@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { apiPath } from "./proxy-path";
 
 const httpUrl = z.string().url().refine((value) => {
   const protocol = new URL(value).protocol;
@@ -50,8 +51,8 @@ export function readLaterProxyRequest(name: ToolName, rawInput: unknown) {
   }
   if (name === "file_reference") {
     const { referenceId, ...body } = readLaterMcpSchemas.file.parse(rawInput);
-    return { path: `/references/${encodeURIComponent(referenceId)}/file`, method: "POST" as const, body };
+    return { path: apiPath("/references", referenceId, "file"), method: "POST" as const, body };
   }
   const { referenceId, ...body } = readLaterMcpSchemas.status.parse(rawInput);
-  return { path: `/read-later/${encodeURIComponent(referenceId)}/status`, method: "POST" as const, body };
+  return { path: apiPath("/read-later", referenceId, "status"), method: "POST" as const, body };
 }

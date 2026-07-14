@@ -10,6 +10,7 @@ import {
 } from "./hierarchy-tools";
 import { registerReadLaterTools } from "./read-later-registration";
 import { mcpApiError, toToolResult } from "./proxy-result";
+import { apiPath } from "./proxy-path";
 
 const PORT = Number(process.env.MCP_PORT || 8081);
 const API_BASE = process.env.HOME_BASE_API_URL || "http://127.0.0.1:3002/api/v1";
@@ -109,7 +110,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a task with its filing and subtasks.",
       inputSchema: z.object({ taskId: z.string().min(1) }),
     },
-    async ({ taskId }) => toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}`)),
+    async ({ taskId }) => toToolResult(await apiFetch(bearerToken, apiPath("/tasks", taskId))),
   );
 
   server.registerTool(
@@ -133,7 +134,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ taskId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/tasks", taskId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -143,7 +144,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ taskId: z.string().min(1) }),
     },
     async ({ taskId }) =>
-      toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}/complete`, "POST", {})),
+      toToolResult(await apiFetch(bearerToken, apiPath("/tasks", taskId, "complete"), "POST", {})),
   );
 
   server.registerTool(
@@ -161,7 +162,17 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read an area with its open tasks, projects, notes, docs, and attachments.",
       inputSchema: z.object({ areaId: z.string().min(1) }),
     },
-    async ({ areaId }) => toToolResult(await apiFetch(bearerToken, `/areas/${areaId}`)),
+    async ({ areaId }) => toToolResult(await apiFetch(bearerToken, apiPath("/areas", areaId))),
+  );
+
+  server.registerTool(
+    "read_area_aggregate",
+    {
+      description: "Read the derived aggregate for an Area.",
+      inputSchema: z.object({ areaId: z.string().min(1) }),
+    },
+    async ({ areaId }) =>
+      toToolResult(await apiFetch(bearerToken, apiPath("/areas", areaId, "aggregate"))),
   );
 
   server.registerTool(
@@ -200,7 +211,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ areaId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/areas/${areaId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/areas", areaId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -227,7 +238,17 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a Project with activity and milestones.",
       inputSchema: z.object({ projectId: z.string().min(1) }),
     },
-    async ({ projectId }) => toToolResult(await apiFetch(bearerToken, `/projects/${projectId}`)),
+    async ({ projectId }) => toToolResult(await apiFetch(bearerToken, apiPath("/projects", projectId))),
+  );
+
+  server.registerTool(
+    "list_project_activity",
+    {
+      description: "List the full recent activity feed for a Project.",
+      inputSchema: z.object({ projectId: z.string().min(1) }),
+    },
+    async ({ projectId }) =>
+      toToolResult(await apiFetch(bearerToken, apiPath("/projects", projectId, "activity"))),
   );
 
   server.registerTool(
@@ -237,7 +258,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ projectId: z.string().min(1), entry: z.string().min(1) }),
     },
     async ({ projectId, entry }) =>
-      toToolResult(await apiFetch(bearerToken, `/projects/${projectId}/activity`, "POST", { entry })),
+      toToolResult(await apiFetch(bearerToken, apiPath("/projects", projectId, "activity"), "POST", { entry })),
   );
 
   server.registerTool(
@@ -247,7 +268,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: hierarchyMcpSchemas.updateProject,
     },
     async ({ projectId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/projects", projectId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -275,7 +296,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ projectId, whereLeftOff }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", {
+        await apiFetch(bearerToken, apiPath("/projects", projectId), "PATCH", {
           status: "parked",
           currentState: whereLeftOff,
           logEntry: whereLeftOff ? `Parked: ${whereLeftOff}` : "Project parked.",
@@ -291,7 +312,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ projectId, logEntry }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", {
+        await apiFetch(bearerToken, apiPath("/projects", projectId), "PATCH", {
           status: "active",
           logEntry: logEntry ?? "Project unparked.",
         }),
@@ -328,7 +349,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read an Idea and its notes.",
       inputSchema: z.object({ ideaId: z.string().min(1) }),
     },
-    async ({ ideaId }) => toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}`)),
+    async ({ ideaId }) => toToolResult(await apiFetch(bearerToken, apiPath("/ideas", ideaId))),
   );
 
   server.registerTool(
@@ -346,7 +367,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ ideaId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/ideas", ideaId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -356,7 +377,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ ideaId: z.string().min(1), body: z.string().min(1) }),
     },
     async ({ ideaId, body }) =>
-      toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}/notes`, "POST", { body })),
+      toToolResult(await apiFetch(bearerToken, apiPath("/ideas", ideaId, "notes"), "POST", { body })),
   );
 
   server.registerTool(
@@ -374,7 +395,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a Library Reference with its filing.",
       inputSchema: z.object({ referenceId: z.string().min(1) }),
     },
-    async ({ referenceId }) => toToolResult(await apiFetch(bearerToken, `/references/${referenceId}`)),
+    async ({ referenceId }) => toToolResult(await apiFetch(bearerToken, apiPath("/references", referenceId))),
   );
 
   server.registerTool(
@@ -410,7 +431,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ referenceId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/references/${referenceId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/references", referenceId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -425,7 +446,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ ideaId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}/convert`, "POST", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/ideas", ideaId, "convert"), "POST", body)),
   );
 
   server.registerTool(
@@ -456,7 +477,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a shared markdown note.",
       inputSchema: z.object({ noteId: z.string().min(1) }),
     },
-    async ({ noteId }) => toToolResult(await apiFetch(bearerToken, `/entity-notes/${noteId}`)),
+    async ({ noteId }) => toToolResult(await apiFetch(bearerToken, apiPath("/entity-notes", noteId))),
   );
 
   server.registerTool(
@@ -466,7 +487,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ noteId: z.string().min(1), bodyMd: z.string().min(1) }),
     },
     async ({ noteId, bodyMd }) =>
-      toToolResult(await apiFetch(bearerToken, `/entity-notes/${noteId}`, "PATCH", { bodyMd })),
+      toToolResult(await apiFetch(bearerToken, apiPath("/entity-notes", noteId), "PATCH", { bodyMd })),
   );
 
   server.registerTool(
@@ -484,7 +505,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a shared markdown doc.",
       inputSchema: z.object({ docId: z.string().min(1) }),
     },
-    async ({ docId }) => toToolResult(await apiFetch(bearerToken, `/entity-docs/${docId}`)),
+    async ({ docId }) => toToolResult(await apiFetch(bearerToken, apiPath("/entity-docs", docId))),
   );
 
   server.registerTool(
@@ -513,7 +534,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ docId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/entity-docs/${docId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/entity-docs", docId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -550,7 +571,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ milestoneId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/milestones/${milestoneId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/milestones", milestoneId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -561,7 +582,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ milestoneId }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/milestones/${milestoneId}`, "PATCH", {
+        await apiFetch(bearerToken, apiPath("/milestones", milestoneId), "PATCH", {
           status: "completed",
         }),
       ),
@@ -582,7 +603,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       description: "Read a calendar event.",
       inputSchema: z.object({ eventId: z.string().min(1) }),
     },
-    async ({ eventId }) => toToolResult(await apiFetch(bearerToken, `/calendar-events/${eventId}`)),
+    async ({ eventId }) => toToolResult(await apiFetch(bearerToken, apiPath("/calendar-events", eventId))),
   );
 
   server.registerTool(
@@ -613,7 +634,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ eventId, ...body }) =>
-      toToolResult(await apiFetch(bearerToken, `/calendar-events/${eventId}`, "PATCH", body)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/calendar-events", eventId), "PATCH", body)),
   );
 
   server.registerTool(
@@ -635,7 +656,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async ({ taskId, starred }) =>
-      toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}/star`, "POST", { starred })),
+      toToolResult(await apiFetch(bearerToken, apiPath("/tasks", taskId, "star"), "POST", { starred })),
   );
 
   server.registerTool(
@@ -765,7 +786,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ seenId, response }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/resurfacing/${seenId}/${response}`, "POST", {}),
+        await apiFetch(bearerToken, apiPath("/resurfacing", seenId, response), "POST", {}),
       ),
   );
 
@@ -802,7 +823,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       toToolResult(
         await apiFetch(
           bearerToken,
-          `/scheduled-reviews/${reviewId}/${outcome}`,
+          apiPath("/scheduled-reviews", reviewId, outcome),
           "POST",
           outcome === "snooze" ? { reviewAt } : {},
         ),
@@ -826,7 +847,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ routineId: z.string().min(1) }),
     },
     async ({ routineId }) =>
-      toToolResult(await apiFetch(bearerToken, `/routines/${routineId}/completions`)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/routines", routineId, "completions"))),
   );
 
   server.registerTool(
@@ -859,7 +880,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ routineId }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/routines/${routineId}/complete`, "POST", {}),
+        await apiFetch(bearerToken, apiPath("/routines", routineId, "complete"), "POST", {}),
       ),
   );
 
@@ -882,7 +903,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({ personId: z.string().min(1) }),
     },
     async ({ personId }) =>
-      toToolResult(await apiFetch(bearerToken, `/people/${personId}`)),
+      toToolResult(await apiFetch(bearerToken, apiPath("/people", personId))),
   );
 
   server.registerTool(
@@ -916,7 +937,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ personId, ...body }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/people/${personId}/facts`, "POST", body),
+        await apiFetch(bearerToken, apiPath("/people", personId, "facts"), "POST", body),
       ),
   );
 
@@ -933,7 +954,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ personId, ...body }) =>
       toToolResult(
-        await apiFetch(bearerToken, `/people/${personId}/interactions`, "POST", body),
+        await apiFetch(bearerToken, apiPath("/people", personId, "interactions"), "POST", body),
       ),
   );
 
@@ -959,18 +980,20 @@ async function apiFetch(
     return mcpApiError(502);
   }
 
-  const text = await response.text();
-  let json: unknown = null;
+  let text: string;
   try {
-    json = text ? JSON.parse(text) : null;
+    text = await response.text();
   } catch {
-    json = null;
+    return mcpApiError(502);
   }
   if (!response.ok) {
     return mcpApiError(response.status);
   }
-
-  return json;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return mcpApiError(502);
+  }
 }
 
 async function handleMcpRequest(req: Request, res: Response) {

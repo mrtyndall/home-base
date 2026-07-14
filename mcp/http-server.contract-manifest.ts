@@ -1,0 +1,98 @@
+export type ToolContract = {
+  name: string;
+  input: Record<string, unknown>;
+  request: { method: string; path: string; body?: unknown };
+  pathIdFields?: string[];
+};
+
+const ID = "seeded id";
+const ENCODED_ID = "seeded%20id";
+const UUID = "11111111-1111-4111-8111-111111111111";
+const UUID_2 = "22222222-2222-4222-8222-222222222222";
+const DATE_TIME = "2026-07-14T12:00:00.000Z";
+
+const c = (
+  name: string,
+  input: Record<string, unknown>,
+  method: string,
+  path: string,
+  body?: unknown,
+  pathIdFields?: string[],
+): ToolContract => ({ name, input, request: { method, path, ...(body === undefined ? {} : { body }) }, pathIdFields });
+
+export const TOOL_CONTRACTS: ToolContract[] = [
+  c("list_read_later", { status: "read", limit: 5, cursor: UUID }, "GET", `/read-later?status=read&limit=5&cursor=${UUID}`),
+  c("save_read_later", { url: "https://example.com", title: "Example", areaId: UUID_2 }, "POST", "/read-later", { url: "https://example.com", title: "Example", areaId: UUID_2 }),
+  c("file_reference", { referenceId: UUID, projectId: UUID_2 }, "POST", `/references/${UUID}/file`, { projectId: UUID_2 }, ["referenceId"]),
+  c("set_read_later_status", { referenceId: UUID, status: "archived" }, "POST", `/read-later/${UUID}/status`, { status: "archived" }, ["referenceId"]),
+  c("all_clear_summary", {}, "GET", "/today"),
+  c("search", { query: "Needle & thread" }, "GET", "/search?q=Needle%20%26%20thread"),
+  c("list_captures", { limit: 5, cursor: "cursor" }, "GET", "/captures?limit=5&cursor=cursor"),
+  c("capture_input", { rawText: "Remember this" }, "POST", "/captures", { rawText: "Remember this" }),
+  c("create_task", { title: "Task" }, "POST", "/tasks", { title: "Task" }),
+  c("read_task", { taskId: ID }, "GET", `/tasks/${ENCODED_ID}`, undefined, ["taskId"]),
+  c("update_task", { taskId: ID, title: "Updated" }, "PATCH", `/tasks/${ENCODED_ID}`, { title: "Updated" }, ["taskId"]),
+  c("complete_task", { taskId: ID }, "POST", `/tasks/${ENCODED_ID}/complete`, {}, ["taskId"]),
+  c("list_areas", {}, "GET", "/areas"),
+  c("read_area", { areaId: ID }, "GET", `/areas/${ENCODED_ID}`, undefined, ["areaId"]),
+  c("read_area_aggregate", { areaId: ID }, "GET", `/areas/${ENCODED_ID}/aggregate`, undefined, ["areaId"]),
+  c("create_area", { name: "Area", parentAreaId: ID }, "POST", "/areas", { name: "Area", parentAreaId: ID }),
+  c("reparent_area", { areaId: ID, parentAreaId: "parent" }, "PATCH", `/areas/${ENCODED_ID}`, { parentAreaId: "parent" }, ["areaId"]),
+  c("update_area_state", { areaId: ID, currentState: "Steady" }, "PATCH", `/areas/${ENCODED_ID}`, { currentState: "Steady" }, ["areaId"]),
+  c("create_project", { name: "Project" }, "POST", "/projects", { name: "Project" }),
+  c("list_projects", {}, "GET", "/projects"),
+  c("read_project", { projectId: ID }, "GET", `/projects/${ENCODED_ID}`, undefined, ["projectId"]),
+  c("list_project_activity", { projectId: ID }, "GET", `/projects/${ENCODED_ID}/activity`, undefined, ["projectId"]),
+  c("log_project_activity", { projectId: ID, entry: "Progress" }, "POST", `/projects/${ENCODED_ID}/activity`, { entry: "Progress" }, ["projectId"]),
+  c("update_project_state", { projectId: ID, nextStep: "Call" }, "PATCH", `/projects/${ENCODED_ID}`, { nextStep: "Call" }, ["projectId"]),
+  c("file_project", { projectId: ID, areaId: null }, "PATCH", `/projects/${ENCODED_ID}`, { areaId: null }, ["projectId"]),
+  c("park_project", { projectId: ID, whereLeftOff: "Paused" }, "PATCH", `/projects/${ENCODED_ID}`, { status: "parked", currentState: "Paused", logEntry: "Parked: Paused" }, ["projectId"]),
+  c("unpark_project", { projectId: ID }, "PATCH", `/projects/${ENCODED_ID}`, { status: "active", logEntry: "Project unparked." }, ["projectId"]),
+  c("capture_idea", { title: "Idea" }, "POST", "/ideas", { title: "Idea" }),
+  c("list_ideas", {}, "GET", "/ideas"),
+  c("read_idea", { ideaId: ID }, "GET", `/ideas/${ENCODED_ID}`, undefined, ["ideaId"]),
+  c("update_idea", { ideaId: ID, body: "Body" }, "PATCH", `/ideas/${ENCODED_ID}`, { body: "Body" }, ["ideaId"]),
+  c("add_idea_note", { ideaId: ID, body: "Note" }, "POST", `/ideas/${ENCODED_ID}/notes`, { body: "Note" }, ["ideaId"]),
+  c("list_references", {}, "GET", "/references"),
+  c("read_reference", { referenceId: ID }, "GET", `/references/${ENCODED_ID}`, undefined, ["referenceId"]),
+  c("create_reference", { body: "Reference" }, "POST", "/references", { body: "Reference" }),
+  c("update_reference", { referenceId: ID, body: "Updated" }, "PATCH", `/references/${ENCODED_ID}`, { body: "Updated" }, ["referenceId"]),
+  c("convert_idea", { ideaId: ID, to: "task" }, "POST", `/ideas/${ENCODED_ID}/convert`, { to: "task" }, ["ideaId"]),
+  c("add_entity_note", { parentType: "area", parentId: ID, bodyMd: "Note" }, "POST", "/entity-notes", { parentType: "area", parentId: ID, bodyMd: "Note" }),
+  c("list_entity_notes", {}, "GET", "/entity-notes"),
+  c("read_entity_note", { noteId: ID }, "GET", `/entity-notes/${ENCODED_ID}`, undefined, ["noteId"]),
+  c("update_entity_note", { noteId: ID, bodyMd: "Updated" }, "PATCH", `/entity-notes/${ENCODED_ID}`, { bodyMd: "Updated" }, ["noteId"]),
+  c("list_entity_docs", {}, "GET", "/entity-docs"),
+  c("read_entity_doc", { docId: ID }, "GET", `/entity-docs/${ENCODED_ID}`, undefined, ["docId"]),
+  c("create_entity_doc", { parentType: "project", parentId: ID, title: "Doc", bodyMd: "Body" }, "POST", "/entity-docs", { parentType: "project", parentId: ID, title: "Doc", bodyMd: "Body" }),
+  c("update_entity_doc", { docId: ID, title: "Updated" }, "PATCH", `/entity-docs/${ENCODED_ID}`, { title: "Updated" }, ["docId"]),
+  c("create_milestone", { projectId: ID, title: "Milestone" }, "POST", "/milestones", { projectId: ID, title: "Milestone" }),
+  c("list_milestones", {}, "GET", "/milestones"),
+  c("update_milestone", { milestoneId: ID, status: "open" }, "PATCH", `/milestones/${ENCODED_ID}`, { status: "open" }, ["milestoneId"]),
+  c("complete_milestone", { milestoneId: ID }, "PATCH", `/milestones/${ENCODED_ID}`, { status: "completed" }, ["milestoneId"]),
+  c("calendar_read", {}, "GET", "/calendar-events"),
+  c("read_calendar_event", { eventId: ID }, "GET", `/calendar-events/${ENCODED_ID}`, undefined, ["eventId"]),
+  c("create_calendar_event", { title: "Event", start: DATE_TIME, end: DATE_TIME }, "POST", "/calendar-events", { title: "Event", start: DATE_TIME, end: DATE_TIME }),
+  c("update_calendar_event", { eventId: ID, title: "Updated" }, "PATCH", `/calendar-events/${ENCODED_ID}`, { title: "Updated" }, ["eventId"]),
+  c("list_notifications", {}, "GET", "/notifications"),
+  c("star_task", { taskId: ID, starred: true }, "POST", `/tasks/${ENCODED_ID}/star`, { starred: true }, ["taskId"]),
+  c("list_tasks", { q: "Needle", starred: true, view: "open", limit: 5 }, "GET", "/tasks?q=Needle&starred=1&view=open&limit=5"),
+  c("list_check_ins", { parentType: "area", parentId: ID }, "GET", "/check-ins?parentType=area&parentId=seeded+id"),
+  c("create_check_in", { parentType: "project", parentId: ID, bodyMd: "Update" }, "POST", "/check-ins", { parentType: "project", parentId: ID, bodyMd: "Update" }),
+  c("draft_check_in_summary", { parentType: "area", parentId: ID }, "POST", "/check-ins/draft", { parentType: "area", parentId: ID }),
+  c("list_journal_entries", { q: "Needle", limit: 5 }, "GET", "/journal-entries?q=Needle&limit=5"),
+  c("create_journal_entry", { bodyMd: "Journal" }, "POST", "/journal-entries", { bodyMd: "Journal" }),
+  c("read_resurfaced_item", {}, "GET", "/resurfacing"),
+  c("respond_to_resurfaced_item", { seenId: ID, response: "boost" }, "POST", `/resurfacing/${ENCODED_ID}/boost`, {}, ["seenId"]),
+  c("list_scheduled_reviews", { status: "pending" }, "GET", "/scheduled-reviews?status=pending"),
+  c("settle_scheduled_review", { reviewId: ID, outcome: "snooze", reviewAt: "2026-07-15" }, "POST", `/scheduled-reviews/${ENCODED_ID}/snooze`, { reviewAt: "2026-07-15" }, ["reviewId"]),
+  c("list_routines", {}, "GET", "/routines"),
+  c("list_routine_completions", { routineId: ID }, "GET", `/routines/${ENCODED_ID}/completions`, undefined, ["routineId"]),
+  c("create_routine", { name: "Routine", frequency: "daily" }, "POST", "/routines", { name: "Routine", frequency: "daily" }),
+  c("complete_routine", { routineId: ID }, "POST", `/routines/${ENCODED_ID}/complete`, {}, ["routineId"]),
+  c("list_people", { q: "Alex Smith" }, "GET", "/people?q=Alex%20Smith"),
+  c("read_person", { personId: ID }, "GET", `/people/${ENCODED_ID}`, undefined, ["personId"]),
+  c("create_person", { name: "Alex" }, "POST", "/people", { name: "Alex" }),
+  c("create_person_fact", { personId: ID, factValue: "Fact" }, "POST", `/people/${ENCODED_ID}/facts`, { factValue: "Fact" }, ["personId"]),
+  c("log_interaction", { personId: ID, notes: "Talked" }, "POST", `/people/${ENCODED_ID}/interactions`, { notes: "Talked" }, ["personId"]),
+];

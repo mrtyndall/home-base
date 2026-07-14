@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
 import { registerTools } from "./http-server";
+import { apiPath } from "./proxy-path";
+import { TOOL_CONTRACTS } from "./http-server.contract-manifest";
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
 type ToolRegistration = {
@@ -31,8 +33,8 @@ const expectedCapabilityTools = {
   capture: ["list_captures", "capture_input"],
   calendar: ["calendar_read", "read_calendar_event", "create_calendar_event", "update_calendar_event"],
   tasks: ["list_tasks", "read_task", "create_task", "update_task", "complete_task"],
-  areas: ["list_areas", "read_area", "create_area", "reparent_area", "update_area_state"],
-  projects: ["list_projects", "read_project", "create_project", "update_project_state", "file_project", "log_project_activity"],
+  areas: ["list_areas", "read_area", "read_area_aggregate", "create_area", "reparent_area", "update_area_state"],
+  projects: ["list_projects", "read_project", "list_project_activity", "create_project", "update_project_state", "file_project", "log_project_activity"],
   ideas: ["list_ideas", "read_idea", "capture_idea", "update_idea", "add_idea_note"],
   references: ["list_references", "read_reference", "create_reference", "update_reference", "list_read_later", "save_read_later"],
   notesAndDocs: ["list_entity_notes", "read_entity_note", "add_entity_note", "update_entity_note", "list_entity_docs", "read_entity_doc", "create_entity_doc", "update_entity_doc"],
@@ -50,12 +52,24 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+test("MCP path segments preserve seeded IDs but reject route-confusable input", () => {
+  assert.equal(apiPath("/areas", "seeded-area-id", "aggregate"), "/areas/seeded-area-id/aggregate");
+  assert.equal(apiPath("/areas", "space allowed"), "/areas/space%20allowed");
+  for (const unsafe of ["", "/", "?", "#", "\\", "..", "abc/def", "abc?x", "abc#x"]) {
+    assert.throws(() => apiPath("/areas", unsafe), /invalid.*path segment/i);
+  }
+});
+
 test("Home Base MCP uses unique, active, non-destructive contracts for every capability group", () => {
   const tools = collectTools();
   const names = tools.map((tool) => tool.name);
 
-  assert.equal(tools.length, 72);
   assert.equal(new Set(names).size, names.length);
+  assert.deepEqual(
+    names.toSorted(),
+    TOOL_CONTRACTS.map((contract) => contract.name).toSorted(),
+    "the expected manifest must name every registered tool exactly once",
+  );
   assert.equal(names.some((name) => /domain/i.test(name)), false);
   assert.equal(names.some((name) => /delete/i.test(name)), false);
   for (const tool of tools) {
@@ -65,12 +79,33 @@ test("Home Base MCP uses unique, active, non-destructive contracts for every cap
   for (const namesInGroup of Object.values(expectedCapabilityTools)) {
     for (const name of namesInGroup) assert.ok(names.includes(name), `missing ${name}`);
   }
+  for (const contract of TOOL_CONTRACTS) {
+    const pathname = contract.request.path.split("?", 1)[0];
+    const pathInputIds = Object.entries(contract.input)
+      .filter(([field, value]) =>
+        field.endsWith("Id") &&
+        typeof value === "string" &&
+        pathname.includes(encodeURIComponent(value)))
+      .map(([field]) => field)
+      .toSorted();
+    assert.deepEqual(
+      (contract.pathIdFields ?? []).toSorted(),
+      pathInputIds,
+      `${contract.name} must declare every dynamic path ID for the route-confusion scan`,
+    );
+  }
 });
 
-test("Home Base MCP proxies read, write, and capture tools to scoped REST routes", async () => {
-  const calls: Array<{ input: string; init?: RequestInit }> = [];
+test("every Home Base MCP tool matches its expected REST method, path, query, and body", async () => {
+  const calls: Array<{ path: string; method: string; body?: unknown; authorization?: string }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ input: String(input), init });
+    const rawBody = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+    calls.push({
+      path: String(input).replace("http://127.0.0.1:3002/api/v1", ""),
+      method: init?.method ?? "GET",
+      ...(rawBody === undefined ? {} : { body: rawBody }),
+      authorization: (init?.headers as Record<string, string>).Authorization,
+    });
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -79,19 +114,49 @@ test("Home Base MCP proxies read, write, and capture tools to scoped REST routes
   const tools = collectTools();
   const byName = new Map(tools.map((tool) => [tool.name, tool.handler]));
 
-  await byName.get("read_task")?.({ taskId: "task-1" });
-  await byName.get("update_task")?.({ taskId: "task-1", title: "Next" });
-  await byName.get("capture_input")?.({ rawText: "Remember this" });
+  for (const contract of TOOL_CONTRACTS) {
+    const handler = byName.get(contract.name);
+    assert.ok(handler, `missing handler for ${contract.name}`);
+    const before = calls.length;
+    await handler(contract.input);
+    assert.equal(calls.length, before + 1, `${contract.name} must make exactly one REST call`);
+    assert.deepEqual(calls.at(-1), {
+      ...contract.request,
+      authorization: "Bearer contract-token-placeholder",
+    }, contract.name);
+  }
+});
 
-  assert.equal(calls[0]?.input, "http://127.0.0.1:3002/api/v1/tasks/task-1");
-  assert.equal(calls[0]?.init?.method, "GET");
-  assert.equal((calls[0]?.init?.headers as Record<string, string>).Authorization, "Bearer contract-token-placeholder");
-  assert.equal(calls[1]?.input, "http://127.0.0.1:3002/api/v1/tasks/task-1");
-  assert.equal(calls[1]?.init?.method, "PATCH");
-  assert.equal(calls[1]?.init?.body, JSON.stringify({ title: "Next" }));
-  assert.equal(calls[2]?.input, "http://127.0.0.1:3002/api/v1/captures");
-  assert.equal(calls[2]?.init?.method, "POST");
-  assert.equal(calls[2]?.init?.body, JSON.stringify({ rawText: "Remember this" }));
+test("every dynamic MCP ID handler rejects route-confusable segments before fetch", async () => {
+  let fetchCalls = 0;
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }) as typeof fetch;
+  const byName = new Map(collectTools().map((tool) => [tool.name, tool.handler]));
+  const unsafeSegments = ["", "/", "?", "#", "\\", "..", "abc/def", "abc?x", "abc#x"];
+
+  for (const contract of TOOL_CONTRACTS.filter((entry) => entry.pathIdFields?.length)) {
+    const handler = byName.get(contract.name);
+    assert.ok(handler, `missing handler for ${contract.name}`);
+    for (const field of contract.pathIdFields ?? []) {
+      for (const unsafe of unsafeSegments) {
+        const before = fetchCalls;
+        let rejected = false;
+        try {
+          await handler({ ...contract.input, [field]: unsafe });
+        } catch {
+          rejected = true;
+        }
+        assert.equal(
+          rejected,
+          true,
+          `${contract.name}.${field} accepted ${JSON.stringify(unsafe)}`,
+        );
+        assert.equal(fetchCalls, before, `${contract.name}.${field} fetched before rejecting`);
+      }
+    }
+  }
 });
 
 test("Home Base MCP returns structured errors without upstream response details", async () => {
@@ -123,4 +188,42 @@ test("Home Base MCP returns structured errors when REST is unavailable", async (
   assert.match(serialized, /home_base_api_error/);
   assert.match(serialized, /502/);
   assert.doesNotMatch(serialized, /connection detail/);
+});
+
+test("Home Base MCP redacts response body read failures", async () => {
+  globalThis.fetch = (async () => ({
+    ok: true,
+    status: 200,
+    text: async () => {
+      throw new Error("body stream detail");
+    },
+  })) as unknown as typeof fetch;
+  const readTask = collectTools().find((tool) => tool.name === "read_task")?.handler;
+
+  const result = await readTask?.({ taskId: "task-1" });
+
+  assert.equal((result as { isError?: boolean }).isError, true);
+  const serialized = JSON.stringify(result);
+  assert.match(serialized, /home_base_api_error/);
+  assert.doesNotMatch(serialized, /body stream detail/);
+});
+
+test("Home Base MCP treats malformed successful JSON as a structured error", async () => {
+  globalThis.fetch = (async () => new Response("{malformed", { status: 200 })) as typeof fetch;
+  const readTask = collectTools().find((tool) => tool.name === "read_task")?.handler;
+
+  const result = await readTask?.({ taskId: "task-1" });
+
+  assert.equal((result as { isError?: boolean }).isError, true);
+  assert.match(JSON.stringify(result), /home_base_api_error/);
+});
+
+test("Home Base MCP treats an empty successful response as malformed JSON", async () => {
+  globalThis.fetch = (async () => new Response("", { status: 200 })) as typeof fetch;
+  const readTask = collectTools().find((tool) => tool.name === "read_task")?.handler;
+
+  const result = await readTask?.({ taskId: "task-1" });
+
+  assert.equal((result as { isError?: boolean }).isError, true);
+  assert.match(JSON.stringify(result), /home_base_api_error/);
 });
