@@ -24,6 +24,7 @@ npm run lint
 npm run build
 npm run db:deploy
 npm run db:seed
+npm run verify:hierarchy-release -- --preflight
 npm run calendar:sync
 npm run reminders:send
 ```
@@ -46,11 +47,25 @@ Railway Postgres is the source of truth for real Home Base data. The Railway ser
 
 Database credentials stay in Railway/1Password-backed runtime configuration and must never be committed or copied into documentation. Container startup applies committed migrations and only inserts missing bootstrap defaults; it does not reseed Areas or overwrite settings.
 
+Areas form a nested responsibility tree. An Area may have an optional parent Area; Projects may be filed to an Area or remain unfiled. Tasks, Ideas, and References linked to a Project mirror that Project's optional Area. Before a hierarchy migration, run the read-only preflight and retain all five flags it prints. After migration, pass those flags to the strict gate:
+
+```bash
+npm run verify:hierarchy-release -- --preflight
+npm run verify:hierarchy-release -- \
+  --expected-books=<count> --expected-movies=<count> \
+  --expected-areas=<count> --expected-projects=<count> \
+  --expected-references=<count>
+```
+
+Both modes reject Area cycles, missing Area parents, missing Project Area targets, and Task/Idea/Reference Area mirrors that disagree with their Project. They open a read-only transaction and roll it back; they do not migrate or repair data.
+
 The direct Railway URL is intentionally open during this rollout. Cloudflare Zero Trust Access is the planned access boundary; when it is enabled, the direct Railway origin must also be disabled or blocked so it cannot bypass Cloudflare.
 
 ## Agent Access
 
-The REST API is under `/api/v1` and uses bearer API keys registered with `npm run api:key:register`. The MCP server runs from `npm run mcp:http` and wraps the same API.
+The REST API is under `/api/v1` and uses bearer API keys registered with `npm run api:key:register`. Current hierarchy routes are `GET/POST /api/v1/areas`, `GET/PATCH /api/v1/areas/:id`, `GET/POST /api/v1/projects`, and `GET/PATCH /api/v1/projects/:id`. Area reads include hierarchy paths; Area writes accept `parentAreaId`; Project writes accept an optional or null `areaId`.
+
+The MCP server runs from `npm run mcp:http`, wraps the REST API, and serves streamable HTTP at `/api/mcp` (Tailnet: `https://mac-studio.tail3baa7a.ts.net:8443/api/mcp`). Its hierarchy tools are `list_areas`, `read_area`, `create_area`, `reparent_area`, `create_project`, `update_project_state`, and `file_project`. The in-app data chat has read-only `list_areas` and returns path-labelled hierarchy entries.
 
 ## Google Calendar
 

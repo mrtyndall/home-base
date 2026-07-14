@@ -53,6 +53,8 @@ Two origins serve this app and both must be updated on release:
 
 For an Area-first release, first create a fresh backup and run the old-schema-safe preflight: `npm run verify:area-release -- --preflight`. It rejects the migration's true legacy blocker (a Project attached to `area_inbox`) and prints the current Book/Movie baseline flags. After the migration reaches `SUCCESS`, run the strict read-only gate with those recorded values: `npm run verify:area-release -- --expected-books=<recorded-count> --expected-movies=<recorded-count>`. The post-release gate fails if Inbox compatibility references remain, Project/Area integrity is broken, or either retained media count changes.
 
+For the nested-Area/optional-Project-Area release, run `npm run verify:hierarchy-release -- --preflight` before migration and retain its Book, Movie, Area, Project, and Reference flags. After migration, run the same command with all five `--expected-*` values. Both phases execute in an explicitly read-only transaction and reject Area cycles, orphan Area parents, orphan Project Area references, or Task/Idea/Reference Area mirrors that differ from their Project; strict postflight also rejects any baseline drift. Verification reports problems but never repairs data. Production preflight still requires a fresh backup, and migration application remains the deploy pipeline's responsibility.
+
 The direct Railway URL is intentionally open during the Area-first rollout. Cloudflare Zero Trust Access is the planned access boundary; its rollout is incomplete until the direct Railway origin is disabled or otherwise blocked from bypassing Cloudflare.
 
 ## Integrity Rules
@@ -61,8 +63,9 @@ The direct Railway URL is intentionally open during the Area-first rollout. Clou
 - Parser failures update the capture status but do not remove or overwrite raw input.
 - No app data uses hard deletes. Completed, killed, and parked are statuses.
 - AI-created rows link back to `capture_id`.
-- Areas are flat top-level containers. Projects belong to exactly one Area, and neither Areas nor Projects have self-referencing parent columns.
-- Eligible content may remain unfiled in the global Inbox. Tasks attached to a Project mirror that Project's Area; a database trigger keeps task/project Area alignment intact.
+- Areas form an acyclic tree through optional `parent_area_id`; missing parents and cycles are release-blocking integrity failures.
+- Projects may belong to one Area or remain unfiled. Tasks, Ideas, and References attached to a Project mirror that Project's optional Area; Project filing updates all three child types atomically, while the task database trigger protects task/project alignment on direct task writes.
+- Eligible content may remain unfiled in the global Inbox.
 - Agent writes use `source = api:<key label>` where the table has a source field, and every API write creates a notification feed entry.
 - Search must include raw captures and inactive records.
 - Local database backups are part of the foundation, not a later operational cleanup.
@@ -76,9 +79,9 @@ Tasks with a due date and no due time use the `default_due_date_reminder_time` a
 
 ## Agent Access
 
-The REST API lives under `/api/v1` and uses bearer API keys stored as hashes in `api_keys`. Minimum scopes are `read`, `write`, and `capture`; write rate limits are conservative by default. API routes intentionally expose no delete method.
+The REST API lives under `/api/v1` and uses bearer API keys stored as hashes in `api_keys`. Minimum scopes are `read`, `write`, and `capture`; write rate limits are conservative by default. API routes intentionally expose no delete method. The hierarchy boundary is `GET/POST /areas`, `GET/PATCH /areas/:id`, `GET/POST /projects`, and `GET/PATCH /projects/:id`: Area reads include full paths, Area writes accept `parentAreaId`, and Project writes accept an optional or null `areaId`.
 
-The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streamable HTTP at `/api/mcp`. It provides tools for all-clear summary, search, task creation/completion, area reads/state updates, project creation/state updates, park/unpark, idea capture/conversion, shared markdown notes/docs, milestones, and calendar reads.
+The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streamable HTTP at `/api/mcp`. Its current hierarchy tools are `list_areas`, `read_area`, `create_area`, `reparent_area`, `update_area_state`, `create_project`, `update_project_state`, and `file_project`; the remaining tools cover all-clear/search, task actions, project park/unpark, ideas, shared markdown notes/docs, milestones, calendar, check-ins, journal/resurfacing/reviews, routines, and people. The in-app data chat is a separate read-only agent surface and exposes path-labelled `list_areas` alongside search, summaries, tasks, people, journals, and Project reads.
 
 ## Calendar Sync
 
@@ -103,7 +106,7 @@ The Railway app service is deployed with Google OAuth completed (2026-07-03, "Pr
 
 ## Hierarchy And Containers
 
-Areas are flat ongoing responsibilities and information canvases with `active`, `parked`, and `retired` statuses. They are the default holder for durable context: notes, references, docs, check-ins, standing tasks, and child projects. Projects are finishable or time-gated containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. Every Project belongs to one Area. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic. Eligible Tasks, Notes, Documents, Ideas, and References may remain unfiled in the global Inbox; Books and Movies remain global, and People remain global with an optional Area link.
+Areas are ongoing responsibilities and information canvases with `active`, `parked`, and `retired` statuses. They nest through an optional parent Area and are the default holder for durable context: notes, references, docs, check-ins, standing tasks, and child projects. Projects are finishable or time-gated containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses; their Area is optional so they can remain unfiled until their destination is clear. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic. Eligible Tasks, Notes, Documents, Ideas, and References may remain unfiled in the global Inbox; Books and Movies remain global, and People remain global with an optional Area link.
 
 Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). `entity_notes.starred_at` supports manually starred important notes; nothing auto-stars notes. Check-ins render at the top of both area and project pages as the living timeline, while the generated activity log remains a quieter audit trail. Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export. Area/project state fields are optional and are shown only when the system already has real data; list cards favor derived task, activity, and note signals.
 
@@ -135,6 +138,11 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 - `src/app/api/settings/mcp-health/route.ts`: read-only probe of the MCP server `/health` endpoint (`MCP_HEALTH_URL` override, defaults to the local port).
 
 ## Changelog
+
+### 2026-07-14
+
+- Added nested Areas through optional parent Areas and allowed Projects to remain unfiled. Shared hierarchy validation now protects UI, REST, MCP, and in-app chat paths; Project filing keeps Task, Idea, and Reference Area mirrors consistent.
+- Added the read-only hierarchy release gate with cycle/orphan/mirror checks and Book, Movie, Area, Project, and Reference preservation baselines.
 
 ### 2026-07-04
 
