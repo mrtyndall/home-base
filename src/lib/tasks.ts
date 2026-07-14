@@ -38,7 +38,10 @@ export async function createTaskWithAudit(
   actor: WriteActor,
   client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const destination = await resolveVerifiedDestination(input, client);
+  const destination = await resolveVerifiedDestination(
+    { areaId: input.areaId, projectId: input.projectId },
+    client,
+  );
   const task = await client.task.create({
     data: {
       title: input.title,

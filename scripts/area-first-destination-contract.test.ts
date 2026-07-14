@@ -8,7 +8,8 @@ assert.deepEqual(normalizeDestination({ areaId: " area-1 ", projectId: "" }), {
 });
 assert.equal(destinationKind({ areaId: "area-1" }), "area");
 assert.equal(destinationKind({ areaId: "area-1", projectId: "project-1" }), "project");
-assert.throws(
-  () => normalizeDestination({ projectId: "project-1" }),
-  /Project destinations require an Area/,
-);
+assert.equal(destinationKind({ projectId: "project-1" }), "project");
+assert.deepEqual(normalizeDestination({ projectId: "project-1" }), {
+  areaId: null,
+  projectId: "project-1",
+});

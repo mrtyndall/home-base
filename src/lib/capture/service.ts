@@ -198,7 +198,7 @@ async function buildParserContext(source: string) {
     projects: projects.map((project) => ({
       id: project.id,
       name: project.name,
-      area: project.area.name,
+      area: project.area?.name ?? "Unfiled",
       current_state: project.currentState,
     })),
     recentIdeas,
@@ -461,9 +461,7 @@ async function createTask(
   context: ExecutionContext,
 ) {
   const project = await resolveProject(action.project_id, action.project_match, context);
-  const areaId =
-    project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context));
+  const areaId = await resolveAreaId(action.area_id, action.area_match, context);
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
@@ -636,7 +634,7 @@ async function createProject(
   return {
     type: "project" as const,
     id: project.id,
-    label: `Project saved to ${project.area.name}`,
+    label: `Project saved to ${project.area?.name ?? "Area"}`,
   };
 }
 
@@ -748,9 +746,7 @@ async function createIdea(
   context: ExecutionContext,
 ) {
   const project = await resolveProject(action.project_id, action.project_match, context);
-  const areaId =
-    project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context));
+  const areaId = await resolveAreaId(action.area_id, action.area_match, context);
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
@@ -878,9 +874,7 @@ async function createReference(
   context: ExecutionContext,
 ) {
   const project = await resolveProject(action.project_id, action.project_match, context);
-  const areaId =
-    project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context));
+  const areaId = await resolveAreaId(action.area_id, action.area_match, context);
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
@@ -1284,7 +1278,7 @@ async function resolveEntityParent(
 
     const requestedAreaId = await resolveAreaId(areaId, areaMatch, context);
     await resolveVerifiedDestination(
-      { areaId: requestedAreaId ?? project.areaId, projectId: project.id },
+      { areaId: requestedAreaId, projectId: project.id },
       context.client,
     );
     return { type: "project" as const, id: project.id, label: project.name };

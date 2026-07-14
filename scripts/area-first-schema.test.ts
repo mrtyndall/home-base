@@ -24,8 +24,8 @@ assert.equal(/\bdomainId\b/.test(model("Area")), false, "Area.domainId must leav
 assert.match(model("Task"), /\bareaId\s+String\?\s+@map\("area_id"\)/, "Task.areaId must be nullable");
 assert.doesNotMatch(model("Task"), /areaId[^\n]*@default\("area_inbox"\)/, "Task.areaId must not default to Inbox");
 assert.match(model("Task"), /\barea\s+Area\?\s+@relation/, "Task.area must be nullable");
-assert.match(model("Project"), /\bareaId\s+String\s+@map\("area_id"\)/, "Project.areaId must remain required");
-assert.match(model("Project"), /\barea\s+Area\s+@relation/, "Project.area must remain required");
+assert.match(model("Project"), /\bareaId\s+String\?\s+@map\("area_id"\)/, "Project.areaId must be nullable");
+assert.match(model("Project"), /\barea\s+Area\?\s+@relation/, "Project.area must be nullable");
 
 for (const name of ["EntityNote", "EntityDoc", "Document"]) {
   assert.match(model(name), /\bparentType\s+EntityParentType\?\s+@map\("parent_type"\)/, `${name}.parentType must be nullable`);

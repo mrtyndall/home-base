@@ -1,3 +1,6 @@
+import { type Project } from "@prisma/client";
+import { prisma } from "@/lib/db";
+
 export type AreaHierarchyRecord = {
   id: string;
   name: string;
@@ -36,6 +39,57 @@ type AreaParentClient = {
     }): Promise<{ id: string; parentAreaId: string | null } | null>;
   };
 };
+
+export async function fileProject(
+  projectId: string,
+  areaId: string | null,
+  client: typeof prisma = prisma,
+): Promise<Project> {
+  return client.$transaction(async (transaction) => {
+    if (areaId !== null) {
+      const area = await transaction.area.findFirst({
+        where: { id: areaId, status: "active", isSystem: false },
+        select: { id: true },
+      });
+      if (!area) throw new Error("Area not found.");
+    }
+
+    const project = await transaction.project.update({
+      where: { id: projectId },
+      data: { areaId },
+    });
+
+    const children = { where: { projectId }, data: { areaId } };
+    await transaction.task.updateMany(children);
+    await transaction.idea.updateMany(children);
+    await transaction.reference.updateMany(children);
+
+    await transaction.projectActivity.create({
+      data: {
+        projectId,
+        entry: areaId === null ? "Project unfiled." : "Project filed to Area.",
+        source: "manual",
+        stateSnapshot: {
+          status: project.status,
+          current_state: project.currentState,
+          next_step: project.nextStep,
+          area_id: project.areaId,
+        },
+      },
+    });
+
+    await transaction.notification.create({
+      data: {
+        type: "project_updated",
+        title: areaId === null ? "Project unfiled" : "Project filed",
+        body: project.name,
+        sourceRef: { type: "project", id: project.id, source: "manual" },
+      },
+    });
+
+    return project;
+  });
+}
 
 export function buildAreaTree(
   areas: readonly AreaHierarchyRecord[],

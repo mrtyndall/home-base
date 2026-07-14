@@ -31,7 +31,7 @@ assert.doesNotMatch(source, /getDefaultAreaId|getInboxAreaId/, "eligible writes 
 type FakeClient = {
   area: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
   project: {
-    findFirst: (args: unknown) => Promise<{ id: string; areaId: string } | null>;
+    findFirst: (args: unknown) => Promise<{ id: string; areaId: string | null } | null>;
   };
 };
 
@@ -102,7 +102,7 @@ async function verifyDestinationContract() {
         project: { findFirst: async () => null },
       },
     ),
-    /Project does not belong to the selected Area/,
+    /Project not found/,
   );
 }
 
@@ -111,7 +111,11 @@ assert.match(taskSource, /areaId\?: string \| null/, "task creation must accept 
 
 const captureSource = readFileSync("src/lib/capture/service.ts", "utf8");
 assert.match(captureSource, /Project captures require an Area/, "capture Project creation must remain Area-required");
-assert.match(captureSource, /project\?\.areaId/, "Project selection must derive the mirrored Area");
+assert.match(
+  captureSource,
+  /resolveVerifiedDestination\(\{[\s\S]{0,100}areaId,[\s\S]{0,100}projectId: project\?\.id/,
+  "Project selection must let the shared resolver derive the mirrored Area",
+);
 assert.match(
   captureSource,
   /pg_advisory_xact_lock\(hashtextextended\([^,]+,\s*0\)\)/,

@@ -37,9 +37,6 @@ export function normalizeParentDestination(input: ParentDestinationInput) {
 export function normalizeDestination(input: DestinationInput) {
   const areaId = input.areaId?.trim() || null;
   const projectId = input.projectId?.trim() || null;
-  if (projectId && !areaId) {
-    throw new Error("Project destinations require an Area.");
-  }
   return { areaId, projectId };
 }
 
@@ -48,7 +45,7 @@ type DestinationClient = {
     findFirst(args: unknown): PromiseLike<{ id: string } | null>;
   };
   project: {
-    findFirst(args: unknown): PromiseLike<{ id: string; areaId: string } | null>;
+    findFirst(args: unknown): PromiseLike<{ id: string; areaId: string | null } | null>;
   };
 };
 
@@ -71,10 +68,13 @@ export async function resolveVerifiedDestination(
     where: { id: destination.projectId },
     select: { id: true, areaId: true },
   });
-  if (!project || project.areaId !== destination.areaId) {
+  if (!project) {
+    throw new Error("Project not found.");
+  }
+  if (destination.areaId && destination.areaId !== project.areaId) {
     throw new Error("Project does not belong to the selected Area.");
   }
-  return destination;
+  return { projectId: destination.projectId, areaId: project.areaId };
 }
 
 export function destinationKind(input: DestinationInput) {
