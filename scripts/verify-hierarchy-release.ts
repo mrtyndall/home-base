@@ -90,35 +90,20 @@ export function evaluateHierarchyRelease(
   return failures;
 }
 
-async function collectHierarchyReleaseCounts(client: ReleaseQueryClient) {
+async function hasParentAreaIdColumn(client: ReleaseQueryClient) {
   const result = await client.query(`
-    WITH RECURSIVE "areaWalk" AS (
-      SELECT
-        a."id" AS "originId",
-        a."parent_area_id" AS "nextId",
-        ARRAY[a."id"]::text[] AS "path",
-        false AS "cycle"
-      FROM "areas" a
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'areas'
+        AND column_name = 'parent_area_id'
+    ) AS "hasParentAreaId"
+  `);
+  return (result.rows[0] as { hasParentAreaId?: boolean } | undefined)?.hasParentAreaId === true;
+}
 
-      UNION ALL
-
-      SELECT
-        walk."originId",
-        parent."parent_area_id" AS "nextId",
-        walk."path" || parent."id",
-        parent."id" = ANY(walk."path") AS "cycle"
-      FROM "areaWalk" walk
-      JOIN "areas" parent ON parent."id" = walk."nextId"
-      WHERE NOT walk."cycle"
-    )
-    SELECT
-      (SELECT COUNT(DISTINCT "originId") FROM "areaWalk" WHERE "cycle")::text
-        AS "areaCycleCount",
-      (
-        SELECT COUNT(*) FROM "areas" child
-        LEFT JOIN "areas" parent ON parent."id" = child."parent_area_id"
-        WHERE child."parent_area_id" IS NOT NULL AND parent."id" IS NULL
-      )::text AS "orphanAreaParentCount",
+const sharedCountSelect = `
       (
         SELECT COUNT(*) FROM "projects" p
         LEFT JOIN "areas" a ON a."id" = p."area_id"
@@ -147,7 +132,48 @@ async function collectHierarchyReleaseCounts(client: ReleaseQueryClient) {
       (SELECT COUNT(*) FROM "areas")::text AS "areaCount",
       (SELECT COUNT(*) FROM "projects")::text AS "projectCount",
       (SELECT COUNT(*) FROM "references")::text AS "referenceCount"
-  `);
+`;
+
+async function collectHierarchyReleaseCounts(
+  client: ReleaseQueryClient,
+  hasParentAreaId: boolean,
+) {
+  const sql = hasParentAreaId ? `
+    WITH RECURSIVE "areaWalk" AS (
+      SELECT
+        a."id" AS "originId",
+        a."parent_area_id" AS "nextId",
+        ARRAY[a."id"]::text[] AS "path",
+        false AS "cycle"
+      FROM "areas" a
+
+      UNION ALL
+
+      SELECT
+        walk."originId",
+        parent."parent_area_id" AS "nextId",
+        walk."path" || parent."id",
+        parent."id" = ANY(walk."path") AS "cycle"
+      FROM "areaWalk" walk
+      JOIN "areas" parent ON parent."id" = walk."nextId"
+      WHERE NOT walk."cycle"
+    )
+    SELECT
+      (SELECT COUNT(DISTINCT "originId") FROM "areaWalk" WHERE "cycle")::text
+        AS "areaCycleCount",
+      (
+        SELECT COUNT(*) FROM "areas" child
+        LEFT JOIN "areas" parent ON parent."id" = child."parent_area_id"
+        WHERE child."parent_area_id" IS NOT NULL AND parent."id" IS NULL
+      )::text AS "orphanAreaParentCount",
+      ${sharedCountSelect}
+  ` : `
+    SELECT
+      0::text AS "areaCycleCount",
+      0::text AS "orphanAreaParentCount",
+      ${sharedCountSelect}
+  `;
+  const result = await client.query(sql);
 
   const counts = result.rows[0] as HierarchyReleaseCounts | undefined;
   if (!counts) throw new Error("Hierarchy release count query returned no rows.");
@@ -170,25 +196,52 @@ export async function runHierarchyReleaseVerification(
   log: (line: string) => void = console.log,
 ) {
   const baseline = parseHierarchyBaseline(args);
+  let operationFailed = false;
+  let operationError: unknown;
+  let successMessage = "";
 
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
-    const counts = await collectHierarchyReleaseCounts(client);
+    const hasParentAreaId = await hasParentAreaIdColumn(client);
+    if (baseline !== null && !hasParentAreaId) {
+      throw new Error(
+        "Hierarchy release verification failed: areas.parent_area_id is missing; run strict postflight after the hierarchy migration.",
+      );
+    }
+    const counts = await collectHierarchyReleaseCounts(client, hasParentAreaId);
     const failures = evaluateHierarchyRelease(counts, baseline);
     if (failures.length > 0) {
       throw new Error(`Hierarchy release verification failed:\n- ${failures.join("\n- ")}`);
     }
 
     if (baseline === null) {
-      log(`Hierarchy preflight passed. Post-release baseline: ${baselineFlags(counts)}`);
+      successMessage = `Hierarchy preflight passed. Post-release baseline: ${baselineFlags(counts)}`;
     } else {
-      log(
-        `Hierarchy release verified (Books: ${counts.bookCount}, Movies: ${counts.movieCount}, Areas: ${counts.areaCount}, Projects: ${counts.projectCount}, References: ${counts.referenceCount}).`,
-      );
+      successMessage = `Hierarchy release verified (Books: ${counts.bookCount}, Movies: ${counts.movieCount}, Areas: ${counts.areaCount}, Projects: ${counts.projectCount}, References: ${counts.referenceCount}).`;
     }
-  } finally {
-    await client.query("ROLLBACK").catch(() => undefined);
+  } catch (error: unknown) {
+    operationFailed = true;
+    operationError = error;
   }
+
+  try {
+    await client.query("ROLLBACK");
+  } catch (rollbackError: unknown) {
+    if (operationFailed) {
+      if (operationError instanceof Error) {
+        Object.defineProperty(operationError, "rollbackError", {
+          configurable: true,
+          value: rollbackError,
+        });
+      }
+      throw operationError;
+    }
+    const detail = rollbackError instanceof Error ? rollbackError.message : "unknown rollback error";
+    throw new Error(`Hierarchy release cleanup failed: ${detail}`, { cause: rollbackError });
+  }
+
+  if (operationFailed) throw operationError;
+  log(successMessage);
 }
 
 async function main() {

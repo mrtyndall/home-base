@@ -83,6 +83,7 @@ test("database verification uses one read-only transaction and always rolls it b
   const client = {
     async query(sql: string) {
       queries.push(sql);
+      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: true }] };
       if (/WITH RECURSIVE/.test(sql)) return { rows: [cleanCounts] };
       return { rows: [] };
     },
@@ -91,13 +92,38 @@ test("database verification uses one read-only transaction and always rolls it b
   await runHierarchyReleaseVerification(client, ["--preflight"], (line) => output.push(line));
 
   assert.equal(queries[0], "BEGIN TRANSACTION READ ONLY");
-  assert.match(queries[1], /WITH RECURSIVE/);
-  assert.match(queries[1], /FROM "tasks"/);
-  assert.match(queries[1], /FROM "ideas"/);
-  assert.match(queries[1], /FROM "references"/);
+  assert.match(queries[1], /information_schema\.columns/);
+  assert.match(queries[2], /WITH RECURSIVE/);
+  assert.match(queries[2], /FROM "tasks"/);
+  assert.match(queries[2], /FROM "ideas"/);
+  assert.match(queries[2], /FROM "references"/);
   assert.equal(queries.at(-1), "ROLLBACK");
   assert.match(output.join("\n"), /--expected-books=12/);
   assert.match(output.join("\n"), /--expected-references=23/);
+});
+
+test("preflight uses a legacy-safe count query before parent_area_id exists", async () => {
+  const queries: string[] = [];
+  const output: string[] = [];
+  const client = {
+    async query(sql: string) {
+      queries.push(sql);
+      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: false }] };
+      if (/AS "areaCycleCount"/.test(sql)) return { rows: [cleanCounts] };
+      return { rows: [] };
+    },
+  };
+
+  await runHierarchyReleaseVerification(client, ["--preflight"], (line) => output.push(line));
+
+  assert.match(queries[1], /information_schema\.columns/);
+  assert.doesNotMatch(queries[2], /parent_area_id|WITH RECURSIVE/);
+  assert.match(queries[2], /0::text AS "areaCycleCount"/);
+  assert.match(queries[2], /FROM "tasks"/);
+  assert.match(queries[2], /FROM "ideas"/);
+  assert.match(queries[2], /FROM "references"/);
+  assert.equal(queries.at(-1), "ROLLBACK");
+  assert.match(output.join("\n"), /--expected-areas=5/);
 });
 
 test("database verification rolls back before surfacing an integrity failure", async () => {
@@ -105,6 +131,7 @@ test("database verification rolls back before surfacing an integrity failure", a
   const client = {
     async query(sql: string) {
       queries.push(sql);
+      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: true }] };
       if (/WITH RECURSIVE/.test(sql)) {
         return { rows: [{ ...cleanCounts, orphanProjectAreaCount: "1" }] };
       }
@@ -117,4 +144,43 @@ test("database verification rolls back before surfacing an integrity failure", a
     /orphan Project Areas: 1/,
   );
   assert.equal(queries.at(-1), "ROLLBACK");
+});
+
+test("successful verification fails when its read-only rollback fails", async () => {
+  const output: string[] = [];
+  const client = {
+    async query(sql: string) {
+      if (sql === "ROLLBACK") throw new Error("connection lost during rollback");
+      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: true }] };
+      if (/WITH RECURSIVE/.test(sql)) return { rows: [cleanCounts] };
+      return { rows: [] };
+    },
+  };
+
+  await assert.rejects(
+    runHierarchyReleaseVerification(client, ["--preflight"], (line) => output.push(line)),
+    /Hierarchy release cleanup failed: connection lost during rollback/,
+  );
+  assert.deepEqual(output, [], "success must not be reported before rollback succeeds");
+});
+
+test("verification error remains primary when rollback also fails", async () => {
+  const verificationError = new Error("count query failed");
+  const client = {
+    async query(sql: string) {
+      if (sql === "ROLLBACK") throw new Error("rollback also failed");
+      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: true }] };
+      if (/WITH RECURSIVE/.test(sql)) throw verificationError;
+      return { rows: [] };
+    },
+  };
+
+  await assert.rejects(
+    runHierarchyReleaseVerification(client, ["--preflight"], () => undefined),
+    (error: unknown) => error === verificationError,
+  );
+  assert.match(
+    String((verificationError as Error & { rollbackError?: Error }).rollbackError?.message),
+    /rollback also failed/,
+  );
 });

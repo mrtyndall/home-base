@@ -57,7 +57,7 @@ npm run verify:hierarchy-release -- \
   --expected-references=<count>
 ```
 
-Both modes reject Area cycles, missing Area parents, missing Project Area targets, and Task/Idea/Reference Area mirrors that disagree with their Project. They open a read-only transaction and roll it back; they do not migrate or repair data.
+Both modes reject missing Project Area targets and Task/Idea/Reference Area mirrors that disagree with their Project. On the legacy schema, preflight detects that `parent_area_id` is not present and records zero for the cycle/orphan-parent checks that cannot yet exist; strict postflight requires the new column and rejects Area cycles and missing Area parents. Both modes open a read-only transaction and require a successful rollback; they do not migrate or repair data.
 
 The direct Railway URL is intentionally open during this rollout. Cloudflare Zero Trust Access is the planned access boundary; when it is enabled, the direct Railway origin must also be disabled or blocked so it cannot bypass Cloudflare.
 
