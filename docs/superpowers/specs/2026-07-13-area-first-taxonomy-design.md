@@ -218,4 +218,4 @@ The feature is complete when automated tests prove:
 
 ## Rollout notes
 
-This is a breaking cross-layer change and should ship behind a coordinated migration, not as disconnected UI edits. Before public deployment, owner authentication and capture endpoint protection identified by the code review should be addressed so the newly writable Area and Project flows are not exposed anonymously.
+This is a breaking cross-layer change and should ship behind a coordinated migration, not as disconnected UI edits. The owner has explicitly accepted an open interim Railway deployment while Cloudflare Zero Trust Access is prepared. When Access is enabled on the final custom domain, the direct Railway public domain must be disabled or otherwise blocked so it cannot bypass Access. Bearer and capture endpoint hardening remains required defense in depth.
