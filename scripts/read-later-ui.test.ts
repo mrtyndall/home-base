@@ -4,6 +4,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { test } from "node:test";
 import { ReadLaterList, readLaterHost } from "../src/components/read-later-list";
+import {
+  ReadLaterItemActionControls,
+  ReadLaterMutationError,
+} from "../src/components/read-later-item-actions";
 
 const formSource = [
   readFileSync("src/components/read-later-form.tsx", "utf8"),
@@ -12,16 +16,15 @@ const formSource = [
 const listSource = readFileSync("src/components/read-later-list.tsx", "utf8");
 const databasePage = readFileSync("src/app/ideas/[database]/page.tsx", "utf8");
 const libraryPage = readFileSync("src/app/ideas/page.tsx", "utf8");
-const actions = readFileSync("src/app/actions.ts", "utf8");
 
 test("Save link is URL-first and filing remains optional", () => {
   assert.match(formSource, /name="url"/);
   assert.match(formSource, /type="url"/);
   assert.match(formSource, /placeholder="https:\/\//);
   assert.match(formSource, /<AreaPicker/);
-  assert.match(formSource, /No filing yet/);
+  assert.match(formSource, /value="unfiled">No filing/);
   assert.doesNotMatch(formSource, /name="title"[^>]*required/);
-  assert.doesNotMatch(formSource, /name="(?:areaId|projectId)"[^>]*required/);
+  assert.match(formSource, /value="unchanged"/);
 });
 
 test("queue renders host, saved date, controls, filing path, and long-link wrapping", () => {
@@ -38,13 +41,12 @@ test("queue renders host, saved date, controls, filing path, and long-link wrapp
           savedAt: new Date("2026-07-14T12:00:00Z"),
           areaId: "radio",
           projectId: null,
-          areaPath: "Hobbies / Ham Radio",
-          projectName: null,
+          filingPath: "Hobbies / Ham Radio",
         },
       ],
-      areas: [
-        { id: "hobbies", name: "Hobbies", parentAreaId: null, sortOrder: 0 },
-        { id: "radio", name: "Ham Radio", parentAreaId: "hobbies", sortOrder: 0 },
+      areaOptions: [
+        { id: "hobbies", name: "Hobbies", path: "Hobbies", depth: 0 },
+        { id: "radio", name: "Ham Radio", path: "Hobbies / Ham Radio", depth: 1 },
       ],
       projects: [],
     }),
@@ -61,11 +63,21 @@ test("queue renders host, saved date, controls, filing path, and long-link wrapp
 });
 
 test("Open is an ordinary external link and never submits a read transition", () => {
-  assert.match(listSource, /target="_blank"/);
-  assert.match(listSource, /rel="noreferrer"/);
-  const start = listSource.indexOf("href={url}");
-  const openBlock = listSource.slice(start, listSource.indexOf("</a>", start));
-  assert.doesNotMatch(openBlock, /setReadLaterStatusAction|name="status"/);
+  const markup = renderToStaticMarkup(createElement(ReadLaterItemActionControls, {
+    url: "https://example.com/story",
+    readStatus: "unread",
+    currentAreaId: null,
+    currentProjectId: null,
+    areaOptions: [],
+    projects: [],
+    pendingAction: null,
+    error: null,
+    onStatus: () => assert.fail("rendering Open must not change status"),
+    onFile: () => assert.fail("rendering Open must not file"),
+  }));
+  assert.match(markup, /href="https:\/\/example\.com\/story"/);
+  assert.match(markup, /target="_blank"/);
+  assert.match(markup, /rel="noreferrer"/);
 });
 
 test("queue defaults to unread newest-first with explicit status filters", () => {
@@ -78,25 +90,49 @@ test("queue defaults to unread newest-first with explicit status filters", () =>
   assert.match(libraryPage, /href: "\/ideas\/read-later"/);
 });
 
-test("all mobile controls preserve 44px targets and actions use shared boundaries", () => {
-  for (const [source, label] of [
-    [formSource, "save form"],
-    [listSource, "queue"],
-  ] as const) {
-    assert.doesNotMatch(source, /className="[^"]*\bh-(?:8|9|10)\b[^"]*"/, `${label} contains a short fixed-height control`);
-    assert.match(source, /min-h-11|h-11/, `${label} needs 44px controls`);
+test("filing disclosure stays in flow inside the clipped queue card", () => {
+  const markup = renderToStaticMarkup(createElement(ReadLaterItemActionControls, {
+    url: "https://example.com/story",
+    readStatus: "unread",
+    currentAreaId: null,
+    currentProjectId: null,
+    areaOptions: [{ id: "area-1", name: "Area", path: "Root / Area", depth: 1 }],
+    projects: [],
+    pendingAction: null,
+    error: null,
+    onStatus: () => undefined,
+    onFile: () => undefined,
+  }));
+
+  assert.match(markup, /<details[^>]*>[\s\S]*File[\s\S]*<form/);
+  assert.doesNotMatch(markup, /(?:sm:)?absolute/);
+  assert.match(listSource, /overflow-hidden/);
+  for (const label of ["Open", "Mark read", "Archive", "File", "Save filing"]) {
+    const tag = markup.match(new RegExp(`<[^>]+class="[^"]*min-h-11[^"]*"[^>]*>[^<]*${label}`));
+    assert.ok(tag, `${label} must render with a 44px target`);
   }
-  assert.match(actions, /createReadLater\(/);
-  assert.match(actions, /setReadLaterStatus\(/);
-  assert.match(actions, /resolveVerifiedDestination/);
-  assert.match(actions, /revalidatePath\("\/ideas\/read-later"\)/);
+  assert.match(markup, /<select[^>]*class="[^"]*min-h-11/);
 });
 
-test("saving a duplicate without filing preserves its existing destination", () => {
-  const saveAction = actions.slice(
-    actions.indexOf("export async function saveReadLaterAction"),
-    actions.indexOf("export async function setReadLaterStatusAction"),
-  );
-  assert.match(saveAction, /\.\.\.\(areaId \|\| projectId/);
-  assert.doesNotMatch(saveAction, /\{ url, areaId, projectId, source: "manual" \}/);
+test("pending item actions disable competing mutations and errors are announced", () => {
+  const markup = renderToStaticMarkup(createElement(ReadLaterItemActionControls, {
+    url: "https://example.com/story",
+    readStatus: "unread",
+    currentAreaId: null,
+    currentProjectId: null,
+    areaOptions: [],
+    projects: [],
+    pendingAction: "status",
+    error: null,
+    onStatus: () => undefined,
+    onFile: () => undefined,
+  }));
+  assert.ok((markup.match(/disabled=""/g) ?? []).length >= 3);
+
+  const errorMarkup = renderToStaticMarkup(createElement(ReadLaterMutationError, {
+    error: "Could not update this Read Later item. Try again.",
+  }));
+  assert.match(errorMarkup, /role="alert"/);
+  assert.match(errorMarkup, /aria-live="polite"/);
+  assert.match(errorMarkup, /Could not update/);
 });

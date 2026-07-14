@@ -3,16 +3,21 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, RefreshCw, Star } from "lucide-react";
 import {
-  setReadLaterStatusAction,
   setReferenceSnippetStarred,
   syncBookLoreSnippetsAction,
 } from "@/app/actions";
 import { MarkdownPreview } from "@/components/markdown-preview";
+import { ReadLaterItemActions } from "@/components/read-later-item-actions";
+import type { ReadLaterProjectOption } from "@/components/read-later-form";
 import { ReferenceRating } from "@/components/reference-rating";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { loadReferenceMentions } from "@/lib/reference-mentions";
+import {
+  buildReadLaterAreaContext,
+  readLaterFilingPath,
+} from "@/lib/read-later-display";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +42,7 @@ export default async function ReferenceDetailPage({
     notFound();
   }
 
-  const { reference, mentions } = result;
+  const { reference, mentions, readLater } = result;
   const backHref =
     reference.kind === "book"
       ? "/ideas/books"
@@ -117,29 +122,15 @@ export default async function ReferenceDetailPage({
               </a>
             ) : null}
             {reference.kind === "read_later" ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {reference.url ? (
-                  <a
-                    href={reference.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-                  >
-                    Open <ArrowUpRight size={13} strokeWidth={2.4} />
-                  </a>
-                ) : null}
-                <form action={setReadLaterStatusAction}>
-                  <input type="hidden" name="referenceId" value={reference.id} />
-                  <input
-                    type="hidden"
-                    name="status"
-                    value={reference.readStatus === "unread" ? "read" : "unread"}
-                  />
-                  <button className="min-h-11 rounded-full border border-[#DCE2DA] bg-white px-4 text-[13px] font-medium text-stone-700 transition hover:border-teal-700/40 hover:text-teal-800">
-                    {reference.readStatus === "unread" ? "Mark read" : "Mark unread"}
-                  </button>
-                </form>
-              </div>
+              <ReadLaterItemActions
+                itemId={reference.id}
+                url={reference.url ?? reference.body}
+                readStatus={reference.readStatus}
+                currentAreaId={reference.areaId}
+                currentProjectId={reference.projectId}
+                areaOptions={readLater?.areaOptions ?? []}
+                projects={readLater?.projects ?? []}
+              />
             ) : null}
           </div>
         </div>
@@ -151,9 +142,7 @@ export default async function ReferenceDetailPage({
             Filing
           </p>
           <p className="mt-1 text-sm text-stone-700">
-            {reference.project
-              ? `${reference.area?.name ?? "No area yet"} / ${reference.project.name}`
-              : reference.area?.name ?? "No filing yet"}
+            {readLater?.filingPath ?? "Unfiled"}
           </p>
         </section>
       ) : null}
@@ -315,14 +304,58 @@ async function loadReference(referenceId: string) {
       },
     });
     if (!reference) {
-      return { ok: true as const, reference: null, mentions: [] };
+      return { ok: true as const, reference: null, mentions: [], readLater: null };
     }
 
     const mentionMap = await loadReferenceMentions("reference", [reference.id]);
+    let readLater = null;
+    if (reference.kind === "read_later") {
+      const [areas, rawProjects] = await Promise.all([
+        prisma.area.findMany({
+          where: { isSystem: false },
+          select: {
+            id: true,
+            name: true,
+            parentAreaId: true,
+            sortOrder: true,
+            status: true,
+            isSystem: true,
+          },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        }),
+        prisma.project.findMany({
+          where: { status: { in: ["active", "parked", "someday"] } },
+          select: { id: true, name: true, areaId: true },
+          orderBy: { name: "asc" },
+        }),
+      ]);
+      const areaContext = buildReadLaterAreaContext(areas);
+      const projects: ReadLaterProjectOption[] = rawProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        areaPath: project.areaId
+          ? areaContext.pathById.get(project.areaId) ?? "Area"
+          : null,
+      }));
+      readLater = {
+        areaOptions: areaContext.activeOptions,
+        projects,
+        filingPath: readLaterFilingPath(
+          {
+            areaId: reference.areaId,
+            project: reference.project
+              ? { name: reference.project.name, areaId: reference.project.areaId }
+              : null,
+          },
+          areaContext.pathById,
+        ),
+      };
+    }
     return {
       ok: true as const,
       reference,
       mentions: mentionMap.get(reference.id) ?? [],
+      readLater,
     };
   } catch {
     return { ok: false as const };

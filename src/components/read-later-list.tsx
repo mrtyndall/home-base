@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
-import { fileReadLaterAction, setReadLaterStatusAction } from "@/app/actions";
 import type { ReadLaterProjectOption } from "@/components/read-later-form";
-import type { AreaHierarchyRecord } from "@/lib/hierarchy";
-import { flattenAreaOptions } from "@/lib/hierarchy";
+import { ReadLaterItemActions } from "@/components/read-later-item-actions";
+import type { AreaOption } from "@/lib/hierarchy";
 import type { ReadLaterStatus } from "@/lib/read-later";
 
 export type ReadLaterListItem = {
@@ -15,19 +13,18 @@ export type ReadLaterListItem = {
   savedAt: Date;
   areaId: string | null;
   projectId: string | null;
-  areaPath: string | null;
-  projectName: string | null;
+  filingPath: string;
 };
 
 export function ReadLaterList({
   items,
   status,
-  areas,
+  areaOptions,
   projects,
 }: {
   items: readonly ReadLaterListItem[];
   status: ReadLaterStatus;
-  areas: readonly AreaHierarchyRecord[];
+  areaOptions: readonly AreaOption[];
   projects: readonly ReadLaterProjectOption[];
 }) {
   if (items.length === 0) {
@@ -45,17 +42,12 @@ export function ReadLaterList({
     );
   }
 
-  const areaOptions = flattenAreaOptions(areas);
-
   return (
     <div className="divide-y divide-[#E7EBE5] overflow-hidden rounded-[18px] border border-[#DCE2DA] bg-white">
       {items.map((item) => {
         const url = item.url ?? item.body;
         const title = item.title?.trim() || readLaterHost(url);
         const excerpt = item.body !== url ? item.body : null;
-        const path = item.projectName
-          ? `${item.areaPath ?? "No area yet"} / ${item.projectName}`
-          : item.areaPath ?? "Unfiled";
 
         return (
           <article
@@ -79,7 +71,7 @@ export function ReadLaterList({
                 {readLaterHost(url)} · saved {formatReadLaterDate(item.savedAt)}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-[#6B7268]" style={{ overflowWrap: "anywhere" }}>
-                {path}
+                {item.filingPath}
               </p>
               {excerpt ? (
                 <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-stone-600">
@@ -88,72 +80,15 @@ export function ReadLaterList({
               ) : null}
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-              >
-                Open <ArrowUpRight size={13} strokeWidth={2.4} />
-              </a>
-              <form action={setReadLaterStatusAction}>
-                <input type="hidden" name="referenceId" value={item.id} />
-                <input
-                  type="hidden"
-                  name="status"
-                  value={item.readStatus === "unread" ? "read" : "unread"}
-                />
-                <button className="min-h-11 rounded-full px-3.5 text-[13px] font-medium text-stone-700 transition hover:bg-[#F1F4EF] hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-                  {item.readStatus === "unread" ? "Mark read" : "Mark unread"}
-                </button>
-              </form>
-              {item.readStatus !== "archived" ? (
-                <form action={setReadLaterStatusAction}>
-                  <input type="hidden" name="referenceId" value={item.id} />
-                  <input type="hidden" name="status" value="archived" />
-                  <button className="min-h-11 rounded-full px-3.5 text-[13px] font-medium text-stone-600 transition hover:bg-[#F1F4EF] hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-                    Archive
-                  </button>
-                </form>
-              ) : null}
-              <details className="group relative">
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full px-3.5 text-[13px] font-medium text-stone-700 transition hover:bg-[#F1F4EF] hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
-                  File
-                </summary>
-                <form
-                  action={fileReadLaterAction}
-                  className="mt-2 w-full min-w-[min(310px,calc(100vw-3rem))] space-y-3 rounded-[16px] border border-[#DCE2DA] bg-[#FAFBF9] p-3.5 shadow-[0_12px_32px_rgba(28,25,23,0.14)] sm:absolute sm:left-0 sm:z-20 sm:w-[310px]"
-                >
-                  <input type="hidden" name="referenceId" value={item.id} />
-                  <label className="block text-[13px] font-medium text-stone-600">
-                    <span>Destination</span>
-                    <select
-                      name="destination"
-                      defaultValue={item.projectId ? `project:${item.projectId}` : item.areaId ? `area:${item.areaId}` : ""}
-                      className="mt-1 min-h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
-                    >
-                      <option value="">No filing yet</option>
-                      <optgroup label="Areas">
-                        {areaOptions.map((area) => (
-                          <option key={area.id} value={`area:${area.id}`}>{area.path}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Projects">
-                        {projects.map((project) => (
-                          <option key={project.id} value={`project:${project.id}`}>
-                            {project.areaPath ? `${project.areaPath} / ${project.name}` : `No area yet / ${project.name}`}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </label>
-                  <button className="min-h-11 w-full rounded-full bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
-                    Save filing
-                  </button>
-                </form>
-              </details>
-            </div>
+            <ReadLaterItemActions
+              itemId={item.id}
+              url={url}
+              readStatus={item.readStatus}
+              currentAreaId={item.areaId}
+              currentProjectId={item.projectId}
+              areaOptions={areaOptions}
+              projects={projects}
+            />
           </article>
         );
       })}

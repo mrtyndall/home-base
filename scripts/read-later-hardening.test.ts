@@ -114,6 +114,7 @@ function clientFixture(initial: StoredReference | null = null) {
   let p2002Failures = 0;
   let hiddenFinds = 0;
   let invalidArea = false;
+  let updateFailure: Error | null = null;
   const calls = { area: 0, create: 0, update: [] as Array<Record<string, unknown>>, updateMany: [] as Array<Record<string, unknown>> };
   const reference = {
     async findFirst(args: { where: Record<string, unknown> }) {
@@ -144,6 +145,7 @@ function clientFixture(initial: StoredReference | null = null) {
     },
     async update(args: { data: Record<string, unknown> }) {
       calls.update.push(args.data);
+      if (updateFailure) throw updateFailure;
       assert.ok(current);
       current = { ...current, ...args.data } as StoredReference;
       return current;
@@ -178,6 +180,7 @@ function clientFixture(initial: StoredReference | null = null) {
     calls,
     current: () => current,
     failArea() { invalidArea = true; },
+    failUpdates(error: Error) { updateFailure = error; },
     failCreates(count: number) { p2002Failures = count; },
     hideFinds(count: number) { hiddenFinds = count; },
   };
@@ -387,24 +390,54 @@ test("durable save returns before separately scheduled enrichment", async () => 
   });
 });
 
+test("best-effort enrichment contains a persistence failure", async () => {
+  const fixture = clientFixture();
+  let job: (() => Promise<void>) | undefined;
+  await readLater.createReadLater(
+    { url: "https://example.com/story" },
+    fixture.client,
+    {
+      scheduleEnrichment(task: () => Promise<void>) { job = task; },
+      fetchMetadata: async () => ({ title: "Later" }),
+    },
+  );
+  fixture.failUpdates(new Error("database unavailable"));
+
+  assert.ok(job);
+  await assert.doesNotReject(job());
+});
+
 test("an invalid explicit destination is rejected even when the URL is a duplicate", async () => {
   const fixture = clientFixture(stored());
   fixture.failArea();
   await assert.rejects(
-    readLater.createReadLater({ url: "https://example.com/story", areaId: "missing" }, fixture.client),
+    readLater.createReadLater({
+      url: "https://example.com/story",
+      filing: { mode: "area", areaId: "missing" },
+    }, fixture.client),
     /Area not found/,
   );
   assert.equal(fixture.calls.area, 1);
 });
 
-test("an explicit valid destination refiles a duplicate while omission preserves it", async () => {
-  const fixture = clientFixture(stored({ areaId: null }));
+test("omitted filing preserves a duplicate and explicit unfiled clears it", async () => {
+  const fixture = clientFixture(stored({ areaId: "area-1" }));
   const preserved = await readLater.createReadLater({ url: "https://example.com/story" }, fixture.client);
-  assert.equal(preserved.areaId, null);
+  assert.equal(preserved.areaId, "area-1");
   assert.equal(fixture.calls.update.length, 0);
 
+  const unfiled = await readLater.createReadLater(
+    { url: "https://example.com/story", filing: { mode: "unfiled" } },
+    fixture.client,
+  );
+  assert.equal(unfiled.areaId, null);
+  assert.deepEqual(fixture.calls.update[0], { areaId: null, projectId: null });
+});
+
+test("explicit Area filing refiles a duplicate", async () => {
+  const fixture = clientFixture(stored({ areaId: null }));
   const filed = await readLater.createReadLater(
-    { url: "https://example.com/story", areaId: "area-1" },
+    { url: "https://example.com/story", filing: { mode: "area", areaId: "area-1" } },
     fixture.client,
   );
   assert.equal(filed.areaId, "area-1");

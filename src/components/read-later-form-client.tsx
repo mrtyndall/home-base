@@ -15,7 +15,7 @@ export function ReadLaterFormClient({
   projects: readonly ReadLaterProjectOption[];
 }) {
   const [state, formAction, pending] = useActionState(saveReadLaterAction, initialState);
-  const [destination, setDestination] = useState<"none" | "area" | "project">("none");
+  const [destination, setDestination] = useState<"unchanged" | "unfiled" | "area" | "project">("unchanged");
 
   return (
     <section className="rounded-[18px] border border-[#DCE2DA] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.04)]">
@@ -53,11 +53,13 @@ export function ReadLaterFormClient({
             <label className="block text-[13px] font-medium text-stone-600">
               <span>Destination</span>
               <select
+                name="filingMode"
                 value={destination}
                 onChange={(event) => setDestination(event.target.value as typeof destination)}
                 className="mt-1 min-h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
               >
-                <option value="none">No filing yet</option>
+                <option value="unchanged">Leave existing filing unchanged</option>
+                <option value="unfiled">No filing</option>
                 <option value="area">Area</option>
                 <option value="project">Project</option>
               </select>
@@ -69,9 +71,10 @@ export function ReadLaterFormClient({
                 <select
                   name="projectId"
                   defaultValue=""
+                  required
                   className="mt-1 min-h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
                 >
-                  <option value="">No filing yet</option>
+                  <option value="" disabled>Choose a Project</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.areaPath

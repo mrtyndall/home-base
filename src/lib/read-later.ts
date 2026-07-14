@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import {
   resolveVerifiedDestination,
-  type DestinationInput,
 } from "@/lib/destinations";
 import {
   fetchReadLaterMetadata,
@@ -16,8 +15,15 @@ export {
 
 export type ReadLaterStatus = "unread" | "read" | "archived";
 
-export type CreateReadLaterInput = DestinationInput & {
+export type ReadLaterFilingIntent =
+  | { mode: "unchanged" }
+  | { mode: "unfiled" }
+  | { mode: "area"; areaId: string }
+  | { mode: "project"; projectId: string };
+
+export type CreateReadLaterInput = {
   url: string;
+  filing?: ReadLaterFilingIntent;
   title?: string | null;
   body?: string | null;
   tags?: string[];
@@ -114,8 +120,15 @@ function isUniqueConstraintError(error: unknown) {
     "code" in error && error.code === "P2002";
 }
 
-function destinationWasExplicit(input: CreateReadLaterInput) {
-  return Object.hasOwn(input, "areaId") || Object.hasOwn(input, "projectId");
+export function readLaterFilingDestination(filing: ReadLaterFilingIntent | undefined) {
+  if (!filing || filing.mode === "unchanged") return {};
+  if (filing.mode === "unfiled") return { areaId: null, projectId: null };
+  if (filing.mode === "area") {
+    if (!filing.areaId.trim()) throw new Error("Area not found.");
+    return { areaId: filing.areaId, projectId: null };
+  }
+  if (!filing.projectId.trim()) throw new Error("Project not found.");
+  return { areaId: null, projectId: filing.projectId };
 }
 
 async function applyExplicitDestination(
@@ -141,20 +154,19 @@ function scheduleMetadataEnrichment(
   const fetchMetadata = options.fetchMetadata ?? fetchReadLaterMetadata;
   const schedule = options.scheduleEnrichment ?? defaultScheduleEnrichment;
   schedule(async () => {
-    let metadata: ReadLaterPageMetadata;
     try {
-      metadata = await fetchMetadata(normalizedUrl);
+      const metadata = await fetchMetadata(normalizedUrl);
+      const json = metadataJson(metadata);
+      const data = {
+        ...(!input.title?.trim() && metadata.title ? { title: metadata.title } : {}),
+        ...(!input.body?.trim() && metadata.description ? { body: metadata.description } : {}),
+        ...(json ? { metadata: json } : {}),
+      };
+      if (Object.keys(data).length) {
+        await client.reference.update({ where: { id: item.id }, data });
+      }
     } catch {
       return;
-    }
-    const json = metadataJson(metadata);
-    const data = {
-      ...(!input.title?.trim() && metadata.title ? { title: metadata.title } : {}),
-      ...(!input.body?.trim() && metadata.description ? { body: metadata.description } : {}),
-      ...(json ? { metadata: json } : {}),
-    };
-    if (Object.keys(data).length) {
-      await client.reference.update({ where: { id: item.id }, data });
     }
   });
 }
@@ -166,8 +178,9 @@ export async function createReadLater(
 ) {
   const submittedUrl = input.url.trim();
   const normalizedUrl = normalizeReadLaterUrl(submittedUrl);
-  const destination = await resolveVerifiedDestination(input, client);
-  const explicitDestination = destinationWasExplicit(input);
+  const filing = input.filing ?? { mode: "unchanged" as const };
+  const destination = await resolveVerifiedDestination(readLaterFilingDestination(filing), client);
+  const explicitDestination = filing.mode !== "unchanged";
   const duplicateWhere = {
     kind: "read_later",
     normalizedUrl,

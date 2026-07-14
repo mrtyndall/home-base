@@ -65,7 +65,10 @@ export async function resolveVerifiedDestination(
   }
 
   const project = await client.project.findFirst({
-    where: { id: destination.projectId },
+    where: {
+      id: destination.projectId,
+      status: { in: ["active", "parked", "someday"] },
+    },
     select: { id: true, areaId: true },
   });
   if (!project) {

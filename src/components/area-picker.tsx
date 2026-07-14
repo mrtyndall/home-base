@@ -8,6 +8,7 @@ type AreaPickerProps = {
   lockedAreaId?: string | null;
   nullable?: boolean;
   excludedAreaIds?: readonly string[];
+  selectableAreaIds?: readonly string[];
   label?: string;
 };
 
@@ -18,10 +19,14 @@ export function AreaPicker({
   lockedAreaId,
   nullable = true,
   excludedAreaIds = [],
+  selectableAreaIds,
   label = "Area",
 }: AreaPickerProps) {
   const excluded = new Set(excludedAreaIds);
-  const options = flattenAreaOptions(areas).filter((option) => !excluded.has(option.id));
+  const selectable = selectableAreaIds ? new Set(selectableAreaIds) : null;
+  const options = flattenAreaOptions(areas).filter(
+    (option) => !excluded.has(option.id) && (!selectable || selectable.has(option.id)),
+  );
 
   if (lockedAreaId !== undefined && lockedAreaId !== null) {
     const locked = options.find((option) => option.id === lockedAreaId);

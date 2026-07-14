@@ -10,8 +10,11 @@ import { ReadLaterList } from "@/components/read-later-list";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { flattenAreaOptions } from "@/lib/hierarchy";
 import type { ReadLaterStatus } from "@/lib/read-later";
+import {
+  buildReadLaterAreaContext,
+  readLaterFilingPath,
+} from "@/lib/read-later-display";
 import {
   searchReferenceCandidates,
   type ReferenceLookupCandidate,
@@ -86,7 +89,11 @@ export default async function LibraryDatabasePage({
     }
     return (
       <DatabaseShell title="Read Later">
-        <ReadLaterForm areas={result.areas} projects={result.projects} />
+        <ReadLaterForm
+          areas={result.areas}
+          selectableAreaIds={result.activeAreaIds}
+          projects={result.projects}
+        />
         <nav aria-label="Read Later status" className="flex flex-wrap gap-1.5">
           {([
             ["unread", "Unread"],
@@ -110,7 +117,7 @@ export default async function LibraryDatabasePage({
         <ReadLaterList
           items={result.items}
           status={result.status}
-          areas={result.areas}
+          areaOptions={result.areaOptions}
           projects={result.projects}
         />
       </DatabaseShell>
@@ -186,8 +193,15 @@ async function loadReadLater(requestedStatus?: string) {
         _count: { _all: true },
       }),
       prisma.area.findMany({
-        where: { status: "active", isSystem: false },
-        select: { id: true, name: true, parentAreaId: true, sortOrder: true },
+        where: { isSystem: false },
+        select: {
+          id: true,
+          name: true,
+          parentAreaId: true,
+          sortOrder: true,
+          status: true,
+          isSystem: true,
+        },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
       prisma.project.findMany({
@@ -196,11 +210,11 @@ async function loadReadLater(requestedStatus?: string) {
         orderBy: { name: "asc" },
       }),
     ]);
-    const areaPaths = new Map(flattenAreaOptions(areas).map((area) => [area.id, area.path]));
+    const areaContext = buildReadLaterAreaContext(areas);
     const projects: ReadLaterProjectOption[] = rawProjects.map((project) => ({
       id: project.id,
       name: project.name,
-      areaPath: project.areaId ? areaPaths.get(project.areaId) ?? null : null,
+      areaPath: project.areaId ? areaContext.pathById.get(project.areaId) ?? "Area" : null,
     }));
     const counts: Record<ReadLaterStatus, number> = { unread: 0, read: 0, archived: 0 };
     for (const group of groupedCounts) {
@@ -213,6 +227,8 @@ async function loadReadLater(requestedStatus?: string) {
       status,
       counts,
       areas,
+      activeAreaIds: areaContext.activeAreaIds,
+      areaOptions: areaContext.activeOptions,
       projects,
       items: references.map((reference) => ({
         id: reference.id,
@@ -223,8 +239,15 @@ async function loadReadLater(requestedStatus?: string) {
         savedAt: reference.savedAt,
         areaId: reference.areaId,
         projectId: reference.projectId,
-        areaPath: reference.areaId ? areaPaths.get(reference.areaId) ?? reference.area?.name ?? null : null,
-        projectName: reference.project?.name ?? null,
+        filingPath: readLaterFilingPath(
+          {
+            areaId: reference.areaId,
+            project: reference.project
+              ? { name: reference.project.name, areaId: reference.project.areaId }
+              : null,
+          },
+          areaContext.pathById,
+        ),
       })),
     };
   } catch {

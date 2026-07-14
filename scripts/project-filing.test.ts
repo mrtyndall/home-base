@@ -215,10 +215,14 @@ test("fileProject rejects a system Area before writes", async () => {
 });
 
 test("resolveVerifiedDestination accepts an unfiled Project as authoritative", async () => {
+  let projectWhere: unknown;
   const client = {
     area: { findFirst: async () => ({ id: "area-1" }) },
     project: {
-      findFirst: async () => ({ id: "project-1", areaId: null }),
+      findFirst: async ({ where }: { where: unknown }) => {
+        projectWhere = where;
+        return { id: "project-1", areaId: null };
+      },
     },
   };
 
@@ -229,12 +233,36 @@ test("resolveVerifiedDestination accepts an unfiled Project as authoritative", a
     ),
     { projectId: "project-1", areaId: null },
   );
+  assert.deepEqual(projectWhere, {
+    id: "project-1",
+    status: { in: ["active", "parked", "someday"] },
+  });
   await assert.rejects(
     resolveVerifiedDestination(
       { projectId: "project-1", areaId: "area-1" },
       client,
     ),
     /Project does not belong to the selected Area/,
+  );
+});
+
+test("resolveVerifiedDestination rejects completed Projects", async () => {
+  const completed = { id: "project-1", areaId: "area-1", status: "completed" };
+  const client = {
+    area: { findFirst: async () => null },
+    project: {
+      findFirst: async ({ where }: {
+        where: { id: string; status?: { in: string[] } };
+      }) =>
+        where.id === completed.id && where.status?.in.includes(completed.status)
+          ? completed
+          : null,
+    },
+  };
+
+  await assert.rejects(
+    resolveVerifiedDestination({ projectId: completed.id }, client),
+    /Project not found/,
   );
 });
 

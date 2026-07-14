@@ -11,14 +11,23 @@ export type ReadLaterProjectOption = {
 export function ReadLaterForm({
   areas,
   projects,
+  selectableAreaIds,
 }: {
   areas: readonly AreaHierarchyRecord[];
   projects: readonly ReadLaterProjectOption[];
+  selectableAreaIds: readonly string[];
 }) {
   return (
     <ReadLaterFormClient
       projects={projects}
-      areaPicker={<AreaPicker areas={areas} nullable label="File to Area" />}
+      areaPicker={(
+        <AreaPicker
+          areas={areas}
+          selectableAreaIds={selectableAreaIds}
+          nullable={false}
+          label="File to Area"
+        />
+      )}
     />
   );
 }

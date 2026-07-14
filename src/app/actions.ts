@@ -12,8 +12,14 @@ import {
   createReadLater,
   normalizeReadLaterUrl,
   setReadLaterStatus,
+  type ReadLaterFilingIntent,
   type ReadLaterStatus,
 } from "@/lib/read-later";
+import {
+  performReadLaterFilingMutation,
+  performReadLaterStatusMutation,
+  type ReadLaterMutationResult,
+} from "@/lib/read-later-action-service";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
@@ -596,8 +602,17 @@ export async function saveReadLaterAction(
   const url = getTrimmedString(formData, "url");
   const areaId = getTrimmedString(formData, "areaId") || null;
   const projectId = getTrimmedString(formData, "projectId") || null;
+  const filingMode = getTrimmedString(formData, "filingMode") || "unchanged";
 
   try {
+    const filing: ReadLaterFilingIntent =
+      filingMode === "unfiled"
+        ? { mode: "unfiled" }
+        : filingMode === "area"
+          ? { mode: "area", areaId: areaId ?? "" }
+          : filingMode === "project"
+            ? { mode: "project", projectId: projectId ?? "" }
+            : { mode: "unchanged" };
     const normalizedUrl = normalizeReadLaterUrl(url);
     const existing = await prisma.reference.findFirst({
       where: {
@@ -611,7 +626,7 @@ export async function saveReadLaterAction(
       {
         url,
         source: "manual",
-        ...(areaId || projectId ? { areaId, projectId } : {}),
+        filing,
       },
       undefined,
       { scheduleEnrichment: (job) => after(job) },
@@ -621,7 +636,7 @@ export async function saveReadLaterAction(
     return {
       status: "success",
       message: existing
-        ? areaId || projectId
+        ? filing.mode !== "unchanged"
           ? "Already saved. Filing updated."
           : "Already saved."
         : "Saved to Read Later.",
@@ -634,52 +649,37 @@ export async function saveReadLaterAction(
   }
 }
 
-export async function setReadLaterStatusAction(formData: FormData) {
-  const referenceId = getTrimmedString(formData, "referenceId");
-  const status = getTrimmedString(formData, "status") as ReadLaterStatus;
-  if (!referenceId) return;
-
-  try {
-    const reference = await setReadLaterStatus(referenceId, status);
-    revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
-  } catch {
-    return;
-  }
+export async function setReadLaterStatusAction(input: {
+  referenceId: string;
+  status: ReadLaterStatus;
+}): Promise<ReadLaterMutationResult> {
+  return performReadLaterStatusMutation(input, {
+    setStatus: setReadLaterStatus,
+    revalidate: (reference) => {
+      revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
+    },
+  });
 }
 
-export async function fileReadLaterAction(formData: FormData) {
-  const referenceId = getTrimmedString(formData, "referenceId");
-  const destinationValue = getTrimmedString(formData, "destination");
-  if (!referenceId) return;
-
-  const current = await prisma.reference.findFirst({
-    where: { id: referenceId, kind: "read_later" },
-    select: { id: true, areaId: true, projectId: true },
-  });
-  if (!current) return;
-
-  const [kind, rawId] = destinationValue.split(":", 2);
-  if (destinationValue && !rawId) return;
-  const input = destinationValue
-    ? kind === "area"
-      ? { areaId: rawId, projectId: null }
-      : kind === "project"
-        ? { areaId: null, projectId: rawId }
-        : null
-    : { areaId: null, projectId: null };
-  if (!input) return;
-
-  try {
-    const destination = await resolveVerifiedDestination(input);
-    const reference = await prisma.reference.update({
-      where: { id: current.id },
+export async function fileReadLaterAction(input: {
+  referenceId: string;
+  filing: Exclude<ReadLaterFilingIntent, { mode: "unchanged" }>;
+}): Promise<ReadLaterMutationResult> {
+  return performReadLaterFilingMutation(input, {
+    findReference: (id) => prisma.reference.findFirst({
+      where: { id, kind: "read_later" },
+      select: { id: true, areaId: true, projectId: true },
+    }),
+    resolveDestination: (destination) => resolveVerifiedDestination(destination),
+    updateReference: (id, destination) => prisma.reference.update({
+      where: { id },
       data: destination,
-    });
-    revalidateReadLaterPaths(current.id, current.areaId, current.projectId);
-    revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
-  } catch {
-    return;
-  }
+      select: { id: true, areaId: true, projectId: true },
+    }),
+    revalidate: (reference) => {
+      revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
+    },
+  });
 }
 
 function revalidateReadLaterPaths(

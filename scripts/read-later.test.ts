@@ -146,7 +146,7 @@ test("validates the destination and preserves a URL when metadata enrichment fai
   const { client, calls } = makeClient();
   const result = await createReadLater({
       url: "https://example.com/article?utm_medium=social",
-      areaId: " area-1 ",
+      filing: { mode: "area", areaId: " area-1 " },
       tags: ["web"],
     }, client, { scheduleEnrichment() {} });
 
