@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { validateAttachmentMetadata } from "@/lib/attachment-policy";
 
 export function AttachmentUpload({
   parentType,
@@ -25,8 +26,19 @@ export function AttachmentUpload({
     const file = event.target.files?.[0];
     if (!file || pending) return;
 
-    setPending(true);
     setMessage("");
+    const validation = validateAttachmentMetadata({
+      filename: file.name,
+      mime: file.type,
+      size: file.size,
+    });
+    if (!validation.ok) {
+      setMessage(validation.error);
+      event.target.value = "";
+      return;
+    }
+
+    setPending(true);
     try {
       const presignResponse = await fetch("/api/documents/presign", {
         method: "POST",
@@ -35,7 +47,7 @@ export function AttachmentUpload({
           parentType,
           parentId,
           filename: file.name,
-          mime: file.type || "application/octet-stream",
+          mime: validation.mime,
           size: file.size,
         }),
       });
@@ -51,11 +63,14 @@ export function AttachmentUpload({
       };
       const uploadResponse = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": validation.mime },
         body: file,
       });
       if (!uploadResponse.ok) {
-        throw new Error("Upload failed.");
+        const body = (await uploadResponse.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Upload failed. Try again.");
       }
 
       setMessage("Attachment uploaded.");
@@ -71,6 +86,7 @@ export function AttachmentUpload({
   return (
     <div className="space-y-2">
       <label
+        aria-busy={pending}
         className={
           variant === "quiet"
             ? "inline-flex h-8 cursor-pointer items-center px-2 text-[13px] font-medium text-stone-500 transition hover:text-stone-950"
@@ -83,10 +99,13 @@ export function AttachmentUpload({
           accept={accept}
           className="sr-only"
           onChange={upload}
+          disabled={pending}
         />
       </label>
       {message ? (
         <p
+          role="status"
+          aria-live="polite"
           className={`text-[13px] ${
             message === "Attachment uploaded."
               ? "text-[#6B7268]"

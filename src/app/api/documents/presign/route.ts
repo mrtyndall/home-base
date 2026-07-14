@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveVerifiedDestination } from "@/lib/destinations";
+import { validateAttachmentMetadata } from "@/lib/attachment-policy";
 import { createUploadUrl, isR2Configured } from "@/lib/r2";
 
 export async function POST(request: Request) {
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
   const parentType = body?.parentType;
   const parentId = typeof body?.parentId === "string" ? body.parentId : null;
   const filename = typeof body?.filename === "string" ? body.filename : "";
-  const mime = typeof body?.mime === "string" ? body.mime : "application/octet-stream";
+  const requestedMime = typeof body?.mime === "string" ? body.mime : "";
   const size = Number(body?.size ?? 0);
 
   if (
@@ -18,12 +19,20 @@ export async function POST(request: Request) {
       parentType !== "journal_entry" &&
       parentType != null) ||
     ((parentType == null) !== (parentId == null)) ||
-    !filename ||
-    !Number.isFinite(size) ||
-    size <= 0
+    !filename
   ) {
     return NextResponse.json({ error: "Invalid attachment request." }, { status: 400 });
   }
+
+  const validation = validateAttachmentMetadata({
+    filename,
+    mime: requestedMime,
+    size,
+  });
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const mime = validation.mime;
 
   if (parentType === "area") {
     await resolveVerifiedDestination({ areaId: parentId });
@@ -50,9 +59,20 @@ export async function POST(request: Request) {
       size,
     },
   });
-  const uploadUrl = isR2Configured()
-    ? await createUploadUrl({ key, mime })
-    : `/api/documents/${document.id}/upload-local`;
+  let uploadUrl: string;
+  try {
+    uploadUrl = isR2Configured()
+      ? await createUploadUrl({ key, mime, size })
+      : `/api/documents/${document.id}/upload-local`;
+  } catch {
+    await prisma.document
+      .delete({ where: { id: document.id } })
+      .catch(() => undefined);
+    return NextResponse.json(
+      { error: "Upload could not be prepared. Try again." },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ documentId: document.id, uploadUrl });
 }

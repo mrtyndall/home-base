@@ -41,9 +41,11 @@ function createClient(config: R2Config) {
 export async function createUploadUrl({
   key,
   mime,
+  size,
 }: {
   key: string;
   mime: string;
+  size: number;
 }) {
   const config = getR2Config();
   if (!config) throw new Error("R2 is not configured.");
@@ -55,6 +57,7 @@ export async function createUploadUrl({
       Bucket: config.bucket,
       Key: key,
       ContentType: mime,
+      ContentLength: size,
     }),
     { expiresIn: 600 },
   );
