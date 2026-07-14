@@ -15,7 +15,7 @@ assert.ok(
   "Confirmation should show the selected destination area name.",
 );
 assert.ok(
-  source.includes("Choose area"),
+  source.includes("Choose an area before filing."),
   "Capture filing should not default to the first area in the list.",
 );
 assert.ok(
