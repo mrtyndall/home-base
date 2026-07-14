@@ -7,6 +7,10 @@ const areaPage = fs.readFileSync("src/app/areas/[areaId]/page.tsx", "utf8");
 const homePage = fs.readFileSync("src/app/page.tsx", "utf8");
 const projectsPage = fs.readFileSync("src/app/projects/page.tsx", "utf8");
 const todayPage = fs.readFileSync("src/app/today/page.tsx", "utf8");
+const actionableCaptures = fs.readFileSync(
+  "src/lib/actionable-captures.ts",
+  "utf8",
+);
 const entityDepth = fs.readFileSync("src/components/entity-depth.tsx", "utf8");
 
 assert.ok(
@@ -46,7 +50,8 @@ assert.ok(
   "Home and Projects pending-capture counts should ignore dismissed captures.",
 );
 assert.ok(
-  todayPage.includes("capture.status === \"dismissed\""),
+  todayPage.includes("selectActionableCaptures") &&
+    actionableCaptures.includes('capture.status !== "active"'),
   "Recent capture actions should not offer filing controls for dismissed captures.",
 );
 

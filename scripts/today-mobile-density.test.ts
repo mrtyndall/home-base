@@ -10,8 +10,13 @@ assert.doesNotMatch(todaySource, /Recent captures/);
 assert.match(todaySource, /selectActionableCaptures\(captures\)/);
 assert.match(
   dashboardSource,
-  /prisma\.capture\.findMany\(\{[\s\S]{0,200}where: \{ status: "active" \}[\s\S]{0,200}take: 50/,
-  "Today must inspect a bounded review window larger than the rendered capture count.",
+  /prisma\.\$queryRaw<[\s\S]+FROM captures[\s\S]+WHERE status = 'active'::"CaptureStatus"[\s\S]+parse_status IS NULL[\s\S]+parse_status IN[\s\S]+created_items[\s\S]+@\?[\s\S]+ORDER BY created_at DESC[\s\S]+LIMIT 5/,
+  "The database must filter every actionable capture state before applying the display limit.",
+);
+assert.doesNotMatch(
+  dashboardSource,
+  /prisma\.capture\.findMany\(\{[\s\S]{0,300}take: 50/,
+  "Processed captures must not occupy a pre-filter query window.",
 );
 assert.match(todaySource, /space-y-5 sm:space-y-7/);
 assert.match(

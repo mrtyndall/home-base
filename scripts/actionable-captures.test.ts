@@ -53,7 +53,7 @@ const olderActionableCapture = {
   parseStatus: "failed",
   createdItems: [],
 };
-const newerProcessedCaptures = Array.from({ length: 7 }, (_, index) => ({
+const newerProcessedCaptures = Array.from({ length: 51 }, (_, index) => ({
   id: `processed-${index}`,
   ...processedTaskCapture,
 }));
@@ -64,5 +64,5 @@ assert.deepEqual(
     5,
   ).map((capture) => capture.id),
   ["needs-review"],
-  "Filtering must happen before the display limit so newer receipts cannot hide review work.",
+  "Even more than 50 newer receipts cannot hide review work when filtering precedes the limit.",
 );

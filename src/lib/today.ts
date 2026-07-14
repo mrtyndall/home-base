@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { Capture } from "@prisma/client";
 import {
   addDaysToDateString,
   dateOnlyFromString,
@@ -134,13 +135,31 @@ export async function getTodayDashboard() {
         ],
         take: getTodayTaskInboxLimit(),
       }),
-      prisma.capture.findMany({
-        // Today renders at most five review items. Inspect a larger bounded
-        // active window so processed receipts cannot crowd review work out.
-        where: { status: "active" },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      }),
+      prisma.$queryRaw<Capture[]>`
+        SELECT
+          id,
+          raw_text AS "rawText",
+          source,
+          status,
+          device_context AS "deviceContext",
+          parse_status AS "parseStatus",
+          parsed_actions AS "parsedActions",
+          created_items AS "createdItems",
+          created_at AS "createdAt"
+        FROM captures
+        WHERE status = 'active'::"CaptureStatus"
+          AND (
+            parse_status IS NULL
+            OR parse_status IN (
+              'ambiguous'::"CaptureParseStatus",
+              'failed'::"CaptureParseStatus"
+            )
+            OR COALESCE(created_items, '[]'::jsonb)
+              @? '$[*] ? (@.type == "pending_capture")'
+          )
+        ORDER BY created_at DESC
+        LIMIT 5
+      `,
       prisma.task.findFirst({
         where: {
           status: "open",
