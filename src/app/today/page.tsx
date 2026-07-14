@@ -10,6 +10,7 @@ import { getRecentCaptureHref } from "@/lib/today-capture-actions";
 import { ResurfacedMemory } from "@/components/resurfaced-memory";
 import { TodayRoutinesLine } from "@/components/today-routines";
 import { CaptureFileActions } from "@/components/capture-file-actions";
+import { isActionableCapture } from "@/lib/actionable-captures";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function TodayPage() {
   const data = await getTodayDashboard();
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5 sm:space-y-7">
       <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Today
@@ -65,7 +66,7 @@ export default async function TodayPage() {
           ) : null}
 
           <section className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <div className="space-y-7">
+            <div className="space-y-5 sm:space-y-7">
               {data.todayEvents.length > 0 ? (
                 <div className="space-y-2.5">
                   <div className="flex items-baseline justify-between gap-3">
@@ -172,7 +173,7 @@ export default async function TodayPage() {
               </div>
             </div>
 
-            <div className="space-y-7">
+            <div className="space-y-5 sm:space-y-7">
               <TodayRoutinesLine routines={data.routinesDueToday} />
               <RecentCapturesStrip
                 captures={data.recentCaptures}
@@ -264,7 +265,9 @@ function RecentCapturesStrip({
   captures: RecentCapture[];
   areas: Area[];
 }) {
-  if (captures.length === 0) {
+  const actionableCaptures = captures.filter(isActionableCapture);
+
+  if (actionableCaptures.length === 0) {
     return null;
   }
 
@@ -272,17 +275,16 @@ function RecentCapturesStrip({
     <section className="space-y-2.5">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          Recent captures
+          Captures to review
         </h2>
       </div>
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-        {captures.slice(0, 5).map((capture) => {
+        {actionableCaptures.slice(0, 5).map((capture) => {
           const outcome =
             formatCaptureOutcome(capture.createdItems) ??
             capture.parseStatus ??
             "saved";
           const href = getRecentCaptureHref(capture);
-          const pending = isPendingCapture(capture);
 
           return (
             <div
@@ -298,20 +300,11 @@ function RecentCapturesStrip({
                 </Link>
                 <p className="mt-0.5 text-xs text-[#9AA096]">{outcome}</p>
               </div>
-              {pending ? (
-                <CaptureFileActions
-                  captureId={capture.id}
-                  areas={areas}
-                  align="right"
-                />
-              ) : (
-                <Link
-                  href={href}
-                  className="inline-flex h-[30px] shrink-0 items-center rounded-full border border-[#E2E6DF] bg-white px-3 text-[13px] font-medium text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
-                >
-                  Open
-                </Link>
-              )}
+              <CaptureFileActions
+                captureId={capture.id}
+                areas={areas}
+                align="right"
+              />
             </div>
           );
         })}
@@ -452,18 +445,4 @@ function isCreatedItem(
     "label" in item &&
     typeof item.label === "string"
   );
-}
-
-function isPendingCapture(capture: RecentCapture) {
-  if (capture.status === "dismissed") {
-    return false;
-  }
-  if (capture.parseStatus === "ambiguous" || capture.parseStatus === "failed") {
-    return true;
-  }
-  return Array.isArray(capture.createdItems)
-    ? capture.createdItems.some(
-        (item) => isCreatedItem(item) && item.type === "pending_capture",
-      )
-    : false;
 }

@@ -131,7 +131,7 @@ export function TaskDropZone({
       data-drop-date={targetDate ?? ""}
       data-drop-kind={kind}
       data-drop-key={taskDropKey(kind, targetDate)}
-      className={`relative min-h-20 space-y-2 rounded-[14px] border p-1.5 transition ${
+      className={`relative ${isEmpty ? "min-h-0" : "min-h-20"} ${draggingTask ? "min-h-20" : ""} space-y-2 rounded-[14px] border p-1.5 transition ${
         isActive
           ? "border-teal-700 bg-teal-700/5"
           : draggingTask
