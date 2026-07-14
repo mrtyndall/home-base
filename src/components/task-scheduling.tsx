@@ -179,7 +179,7 @@ export function DraggableTaskLink({
   detail,
   currentDueDate,
   currentParentTaskId = null,
-  currentAreaId = "area_inbox",
+  currentAreaId = "",
   currentProjectId = null,
   areaGroups = [],
   projects = [],

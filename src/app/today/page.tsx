@@ -1,5 +1,5 @@
 import { CheckCircle2, Inbox } from "lucide-react";
-import type { Area, Capture, Domain } from "@prisma/client";
+import type { Area, Capture } from "@prisma/client";
 import Link from "next/link";
 import { getTodayDashboard } from "@/lib/today";
 import { formatDateOnly, formatShortDate, formatTime } from "@/lib/dates";
@@ -176,7 +176,7 @@ export default async function TodayPage() {
               <TodayRoutinesLine routines={data.routinesDueToday} />
               <RecentCapturesStrip
                 captures={data.recentCaptures}
-                domains={data.domains}
+                areas={data.areas}
               />
               <div className="space-y-2.5">
                 <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
@@ -212,7 +212,7 @@ type TodayTask = {
   title: string;
   dueDate: Date | null;
   starred: boolean;
-  area: { name: string };
+  area: { name: string } | null;
   project: { name: string } | null;
 };
 
@@ -227,7 +227,7 @@ function TodayTaskRow({
   tomorrow: string;
   grouped?: boolean;
 }) {
-  const detail = `${task.area.name}${task.project ? ` / ${task.project.name}` : ""}`;
+  const detail = `${task.area?.name ?? "Inbox"}${task.project ? ` / ${task.project.name}` : ""}`;
 
   return (
     <div
@@ -259,10 +259,10 @@ type RecentCapture = Capture;
 
 function RecentCapturesStrip({
   captures,
-  domains,
+  areas,
 }: {
   captures: RecentCapture[];
-  domains: Array<Domain & { areas: Area[] }>;
+  areas: Area[];
 }) {
   if (captures.length === 0) {
     return null;
@@ -301,7 +301,7 @@ function RecentCapturesStrip({
               {pending ? (
                 <CaptureFileActions
                   captureId={capture.id}
-                  domains={domains}
+                  areas={areas}
                   align="right"
                 />
               ) : (

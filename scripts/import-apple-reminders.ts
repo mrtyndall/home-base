@@ -18,7 +18,7 @@ type NormalizedReminder = {
   dueTime?: string;
   priority?: string;
   completed: boolean;
-  domainName?: string;
+  areaName?: string;
   projectName?: string;
   raw: ReminderRow;
 };
@@ -87,7 +87,7 @@ async function importReminder(reminder: NormalizedReminder, inputPath: string) {
     : undefined;
   const areaId = projectId
     ? await resolveProjectAreaId(projectId)
-    : await resolveAreaId(reminder.domainName);
+    : await resolveAreaId(reminder.areaName);
 
   return getPrisma().$transaction(async (tx) => {
     const capture = await tx.capture.create({
@@ -168,7 +168,7 @@ function normalizeReminder(row: ReminderRow): NormalizedReminder | null {
     dueTime,
     priority: readField(row, "priority")?.trim() || undefined,
     completed: parseBoolean(readField(row, "completed", "is_completed", "done")),
-    domainName: readField(row, "domain", "list", "list_name")?.trim() || undefined,
+    areaName: readField(row, "area", "domain", "list", "list_name")?.trim() || undefined,
     projectName: readField(row, "project", "project_name")?.trim() || undefined,
     raw: row,
   };
@@ -235,32 +235,7 @@ async function resolveAreaId(name?: string) {
     if (area) return area.id;
   }
 
-  const systemDomain = await getPrisma().domain.upsert({
-    where: { name: "System" },
-    update: { active: false, isSystem: true },
-    create: {
-      name: "System",
-      description: "Hidden system grouping for imported or ambiguous items.",
-      sortOrder: 0,
-      isSystem: true,
-      active: false,
-    },
-  });
-
-  const inbox = await getPrisma().area.upsert({
-    where: { id: "area_inbox" },
-    update: { name: "Inbox", domainId: systemDomain.id, isSystem: true },
-    create: {
-      id: "area_inbox",
-      name: "Inbox",
-      domainId: systemDomain.id,
-      isSystem: true,
-      currentState: "System catch-all for quick-add and ambiguous imports.",
-      nextStep: "Route items when the right area becomes clear.",
-    },
-  });
-
-  return inbox.id;
+  return null;
 }
 
 async function resolveProjectAreaId(projectId: string) {
@@ -269,7 +244,7 @@ async function resolveProjectAreaId(projectId: string) {
     select: { areaId: true },
   });
 
-  return project?.areaId ?? resolveAreaId();
+  return project?.areaId ?? null;
 }
 
 async function resolveProjectId(name: string) {

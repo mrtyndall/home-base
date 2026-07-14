@@ -97,7 +97,7 @@ export default async function HomePage() {
                 id: task.id,
                 title: task.title,
                 detail: [
-                  task.area.name,
+                  task.area?.name ?? "Inbox",
                   task.project?.name,
                   task.dueDate ? formatDateOnly(task.dueDate) : null,
                 ]
@@ -177,7 +177,7 @@ function TaskReceiptRow({ task }: { task: HomeTask }) {
         <p className="text-[15px] font-medium text-stone-950">{task.title}</p>
         <p className="mt-0.5 text-[13px] text-[#6B7268]">
           {[
-            task.area.name,
+            task.area?.name ?? "Inbox",
             task.project?.name,
             task.dueDate ? formatDateOnly(task.dueDate) : null,
           ]
@@ -440,6 +440,12 @@ async function getHomeData() {
       slippingProjectCount,
     };
   } catch {
-    return { ok: false as const };
+    return {
+      ok: false as const,
+      pendingCaptureCount: 0,
+      reviewDueCount: 0,
+      freshCheckInCount: 0,
+      slippingProjectCount: 0,
+    };
   }
 }

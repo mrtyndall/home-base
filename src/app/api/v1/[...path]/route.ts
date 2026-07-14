@@ -1071,6 +1071,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
         ? await resolveAreaReference(parsed.areaId, parsed.areaName)
         : parsed.areaId;
       const nextAreaId = areaId === undefined ? existing.areaId : areaId;
+      if (!nextAreaId) throw new Error("Project creation requires an active Area.");
       await resolveVerifiedDestination({ areaId: nextAreaId });
       const project = await prisma.$transaction(async (tx) => {
         const updated = await tx.project.update({

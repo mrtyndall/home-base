@@ -1,6 +1,5 @@
 import type {
   Area,
-  Domain,
   EntityNote,
   Project,
   ProjectActivity,
@@ -32,56 +31,66 @@ export default async function ProjectsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { projects, domains } = result;
+  const { projects, areas } = result;
   const recentProjects = getRecentProjects(projects);
 
   return (
     <div className="space-y-7">
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
-          Areas & Projects
+          Areas
         </h1>
-        <Link
-          href="/projects/new"
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
-        >
-          <Plus size={14} />
-          New project
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/projects/new"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#D8DDD5] bg-white px-4 text-[13px] font-medium text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
+          >
+            <Plus size={14} />
+            New project
+          </Link>
+          <Link
+            href="/areas/new"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
+          >
+            <Plus size={14} />
+            New area
+          </Link>
+        </div>
       </header>
-      <AreaShelves domains={domains} />
+      <AreaShelves areas={areas} />
       <RecentProjectsRail projects={recentProjects} />
     </div>
   );
 }
 
-function AreaShelves({ domains }: { domains: DomainWithAreas[] }) {
+function AreaShelves({ areas }: { areas: AreaListItem[] }) {
   return (
     <section className="space-y-4">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Areas
       </h2>
-      {domains.map((domain) => {
-        if (domain.areas.length === 0) {
-          return null;
-        }
-
-        return (
-          <div key={domain.id} className="space-y-2.5">
-            <Link
-              href={`/domains/${domain.id}`}
-              className="inline-flex text-[11px] font-semibold uppercase tracking-[0.12em] text-[#B0ACA2] transition hover:text-teal-700"
-            >
-              {domain.name}
-            </Link>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {domain.areas.map((area) => (
-                <AreaCard key={area.id} area={area} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      {areas.length === 0 ? (
+        <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/60 p-6 sm:p-8">
+          <h3 className="font-serif text-[22px] font-medium text-stone-950">
+            Create your first area
+          </h3>
+          <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-[#6B7268]">
+            Start with an ongoing part of life you want to keep tending.
+            Projects can live inside it when they have a finish line.
+          </p>
+          <Link
+            href="/areas/new"
+            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
+          >
+            <Plus size={14} />
+            New area
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {areas.map((area) => <AreaCard key={area.id} area={area} />)}
+        </div>
+      )}
     </section>
   );
 }
@@ -185,12 +194,6 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           </h2>
         </Link>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Link
-            href={`/domains/${project.area.domain.id}`}
-            className="inline-flex h-6 items-center rounded-full border border-[#E2E6DF] bg-white px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700"
-          >
-            {project.area.domain.name}
-          </Link>
           <ProjectOverflowMenu projectId={project.id} status={project.status} />
         </div>
       </div>
@@ -264,7 +267,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
 }
 
 type ProjectListItem = Project & {
-  area: Area & { domain: Domain };
+  area: Area;
   tasks: Array<
     Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">
   >;
@@ -285,10 +288,6 @@ type AreaListItem = Area & {
   recentNote: Pick<EntityNote, "bodyMd" | "createdAt"> | null;
   pendingCaptureCount: number;
   reviewCount: number;
-};
-
-type DomainWithAreas = Domain & {
-  areas: AreaListItem[];
 };
 
 function getNextDatedTask(project: ProjectListItem) {
@@ -387,11 +386,11 @@ function getAreaHeadline(area: AreaListItem) {
 async function loadProjects() {
   try {
     const today = dateOnlyFromString(localDateString());
-    const [projects, domains] = await Promise.all([
+    const [projects, areas] = await Promise.all([
       prisma.project.findMany({
         where: { status: { in: ["active", "someday", "parked"] } },
         include: {
-          area: { include: { domain: true } },
+          area: true,
           tasks: {
             where: { status: { in: ["open", "completed"] } },
             orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
@@ -405,22 +404,14 @@ async function loadProjects() {
         orderBy: [{ area: { sortOrder: "asc" } }, { createdAt: "desc" }],
         take: 80,
       }),
-      prisma.domain.findMany({
-        where: { active: true },
-        orderBy: [{ isSystem: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
-        include: {
-          areas: {
-            where: { status: { in: ["active", "parked"] } },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
-        },
+      prisma.area.findMany({
+        where: { status: { in: ["active", "parked"] }, isSystem: false },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
     ]);
 
     const projectIds = projects.map((project) => project.id);
-    const areaIds = domains.flatMap((domain) =>
-      domain.areas.map((area) => area.id),
-    );
+    const areaIds = areas.map((area) => area.id);
     const [
       notes,
       taskActivity,
@@ -433,8 +424,6 @@ async function loadProjects() {
       areaDueTaskGroups,
       areaNoteRows,
       areaDocGroups,
-      pendingCaptureCount,
-      readyReviewCount,
     ] = await Promise.all([
       prisma.entityNote.findMany({
         where: {
@@ -498,24 +487,10 @@ async function loadProjects() {
         },
         _count: { _all: true },
       }),
-      prisma.capture.count({
-        where: {
-          status: "active",
-          OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
-        },
-      }),
-      prisma.scheduledReview.count({
-        where: {
-          OR: [
-            { status: "surfaced" },
-            { status: "pending", reviewAt: { lte: today } },
-            { status: "pending", reviewAt: null },
-          ],
-        },
-      }),
     ]);
     const notesByProject = new Map<string, EntityNote[]>();
     for (const note of notes) {
+      if (!note.parentId) continue;
       const group = notesByProject.get(note.parentId) ?? [];
       group.push(note);
       notesByProject.set(note.parentId, group);
@@ -557,29 +532,28 @@ async function loadProjects() {
       milestoneCounts: milestoneCountsByProject.get(project.id) ?? null,
     }));
     const openTasksByArea = new Map(
-      areaOpenTaskGroups.map((group) => [group.areaId, group._count._all]),
+      areaOpenTaskGroups.flatMap((group) => group.areaId ? [[group.areaId, group._count._all] as const] : []),
     );
     const activeProjectsByArea = new Map(
       areaActiveProjectGroups.map((group) => [group.areaId, group._count._all]),
     );
     const starredNotesByArea = new Map(
-      areaStarredNoteGroups.map((group) => [group.parentId, group._count._all]),
+      areaStarredNoteGroups.flatMap((group) => group.parentId ? [[group.parentId, group._count._all] as const] : []),
     );
     const dueTasksByArea = new Map(
-      areaDueTaskGroups.map((group) => [group.areaId, group._count._all]),
+      areaDueTaskGroups.flatMap((group) => group.areaId ? [[group.areaId, group._count._all] as const] : []),
     );
     const docsByArea = new Map(
       areaDocGroups.map((group) => [group.parentId, group._count._all]),
     );
     const recentNotesByArea = new Map<string, EntityNote>();
     for (const note of areaNoteRows) {
+      if (!note.parentId) continue;
       if (!recentNotesByArea.has(note.parentId)) {
         recentNotesByArea.set(note.parentId, note);
       }
     }
-    const domainsWithAreas = domains.map((domain) => ({
-      ...domain,
-      areas: domain.areas.map((area) => ({
+    const areasWithFacts = areas.map((area) => ({
         ...area,
         openTaskCount: openTasksByArea.get(area.id) ?? 0,
         dueTaskCount: dueTasksByArea.get(area.id) ?? 0,
@@ -588,15 +562,14 @@ async function loadProjects() {
         docCount: docsByArea.get(area.id) ?? 0,
         latestCheckIn: latestAreaCheckIns.get(area.id) ?? null,
         recentNote: recentNotesByArea.get(area.id) ?? null,
-        pendingCaptureCount: area.id === "area_inbox" ? pendingCaptureCount : 0,
-        reviewCount: area.id === "area_inbox" ? readyReviewCount : 0,
-      })),
+        pendingCaptureCount: 0,
+        reviewCount: 0,
     }));
 
     return {
       ok: true as const,
       projects: projectsWithNotes,
-      domains: domainsWithAreas,
+      areas: areasWithFacts,
     };
   } catch {
     return { ok: false as const };

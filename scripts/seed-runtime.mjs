@@ -1,68 +1,14 @@
 import pg from "pg";
 import crypto from "node:crypto";
 
-const domains = [
-  {
-    name: "System",
-    description: "Hidden system grouping for the Inbox area.",
-    sortOrder: 0,
-    isSystem: true,
-    active: false,
-  },
-  {
-    name: "Home",
-    description: "House, errands, maintenance, admin, and family logistics.",
-    sortOrder: 10,
-    isSystem: false,
-    active: true,
-  },
-  {
-    name: "Family",
-    description: "Family commitments, plans, and follow-ups.",
-    sortOrder: 20,
-    isSystem: false,
-    active: true,
-  },
-  {
-    name: "Health",
-    description: "Health, appointments, fitness, and care tasks.",
-    sortOrder: 30,
-    isSystem: false,
-    active: true,
-  },
-  {
-    name: "Creative",
-    description: "Personal writing, podcast, media, and creative threads.",
-    sortOrder: 40,
-    isSystem: false,
-    active: true,
-  },
-  {
-    name: "Hobbies",
-    description: "Radio, homelab, solar research, and side builds.",
-    sortOrder: 50,
-    isSystem: false,
-    active: true,
-  },
-];
-
 const areas = [
-  {
-    id: "area_inbox",
-    name: "Inbox",
-    domainName: "System",
-    sortOrder: 0,
-    isSystem: true,
-    currentState: "System catch-all for quick-add and genuinely ambiguous captures.",
-    nextStep: "Route items when the right area becomes clear.",
-  },
-  { name: "Home", domainName: "Home", sortOrder: 10 },
-  { name: "Family", domainName: "Family", sortOrder: 20 },
-  { name: "Health", domainName: "Health", sortOrder: 30 },
-  { name: "Creative", domainName: "Creative", sortOrder: 40 },
-  { name: "Ham Radio", domainName: "Hobbies", sortOrder: 10 },
-  { name: "Homelab", domainName: "Hobbies", sortOrder: 20 },
-  { name: "Magic/Pokemon", domainName: "Hobbies", sortOrder: 30 },
+  { name: "Home", sortOrder: 10 },
+  { name: "Family", sortOrder: 20 },
+  { name: "Health", sortOrder: 30 },
+  { name: "Creative", sortOrder: 40 },
+  { name: "Ham Radio", sortOrder: 50 },
+  { name: "Homelab", sortOrder: 60 },
+  { name: "Magic/Pokemon", sortOrder: 70 },
 ];
 
 const settings = [
@@ -88,41 +34,18 @@ const pool = new pg.Pool({
 });
 
 try {
-  for (const domain of domains) {
-    await pool.query(
-      `
-      INSERT INTO domains (id, name, description, sort_order, is_system, active)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (name) DO UPDATE SET
-        description = EXCLUDED.description,
-        sort_order = EXCLUDED.sort_order,
-        is_system = EXCLUDED.is_system,
-        active = EXCLUDED.active
-      `,
-      [
-        crypto.randomUUID(),
-        domain.name,
-        domain.description,
-        domain.sortOrder,
-        domain.isSystem,
-        domain.active,
-      ],
-    );
-  }
+  await pool.query(
+    `
+    INSERT INTO domains (id, name, description, sort_order, is_system, active)
+    VALUES ('domain_system', 'System', 'Hidden migration compatibility group.', 0, true, false)
+    ON CONFLICT (name) DO NOTHING
+    `,
+  );
 
   for (const area of areas) {
-    const domainResult = await pool.query(
-      `SELECT id FROM domains WHERE name = $1 LIMIT 1`,
-      [area.domainName],
-    );
-    const domainId = domainResult.rows[0]?.id;
-    if (!domainId) {
-      throw new Error(`Missing domain for area ${area.name}`);
-    }
-
     const existingArea = await pool.query(
-      `SELECT id FROM areas WHERE name = $1 AND domain_id = $2 LIMIT 1`,
-      [area.name, domainId],
+      `SELECT id FROM areas WHERE name = $1 LIMIT 1`,
+      [area.name],
     );
     const areaId =
       existingArea.rows[0]?.id ??
@@ -134,10 +57,9 @@ try {
       INSERT INTO areas
         (id, name, domain_id, status, current_state, next_step, sort_order, is_system, created_at, updated_at)
       VALUES
-        ($1, $2, $3, 'active', $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ($1, $2, 'domain_system', 'active', $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
-        domain_id = EXCLUDED.domain_id,
         current_state = COALESCE(EXCLUDED.current_state, areas.current_state),
         next_step = COALESCE(EXCLUDED.next_step, areas.next_step),
         sort_order = EXCLUDED.sort_order,
@@ -147,7 +69,6 @@ try {
       [
         areaId,
         area.name,
-        domainId,
         area.currentState ?? null,
         area.nextStep ?? null,
         area.sortOrder,

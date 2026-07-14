@@ -1,4 +1,4 @@
-import type { Area, Domain, Project, Task } from "@prisma/client";
+import type { Area, Project, Task } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import {
@@ -64,7 +64,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     .filter(
       (item) =>
         selectedDomainIds.length === 0 ||
-        selectedDomainIds.includes(item.area.domainId),
+        selectedDomainIds.includes(item.areaId),
     )
     .map((item) => item.id);
   const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
@@ -80,7 +80,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const visibleTasks = tasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
-      !selectedDomainIds.includes(task.area.domainId)
+      (!task.areaId || !selectedDomainIds.includes(task.areaId))
     ) {
       return false;
     }
@@ -98,7 +98,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const visibleDoneTasks = doneTasks.filter((task) => {
     if (
       selectedDomainIds.length > 0 &&
-      !selectedDomainIds.includes(task.area.domainId)
+      (!task.areaId || !selectedDomainIds.includes(task.areaId))
     ) {
       return false;
     }
@@ -116,10 +116,10 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   const today = localDateString();
   const tomorrow = addDaysToDateString(today, 1);
   const sections = groupTasks(visibleTasks, today, tomorrow);
-  const areaGroups = domains.map((domain) => ({
-    domainName: domain.name,
-    areas: domain.areas.map((area) => ({ id: area.id, name: area.name })),
-  }));
+  const areaGroups = [{
+    domainName: "Areas",
+    areas: domains.map((area) => ({ id: area.id, name: area.name })),
+  }];
   const projectOptions = projects.map((project) => ({
     id: project.id,
     name: project.name,
@@ -413,7 +413,7 @@ const filterChipOn =
 const filterChipOff =
   "rounded-full border border-[#E2E6DF] bg-white/85 px-3 py-1.5 text-[13px] text-stone-600 transition hover:border-teal-700/50 hover:text-teal-700";
 
-function DomainFilter({
+function AreaFilter({
   domains,
   selectedDomainIds,
   selectedProjectIds,
@@ -421,14 +421,14 @@ function DomainFilter({
   starredOnly,
   view,
 }: {
-  domains: Array<Domain & { areas: Area[] }>;
+  domains: Area[];
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   selectedSection: TaskSectionFilter;
   starredOnly: boolean;
   view: TaskViewFilter;
 }) {
-  const visibleDomains = domains.filter((domain) => !domain.isSystem);
+  const visibleDomains = domains.filter((area) => !area.isSystem);
   return (
     <nav className="flex flex-wrap gap-1.5">
       <Link
@@ -476,8 +476,8 @@ function TaskFilters({
   starredOnly,
   view,
 }: {
-  domains: Array<Domain & { areas: Area[] }>;
-  projects: Array<Project & { area: Area & { domain: Domain } }>;
+  domains: Area[];
+  projects: Array<Project & { area: Area }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   projectSearch: string;
@@ -505,9 +505,9 @@ function TaskFilters({
         <div className="grid gap-3.5">
           <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-              Domain
+              Area
             </p>
-            <DomainFilter
+            <AreaFilter
               domains={domains}
               selectedDomainIds={selectedDomainIds}
               selectedProjectIds={selectedProjectIds}
@@ -576,7 +576,7 @@ function ProjectFilter({
   starredOnly,
   view,
 }: {
-  projects: Array<Project & { area: Area & { domain: Domain } }>;
+  projects: Array<Project & { area: Area }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   projectSearch: string;
@@ -588,10 +588,10 @@ function ProjectFilter({
   const visibleProjects = projects.filter((project) => {
     const inDomain =
       selectedDomainIds.length === 0 ||
-      selectedDomainIds.includes(project.area.domainId);
+      selectedDomainIds.includes(project.areaId);
     if (!inDomain) return false;
     if (!normalizedSearch) return true;
-    return [project.name, project.area.name, project.area.domain.name]
+    return [project.name, project.area.name]
       .join(" ")
       .toLowerCase()
       .includes(normalizedSearch);
@@ -870,8 +870,7 @@ function DoneSection({
                 </p>
                 <p className="mt-0.5 text-xs text-stone-500">
                   {[
-                    task.area.domain.name,
-                    task.area.name,
+                    task.area?.name ?? "Inbox",
                     task.project?.name,
                     task.completedAt
                       ? `completed ${formatDateOnly(task.completedAt)}`
@@ -923,7 +922,7 @@ function TaskCard({
           detail={formatTaskDetail(task, slipDays)}
           currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
           currentParentTaskId={task.parentTaskId}
-          currentAreaId={task.areaId}
+          currentAreaId={task.areaId ?? ""}
           currentProjectId={task.projectId}
           areaGroups={areaGroups}
           projects={projects}
@@ -994,7 +993,7 @@ function SubtaskList({
                 subtask.dueDate?.toISOString().slice(0, 10) ?? null
               }
               currentParentTaskId={subtask.parentTaskId}
-              currentAreaId={subtask.areaId}
+              currentAreaId={subtask.areaId ?? ""}
               currentProjectId={subtask.projectId}
               areaGroups={areaGroups}
               projects={projects}
@@ -1010,13 +1009,13 @@ function SubtaskList({
 }
 
 type TaskListItem = Task & {
-  area: Area & { domain: Domain };
+  area: Area | null;
   project: Project | null;
-  subtasks: Array<Task & { area: Area; project: Project | null }>;
+  subtasks: Array<Task & { area: Area | null; project: Project | null }>;
 };
 
 type DoneTaskItem = Task & {
-  area: Area & { domain: Domain };
+  area: Area | null;
   project: Project | null;
 };
 
@@ -1034,8 +1033,7 @@ type TaskProjectOption = {
 
 function formatTaskDetail(task: TaskListItem, slipDays: number) {
   return [
-    task.area.domain.name,
-    task.area.name,
+    task.area?.name ?? "Inbox",
     task.project?.name,
     task.dueDate ? formatDateOnly(task.dueDate) : null,
     task.recurrenceRule ? "repeats" : null,
@@ -1105,7 +1103,7 @@ async function loadTasks(view: TaskViewFilter) {
                 ],
               },
               include: {
-                area: { include: { domain: true } },
+                area: true,
                 project: true,
                 subtasks: {
                   where: { status: "open" },
@@ -1128,7 +1126,7 @@ async function loadTasks(view: TaskViewFilter) {
           ? prisma.task.findMany({
               where: { status: "completed" },
               include: {
-                area: { include: { domain: true } },
+                area: true,
                 project: true,
               },
               orderBy: [{ completedAt: "desc" }],
@@ -1151,20 +1149,12 @@ async function loadTasks(view: TaskViewFilter) {
           : Promise.resolve(0),
         prisma.project.findMany({
           where: { status: { in: ["active", "parked", "someday"] } },
-          include: { area: { include: { domain: true } } },
+          include: { area: true },
           orderBy: [{ area: { sortOrder: "asc" } }, { name: "asc" }],
         }),
-        prisma.domain.findMany({
-          where: {
-            OR: [{ active: true, isSystem: false }, { isSystem: true }],
-          },
-          include: {
-            areas: {
-              where: { status: "active" },
-              orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-            },
-          },
-          orderBy: { sortOrder: "asc" },
+        prisma.area.findMany({
+          where: { status: "active", isSystem: false },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         }),
       ]);
 
@@ -1178,6 +1168,14 @@ async function loadTasks(view: TaskViewFilter) {
       domains,
     };
   } catch {
-    return { ok: false as const };
+    return {
+      ok: false as const,
+      tasks: [] as TaskListItem[],
+      doneTasks: [] as DoneTaskItem[],
+      openCount: 0,
+      doneCount: 0,
+      projects: [] as Array<Project & { area: Area }>,
+      domains: [] as Area[],
+    };
   }
 }

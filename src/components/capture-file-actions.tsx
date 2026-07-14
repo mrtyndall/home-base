@@ -1,6 +1,6 @@
 "use client";
 
-import type { Area, Domain } from "@prisma/client";
+import type { Area } from "@prisma/client";
 import { useMemo, useState } from "react";
 import { convertPendingCapture } from "@/app/actions";
 
@@ -17,7 +17,7 @@ export function CaptureFileActions({
   captureId,
   reviewId,
   proposalId,
-  domains,
+  areas,
   align = "left",
   label = "File",
   defaultAreaId = "",
@@ -26,7 +26,7 @@ export function CaptureFileActions({
   captureId: string;
   reviewId?: string;
   proposalId?: string;
-  domains: Array<Domain & { areas: Area[] }>;
+  areas: Area[];
   align?: "left" | "right";
   label?: string;
   defaultAreaId?: string;
@@ -39,12 +39,8 @@ export function CaptureFileActions({
 
   const selectedAreaName = useMemo(() => {
     if (!areaId) return null;
-    for (const domain of domains) {
-      const area = domain.areas.find((candidate) => candidate.id === areaId);
-      if (area) return area.name;
-    }
-    return null;
-  }, [areaId, domains]);
+    return areas.find((candidate) => candidate.id === areaId)?.name ?? null;
+  }, [areaId, areas]);
 
   return (
     <details className="relative">
@@ -86,32 +82,23 @@ export function CaptureFileActions({
           Into
         </p>
         <div className="mt-1.5 max-h-44 overflow-y-auto rounded-[14px] border border-[#E2E6DF] bg-white p-1.5">
-          {domains.map((domain) => (
-            <div key={domain.id} className="py-1">
-              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B0ACA2]">
-                {domain.name}
-              </p>
-              <div className="grid gap-1">
-                {domain.areas.map((area) => (
-                  <button
-                    key={area.id}
-                    type="button"
-                    onClick={() => setAreaId(area.id)}
-                    className={`flex min-h-8 items-center justify-between rounded-[10px] px-2.5 py-1.5 text-left text-[13px] font-medium transition ${
-                      areaId === area.id
-                        ? "bg-[#E8F5F0] text-teal-800"
-                        : "text-stone-700 hover:bg-[#F7F9F5] hover:text-stone-950"
-                    }`}
-                  >
-                    <span>{area.name}</span>
-                    {areaId === area.id ? (
-                      <span className="text-[11px] text-teal-700">Selected</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+          <div className="grid gap-1">
+            {areas.map((area) => (
+              <button
+                key={area.id}
+                type="button"
+                onClick={() => setAreaId(area.id)}
+                className={`flex min-h-8 items-center justify-between rounded-[10px] px-2.5 py-1.5 text-left text-[13px] font-medium transition ${
+                  areaId === area.id
+                    ? "bg-[#E8F5F0] text-teal-800"
+                    : "text-stone-700 hover:bg-[#F7F9F5] hover:text-stone-950"
+                }`}
+              >
+                <span>{area.name}</span>
+                {areaId === area.id ? <span className="text-[11px] text-teal-700">Selected</span> : null}
+              </button>
+            ))}
+          </div>
         </div>
         {selectedType ? (
           <div className="mt-3 rounded-[14px] border border-teal-700/20 bg-white px-3 py-2">

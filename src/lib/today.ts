@@ -42,7 +42,7 @@ export async function getTodayDashboard() {
       nextEvent,
       calendarSync,
       calendarStaleMinutesSetting,
-      domains,
+      areas,
     ] = await Promise.all([
       prisma.task.findMany({
         where: { status: "open", starred: true },
@@ -141,14 +141,9 @@ export async function getTodayDashboard() {
       prisma.appSetting.findUnique({
         where: { key: "google_calendar_stale_minutes" },
       }),
-      prisma.domain.findMany({
-        include: {
-          areas: {
-            where: { status: "active" },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
-        },
-        orderBy: { sortOrder: "asc" },
+      prisma.area.findMany({
+        where: { status: "active", isSystem: false },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
     ]);
 
@@ -197,7 +192,7 @@ export async function getTodayDashboard() {
       nextEvent,
       resurfacedItem,
       routinesDueToday,
-      domains,
+      areas,
       calendarSync: {
         status: calendarSync?.status ?? "not_configured",
         lastSyncedAt: calendarSync?.lastSyncedAt ?? null,

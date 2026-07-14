@@ -909,6 +909,19 @@ export async function createProject(formData: FormData) {
   redirect(`/projects/${project.id}`);
 }
 
+export async function createArea(formData: FormData) {
+  const name = getTrimmedString(formData, "name");
+  if (!name) return;
+
+  const last = await prisma.area.aggregate({ _max: { sortOrder: true } });
+  const area = await prisma.area.create({
+    data: { name, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+  });
+
+  revalidatePath("/projects");
+  redirect(`/areas/${area.id}`);
+}
+
 export async function updateProjectState(formData: FormData) {
   const projectId = getTrimmedString(formData, "projectId");
   const currentState = getTrimmedString(formData, "currentState");

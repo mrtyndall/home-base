@@ -77,8 +77,9 @@ async function loadNote(noteId: string) {
       return { ok: true as const, note: null, parent: null, mentions: [] };
     }
 
-    const parent =
-      note.parentType === "area"
+    const parent = !note.parentType || !note.parentId
+      ? null
+      : note.parentType === "area"
         ? await prisma.area.findUnique({
             where: { id: note.parentId },
             select: { id: true, name: true },
@@ -94,15 +95,17 @@ async function loadNote(noteId: string) {
       note,
       parent: {
         label:
-          parent?.name ?? (note.parentType === "area" ? "Area" : "Project"),
+          parent?.name ?? (!note.parentType ? "Inbox" : note.parentType === "area" ? "Area" : "Project"),
         href:
-          note.parentType === "area"
+          !note.parentType || !note.parentId
+            ? "/#inbox"
+            : note.parentType === "area"
             ? `/areas/${note.parentId}`
             : `/projects/${note.parentId}`,
       },
       mentions: mentionMap.get(note.id) ?? [],
     };
   } catch {
-    return { ok: false as const };
+    return { ok: false as const, note: null, parent: null, mentions: [] };
   }
 }

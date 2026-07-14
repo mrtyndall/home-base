@@ -66,13 +66,6 @@ export default async function ProjectDetailPage({
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
               <Link
-                href={`/domains/${project.area.domain.id}`}
-                className="transition hover:text-teal-700"
-              >
-                {project.area.domain.name}
-              </Link>
-              {" / "}
-              <Link
                 href={`/areas/${project.area.id}`}
                 className="transition hover:text-teal-700"
               >
@@ -220,7 +213,6 @@ function ProjectTasksSection({ project }: { project: LoadedProject }) {
                 </p>
                 <p className="mt-0.5 text-xs text-[#6B7268]">
                   {[
-                    project.area.domain.name,
                     project.area.name,
                     task.dueDate ? formatDateOnly(task.dueDate) : null,
                     task.recurrenceRule
@@ -343,7 +335,7 @@ async function loadProject(projectId: string) {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       include: {
-        area: { include: { domain: true } },
+        area: true,
         tasks: {
           where: { status: "open" },
           orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
@@ -412,6 +404,6 @@ async function loadProject(projectId: string) {
         : null,
     };
   } catch {
-    return { ok: false as const };
+    return { ok: false as const, project: null };
   }
 }

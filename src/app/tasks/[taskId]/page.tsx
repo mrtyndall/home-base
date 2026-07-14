@@ -80,7 +80,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-              {task.area.name}
+              {task.area?.name ?? "Inbox"}
               {task.project ? ` / ${task.project.name}` : ""}
             </p>
             <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950">
@@ -223,17 +223,12 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                 <Field label="Area">
                   <select
                     name="areaId"
-                    defaultValue={task.areaId}
+                    defaultValue={task.areaId ?? ""}
                     className={inputClassName}
                   >
-                    {domains.map((domain) => (
-                      <optgroup key={domain.id} label={domain.name}>
-                        {domain.areas.map((area) => (
-                          <option key={area.id} value={area.id}>
-                            {area.name}
-                          </option>
-                        ))}
-                      </optgroup>
+                    <option value="">Inbox</option>
+                    {domains.map((area) => (
+                      <option key={area.id} value={area.id}>{area.name}</option>
                     ))}
                   </select>
                 </Field>
@@ -387,30 +382,22 @@ async function loadTaskDetail(taskId: string) {
     }
 
     const [domains, projects] = await Promise.all([
-      prisma.domain.findMany({
-        where: {
-          OR: [{ active: true, isSystem: false }, { isSystem: true }],
-        },
-        orderBy: { sortOrder: "asc" },
-        include: {
-          areas: {
-            where: { status: "active" },
-            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          },
-        },
+      prisma.area.findMany({
+        where: { status: "active", isSystem: false },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
-      prisma.project.findMany({
+      task.areaId ? prisma.project.findMany({
         where: {
           areaId: task.areaId,
           status: { in: ["active", "parked", "someday"] },
         },
         orderBy: { name: "asc" },
-      }),
+      }) : Promise.resolve([]),
     ]);
 
     return { ok: true as const, task, domains, projects };
   } catch {
-    return { ok: false as const };
+    return { ok: false as const, task: null, domains: [], projects: [] };
   }
 }
 

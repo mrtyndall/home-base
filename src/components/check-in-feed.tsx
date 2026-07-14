@@ -30,7 +30,7 @@ export function CheckInFeed({
           <span aria-hidden="true">·</span>
           {checkIn.captureId ? (
             <Link
-              href="/areas/area_inbox"
+              href="/#inbox"
               className="inline-flex items-center gap-1 font-medium text-teal-700 transition hover:text-teal-900"
             >
               <Inbox size={12} />

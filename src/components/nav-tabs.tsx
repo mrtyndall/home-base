@@ -7,7 +7,7 @@ import { FolderKanban, House, Library, ListTodo } from "lucide-react";
 const tabs = [
   { href: "/", label: "Home", icon: House },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/projects", label: "Areas", icon: FolderKanban },
   { href: "/ideas", label: "Library", icon: Library },
 ];
 

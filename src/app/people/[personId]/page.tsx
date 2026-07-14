@@ -96,7 +96,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
                 <option value="">No area</option>
                 {areas.map((area) => (
                   <option key={area.id} value={area.id}>
-                    {area.domain.name} / {area.name}
+                    {area.name}
                   </option>
                 ))}
               </select>
@@ -292,8 +292,7 @@ async function loadPerson(personId: string) {
 
     const areas = await prisma.area.findMany({
       where: { status: { not: "retired" } },
-      include: { domain: { select: { name: true } } },
-      orderBy: [{ domain: { sortOrder: "asc" } }, { sortOrder: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
     const captureIds = [
@@ -318,7 +317,7 @@ async function loadPerson(personId: string) {
       areas,
     };
   } catch {
-    return { ok: false as const };
+    return { ok: false as const, person: null, linkedCaptures: [], linkedMentions: [], areas: [] };
   }
 }
 

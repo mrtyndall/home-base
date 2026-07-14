@@ -201,9 +201,7 @@ function IdeaCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-              {idea.project?.area.domain.name ??
-                idea.area?.domain.name ??
-                "Inbox"}
+              {idea.project?.area.name ?? idea.area?.name ?? "Inbox"}
               {" / "}
               {idea.project?.name ?? idea.area?.name ?? idea.status}
             </p>
@@ -523,8 +521,8 @@ async function loadIdeas() {
         prisma.idea.findMany({
           where: { status: { in: ["seed", "developing"] } },
           include: {
-            area: { include: { domain: true } },
-            project: { include: { area: { include: { domain: true } } } },
+            area: true,
+            project: { include: { area: true } },
             notes: { orderBy: { createdAt: "desc" }, take: 6 },
           },
           orderBy: { updatedAt: "desc" },
@@ -569,6 +567,7 @@ async function loadIdeas() {
         : [];
     const attachmentsByEntry = new Map<string, Document[]>();
     for (const attachment of journalAttachments) {
+      if (!attachment.parentId) continue;
       const group = attachmentsByEntry.get(attachment.parentId) ?? [];
       group.push(attachment);
       attachmentsByEntry.set(attachment.parentId, group);
@@ -588,7 +587,15 @@ async function loadIdeas() {
       references,
     };
   } catch {
-    return { ok: false as const };
+    return {
+      ok: false as const,
+      ideas: [],
+      journalEntries: [],
+      people: [],
+      books: [],
+      movies: [],
+      references: [],
+    };
   }
 }
 
