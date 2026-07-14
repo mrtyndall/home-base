@@ -55,7 +55,7 @@ afterEach(() => {
 test("MCP path segments preserve seeded IDs but reject route-confusable input", () => {
   assert.equal(apiPath("/areas", "seeded-area-id", "aggregate"), "/areas/seeded-area-id/aggregate");
   assert.equal(apiPath("/areas", "space allowed"), "/areas/space%20allowed");
-  for (const unsafe of ["", "/", "?", "#", "\\", "..", "abc/def", "abc?x", "abc#x"]) {
+  for (const unsafe of ["", ".", "..", "/", "?", "#", "\\", "abc/def", "abc?x", "abc#x"]) {
     assert.throws(() => apiPath("/areas", unsafe), /invalid.*path segment/i);
   }
 });
@@ -134,7 +134,7 @@ test("every dynamic MCP ID handler rejects route-confusable segments before fetc
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }) as typeof fetch;
   const byName = new Map(collectTools().map((tool) => [tool.name, tool.handler]));
-  const unsafeSegments = ["", "/", "?", "#", "\\", "..", "abc/def", "abc?x", "abc#x"];
+  const unsafeSegments = ["", ".", "..", "/", "?", "#", "\\", "abc/def", "abc?x", "abc#x"];
 
   for (const contract of TOOL_CONTRACTS.filter((entry) => entry.pathIdFields?.length)) {
     const handler = byName.get(contract.name);

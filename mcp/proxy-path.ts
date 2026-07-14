@@ -6,6 +6,7 @@ export function apiPath(base: string, ...segments: string[]) {
     if (
       typeof segment !== "string" ||
       segment.trim().length === 0 ||
+      segment === "." ||
       segment.includes("..") ||
       /[/?#\\]/.test(segment)
     ) {
