@@ -30,6 +30,18 @@ export async function getTodayDashboard() {
   }
 
   try {
+    const upcomingTaskDates = await prisma.task.groupBy({
+      by: ["dueDate"],
+      where: {
+        status: "open",
+        someday: false,
+        dueDate: { gt: todayDate },
+      },
+      orderBy: { dueDate: "asc" },
+      take: 3,
+    });
+    const upcomingTaskDateLimit = upcomingTaskDates.at(-1)?.dueDate;
+
     const [
       topTasks,
       starredCount,
@@ -148,21 +160,25 @@ export async function getTodayDashboard() {
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
-      prisma.task.findMany({
-        where: {
-          status: "open",
-          someday: false,
-          dueDate: { gt: todayDate },
-        },
-        orderBy: [
-          { dueDate: "asc" },
-          { dueTime: { sort: "asc", nulls: "first" } },
-          { createdAt: "asc" },
-        ],
-        take: 3,
-      }),
+      upcomingTaskDateLimit
+        ? prisma.task.findMany({
+            where: {
+              status: "open",
+              someday: false,
+              dueDate: { gt: todayDate, lte: upcomingTaskDateLimit },
+            },
+            select: {
+              id: true,
+              title: true,
+              dueDate: true,
+              dueTime: true,
+            },
+            orderBy: { dueDate: "asc" },
+          })
+        : Promise.resolve([]),
       prisma.calendarEvent.findMany({
         where: { start: { gte: todayCalendarBounds.end } },
+        select: { id: true, title: true, start: true },
         orderBy: { start: "asc" },
         take: 3,
       }),

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { mergeUpcomingCommitments } from "../src/lib/upcoming-commitments";
 
 const tasks = [
@@ -27,4 +28,32 @@ const events = [
 assert.deepEqual(
   mergeUpcomingCommitments(tasks, events, 3).map((item) => item.id),
   ["untimed-tomorrow", "event-tomorrow", "task-day-three"],
+);
+
+const sameDateTasks = ["10:00", "11:00", "12:00", "9:00"].map(
+  (dueTime) => ({
+    id: `task-${dueTime}`,
+    title: `Task at ${dueTime}`,
+    dueDate: new Date("2026-07-14T00:00:00.000Z"),
+    dueTime,
+  }),
+);
+
+assert.deepEqual(
+  mergeUpcomingCommitments(sameDateTasks, [], 3).map((item) => item.id),
+  ["task-9:00", "task-10:00", "task-11:00"],
+  "The merge must receive every candidate on a bounded date so normalized time, not raw database text order, selects the first three.",
+);
+
+const todaySource = fs.readFileSync("src/lib/today.ts", "utf8");
+
+assert.match(
+  todaySource,
+  /const upcomingTaskDates = await prisma\.task\.groupBy/,
+  "The dashboard should bound upcoming task candidates by distinct dates before merging.",
+);
+assert.match(
+  todaySource,
+  /dueDate: \{ gt: todayDate, lte: upcomingTaskDateLimit \}/,
+  "The dashboard should fetch every task through the bounded date window.",
 );
