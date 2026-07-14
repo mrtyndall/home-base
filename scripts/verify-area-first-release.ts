@@ -59,14 +59,29 @@ async function collectCounts(client: PoolClient) {
 
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required.");
-  const expectedBooks = requiredCount("expected-books");
-  const expectedMovies = requiredCount("expected-movies");
+  const preflight = process.argv.includes("--preflight");
+  const expectedBooks = preflight ? undefined : requiredCount("expected-books");
+  const expectedMovies = preflight ? undefined : requiredCount("expected-movies");
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
     const counts = await collectCounts(client);
+
+    if (preflight) {
+      if (Number(counts.projectInboxCount) !== 0) {
+        throw new Error(
+          `Area-first preflight failed: projects still reference area_inbox: ${counts.projectInboxCount}`,
+        );
+      }
+
+      console.log(
+        `Area-first preflight passed. Post-release baseline: --expected-books=${counts.bookCount} --expected-movies=${counts.movieCount}`,
+      );
+      return;
+    }
+
     const failures: string[] = [];
 
     for (const [label, value] of [

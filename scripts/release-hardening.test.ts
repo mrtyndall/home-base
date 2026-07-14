@@ -43,4 +43,6 @@ for (const invariant of [
   assert.match(releaseVerifier, invariant);
 }
 assert.match(releaseVerifier, /BEGIN TRANSACTION READ ONLY/);
+assert.match(releaseVerifier, /--preflight/);
+assert.match(releaseVerifier, /Post-release baseline:/);
 assert.doesNotMatch(releaseVerifier, /INSERT|UPDATE|DELETE|DROP|ALTER/i);
