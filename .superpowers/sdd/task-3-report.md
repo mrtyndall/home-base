@@ -262,3 +262,44 @@ npx tsc --noEmit
 ```
 
 No UI, schema/migration, Railway, production, main-checkout, or iOS file was modified.
+
+## Final test-only review fix — deterministic transaction interleavings
+
+The disposable integration now proves the retry ordering with database-native synchronization instead of relying on concurrent promise scheduling:
+
+- A disposable `AFTER INSERT ON tasks` trigger blocks the first capture transaction on a session-held advisory lock, so the Task insert has been reached before the retry begins.
+- A `pg_stat_activity` poll observes one advisory-lock waiter before starting the retry and two afterward. The second waiter is the retry contending on the capture idempotency lock.
+- Releasing the trigger barrier lets both calls finish; the probe asserts identical replay results and exactly one Capture and one Task.
+- A second disposable `AFTER INSERT ON tasks` trigger raises `task3 rollback probe`. The explicit-destination capture rejects and leaves zero Capture and Task rows, proving the Task insert and final Capture update share the rollback boundary.
+- Trigger functions, triggers, the held advisory lock, client connections, and the disposable database are cleaned up in failure and success paths.
+
+The focused contract first failed against the scheduling-only probe:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+AssertionError [ERR_ASSERTION]: the disposable integration must block after the target Task insert
+```
+
+Final verification:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+exit 0
+
+npm test
+tests 47; pass 47; fail 0
+
+AREA_FIRST_DISPOSABLE_DATABASE=1 DATABASE_URL=<loopback-disposable-url> npx tsx scripts/area-first-idempotency.integration.ts
+exit 0
+
+SELECT count(*) FROM pg_database WHERE datname LIKE 'home_base_task3_idempotency_%'
+0
+
+npx eslint scripts/area-first-runtime.test.ts scripts/area-first-idempotency.integration.ts
+exit 0
+
+git diff --check
+exit 0
+```
+
+The full TypeScript audit still reports unrelated reserved Task 4 diagnostics; filtering its output for the two changed Task 3 scripts returns no diagnostics. This fix changes only the disposable integration, its static contract, and this report; production runtime code remains unchanged.

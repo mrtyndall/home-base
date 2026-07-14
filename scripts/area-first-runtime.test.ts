@@ -188,4 +188,24 @@ assert.doesNotMatch(apiSource, /const nextAreaId = areaId \?\? existing\.areaId/
   "an unresolved Project patch Area name must not preserve the existing Area",
 );
 
+const idempotencyIntegrationSource = readFileSync(
+  "scripts/area-first-idempotency.integration.ts",
+  "utf8",
+);
+assert.match(
+  idempotencyIntegrationSource,
+  /CREATE TRIGGER[\s\S]*AFTER INSERT[\s\S]*ON tasks/i,
+  "the disposable integration must block after the target Task insert",
+);
+assert.match(
+  idempotencyIntegrationSource,
+  /pg_stat_activity[\s\S]*wait_event[\s\S]*advisory/i,
+  "the disposable integration must observe both advisory-lock waiters",
+);
+assert.match(
+  idempotencyIntegrationSource,
+  /RAISE EXCEPTION[\s\S]*rollback probe/i,
+  "the disposable integration must force failure after Task insertion",
+);
+
 void verifyDestinationContract();
