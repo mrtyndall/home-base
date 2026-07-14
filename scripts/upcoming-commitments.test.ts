@@ -47,13 +47,13 @@ assert.deepEqual(
 
 const todaySource = fs.readFileSync("src/lib/today.ts", "utf8");
 
-assert.match(
+assert.doesNotMatch(
   todaySource,
-  /const upcomingTaskDates = await prisma\.task\.groupBy/,
-  "The dashboard should bound upcoming task candidates by distinct dates before merging.",
+  /upcomingTaskDates|prisma\.task\.groupBy/,
+  "Upcoming tasks must not fetch every row across the first three distinct dates.",
 );
 assert.match(
   todaySource,
-  /dueDate: \{ gt: todayDate, lte: upcomingTaskDateLimit \}/,
-  "The dashboard should fetch every task through the bounded date window.",
+  /prisma\.\$queryRaw<[^>]+>\s*`[\s\S]*ORDER BY[\s\S]*due_date ASC[\s\S]*CASE[\s\S]*due_time ~ '\^\[0-9\]\{1,2\}:\[0-9\]\{2\}\$'[\s\S]*LPAD[\s\S]*LEAST[\s\S]*GREATEST[\s\S]*LIMIT 3[\s\S]*`/,
+  "Upcoming task candidates must be row-bounded after SQL-normalizing their time ordering.",
 );

@@ -101,10 +101,11 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
         <TaskQuickAssignment
           taskId={task.id}
           areas={domains.map(({ id, name }) => ({ id, name }))}
-          projects={assignmentProjects.map(({ id, name, areaId }) => ({
+          projects={assignmentProjects.map(({ id, name, areaId, area }) => ({
             id,
             name,
             areaId,
+            areaName: area.name,
           }))}
         />
       ) : null}
@@ -408,7 +409,16 @@ async function loadTaskDetail(taskId: string) {
       }) : Promise.resolve([]),
       !task.areaId && !task.projectId
         ? prisma.project.findMany({
-            where: { status: { in: ["active", "parked", "someday"] } },
+            where: {
+              status: { in: ["active", "parked", "someday"] },
+              area: { is: { status: "active", isSystem: false } },
+            },
+            select: {
+              id: true,
+              name: true,
+              areaId: true,
+              area: { select: { name: true } },
+            },
             orderBy: { name: "asc" },
           })
         : Promise.resolve([]),

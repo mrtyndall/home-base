@@ -33,7 +33,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const project = projectId
     ? await prisma.project.findFirst({
-        where: { id: projectId, status: { in: ["active", "parked", "someday"] } },
+        where: {
+          id: projectId,
+          status: { in: ["active", "parked", "someday"] },
+          area: { is: { status: "active", isSystem: false } },
+        },
         select: { id: true, areaId: true },
       })
     : null;

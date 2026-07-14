@@ -2,16 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
+import {
+  assignmentProjectLabel,
+  type AssignmentProjectOption,
+} from "@/lib/task-assignment-options";
 
 type AssignmentArea = {
   id: string;
   name: string;
-};
-
-type AssignmentProject = {
-  id: string;
-  name: string;
-  areaId: string;
 };
 
 export function TaskQuickAssignment({
@@ -21,7 +19,7 @@ export function TaskQuickAssignment({
 }: {
   taskId: string;
   areas: AssignmentArea[];
-  projects: AssignmentProject[];
+  projects: AssignmentProjectOption[];
 }) {
   const router = useRouter();
   const [areaId, setAreaId] = useState("");
@@ -107,7 +105,12 @@ export function TaskQuickAssignment({
           <select
             value={projectId}
             onChange={(event) => {
-              setProjectId(event.target.value);
+              const nextProjectId = event.target.value;
+              const project = projects.find(
+                (candidate) => candidate.id === nextProjectId,
+              );
+              setProjectId(nextProjectId);
+              if (project) setAreaId(project.areaId);
               setError(null);
             }}
             className="mt-1 h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
@@ -115,7 +118,7 @@ export function TaskQuickAssignment({
             <option value="">Choose a Project</option>
             {visibleProjects.map((project) => (
               <option key={project.id} value={project.id}>
-                {project.name}
+                {assignmentProjectLabel(project, areaId)}
               </option>
             ))}
           </select>

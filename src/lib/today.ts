@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { Capture } from "@prisma/client";
+import type { Capture, Task } from "@prisma/client";
 import {
   addDaysToDateString,
   dateOnlyFromString,
@@ -10,6 +10,11 @@ import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getRoutinesWithState } from "@/lib/routines";
 import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
 import { mergeUpcomingCommitments } from "@/lib/upcoming-commitments";
+
+type UpcomingTaskCandidate = Pick<
+  Task,
+  "id" | "title" | "dueDate" | "dueTime"
+>;
 
 export async function getTodayDashboard() {
   const today = localDateString();
@@ -31,18 +36,6 @@ export async function getTodayDashboard() {
   }
 
   try {
-    const upcomingTaskDates = await prisma.task.groupBy({
-      by: ["dueDate"],
-      where: {
-        status: "open",
-        someday: false,
-        dueDate: { gt: todayDate },
-      },
-      orderBy: { dueDate: "asc" },
-      take: 3,
-    });
-    const upcomingTaskDateLimit = upcomingTaskDates.at(-1)?.dueDate;
-
     const [
       topTasks,
       starredCount,
@@ -182,22 +175,35 @@ export async function getTodayDashboard() {
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
-      upcomingTaskDateLimit
-        ? prisma.task.findMany({
-            where: {
-              status: "open",
-              someday: false,
-              dueDate: { gt: todayDate, lte: upcomingTaskDateLimit },
-            },
-            select: {
-              id: true,
-              title: true,
-              dueDate: true,
-              dueTime: true,
-            },
-            orderBy: { dueDate: "asc" },
-          })
-        : Promise.resolve([]),
+      prisma.$queryRaw<UpcomingTaskCandidate[]>`
+        SELECT
+          id,
+          title,
+          due_date AS "dueDate",
+          due_time AS "dueTime"
+        FROM tasks
+        WHERE status = 'open'::"TaskStatus"
+          AND someday = false
+          AND due_date > ${todayDate}::date
+        ORDER BY
+          due_date ASC,
+          CASE
+            WHEN due_time ~ '^[0-9]{1,2}:[0-9]{2}$' THEN
+              LPAD(
+                LEAST(GREATEST(SPLIT_PART(due_time, ':', 1)::integer, 0), 23)::text,
+                2,
+                '0'
+              ) || ':' || LPAD(
+                LEAST(GREATEST(SPLIT_PART(due_time, ':', 2)::integer, 0), 59)::text,
+                2,
+                '0'
+              )
+            ELSE '00:00'
+          END ASC,
+          created_at ASC,
+          id ASC
+        LIMIT 3
+      `,
       prisma.calendarEvent.findMany({
         where: { start: { gte: todayCalendarBounds.end } },
         select: { id: true, title: true, start: true },
