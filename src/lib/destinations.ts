@@ -31,7 +31,7 @@ export function normalizeParentDestination(input: ParentDestinationInput) {
     }
     return { areaId: null, projectId: parentId };
   }
-  return normalizeDestination({ areaId, projectId });
+  return { areaId, projectId };
 }
 
 export function normalizeDestination(input: DestinationInput) {

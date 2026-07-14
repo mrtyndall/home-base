@@ -424,7 +424,11 @@ export async function POST(request: Request, context: RouteCtx) {
             })
           : null;
         if (parsed.projectId && !project) throw new Error("Project not found.");
-        const areaId = project?.areaId ?? await findAreaId(parsed.areaId, parsed.areaName);
+        const requestedAreaId = await resolveAreaReference(
+          parsed.areaId,
+          parsed.areaName,
+        );
+        const areaId = project?.areaId ?? requestedAreaId;
         const task = await createTaskWithAudit(
           {
             title: parsed.title,
@@ -488,7 +492,7 @@ export async function POST(request: Request, context: RouteCtx) {
 
       if (resource === "projects") {
         const parsed = createProjectSchema.parse(body);
-        const areaId = await findAreaId(parsed.areaId, parsed.areaName);
+        const areaId = await resolveAreaReference(parsed.areaId, parsed.areaName);
         if (!areaId) throw new Error("Project creation requires an active Area.");
         await resolveVerifiedDestination({ areaId });
         const now = new Date();
@@ -1027,7 +1031,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
           })
         : null;
       const requestedAreaId = parsed.areaName
-        ? await findAreaId(parsed.areaId ?? undefined, parsed.areaName)
+        ? await resolveAreaReference(parsed.areaId ?? undefined, parsed.areaName)
         : parsed.areaId === undefined ? current.areaId : parsed.areaId;
       const destination = await resolveVerifiedDestination({
         areaId: project?.areaId ?? requestedAreaId,
@@ -1064,9 +1068,9 @@ export async function PATCH(request: Request, context: RouteCtx) {
       const existing = await prisma.project.findUnique({ where: { id }, select: { areaId: true } });
       if (!existing) return notFound();
       const areaId = parsed.areaName
-        ? await findAreaId(parsed.areaId, parsed.areaName)
+        ? await resolveAreaReference(parsed.areaId, parsed.areaName)
         : parsed.areaId;
-      const nextAreaId = areaId ?? existing.areaId;
+      const nextAreaId = areaId === undefined ? existing.areaId : areaId;
       await resolveVerifiedDestination({ areaId: nextAreaId });
       const project = await prisma.$transaction(async (tx) => {
         const updated = await tx.project.update({
@@ -1305,16 +1309,22 @@ function notFound() {
   return Response.json({ error: "Not found." }, { status: 404 });
 }
 
-async function findAreaId(areaId?: string | null, areaName?: string) {
-  if (areaId) return areaId;
+async function resolveAreaReference(
+  areaId?: string | null,
+  areaName?: string,
+) {
   if (areaName) {
     const area = await prisma.area.findFirst({
       where: { name: { equals: areaName, mode: "insensitive" } },
       orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     });
-    if (area) return area.id;
+    if (!area) throw new Error("Area not found.");
+    if (areaId && area.id !== areaId) {
+      throw new Error("Conflicting Area fields.");
+    }
+    return area.id;
   }
-  return null;
+  return areaId ?? null;
 }
 
 async function resolveApiDestination(input: {

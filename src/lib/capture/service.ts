@@ -109,7 +109,7 @@ async function persistCaptureAtomically(input: {
   areas: AreaContext[];
 }) {
   return prisma.$transaction(async (client) => {
-    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${input.captureId}))`;
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.captureId}, 0))`;
     const existing = await client.capture.findUnique({ where: { id: input.captureId } });
     if (existing) {
       if (existing.rawText !== input.input.rawText || existing.source !== input.input.source) {

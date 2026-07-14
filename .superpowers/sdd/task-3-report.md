@@ -122,7 +122,7 @@ No UI component/page file was modified.
 - Confirmed the Project move transaction updates the Project and all three mirrored child models atomically.
 - Confirmed API capture labels cannot come from `deviceContext`; only the authenticated API key label reaches audit metadata.
 - Confirmed repeated capture UUIDs return prior parsed results and reused UUIDs with different content are rejected.
-- Known limitation: two truly concurrent first submissions with the same UUID can both observe an unparsed row before either finishes. Sequential offline/client retries are idempotent; fully serialized concurrent execution would require a database claim/lock field in a later schema task.
+- Concurrent first submissions with the same UUID are serialized by a transaction-scoped 64-bit advisory lock and verified against a disposable local PostgreSQL database below.
 - Known boundary: global Inbox presentation and Domain-page removal are not buildable until Task 4 completes the reserved UI cutover.
 
 ## Review fixes — concurrency, validation, and atomicity
@@ -130,7 +130,7 @@ No UI component/page file was modified.
 ### Findings resolved
 
 - Capture processing now validates trusted API actor context before parsing or writing a Capture row.
-- Each capture UUID is serialized with `pg_advisory_xact_lock(hashtext(captureId))` inside an interactive Prisma transaction.
+- Each capture UUID is serialized with `pg_advisory_xact_lock(hashtextextended(captureId, 0))` inside an interactive Prisma transaction.
 - Capture creation, all action side effects, notifications/mentions, and the final `parseStatus`/`createdItems` update use the same transaction client. A crash or thrown action rolls the entire attempt back; the failed/pending fallback is written in a fresh locked transaction.
 - Transaction-client propagation was added to the Task, check-in, reference-mention, person, routine, and resurfacing helpers used by capture execution. Existing non-capture callers retain the default Prisma client.
 - Manual capture conversion now locks by Capture ID and performs the duplicate check, target creation, mention updates, review/proposal settlement, notification, and `createdItems` update in one transaction.
@@ -193,3 +193,72 @@ Turbopack build failed with 2 errors in src/app/domains/[domainId]/page.tsx:
 ```
 
 No Task 4 UI, schema/migration, Railway, production, main-checkout, or iOS file was modified during review fixes.
+
+## Second review fixes — scoped reviews, aliases, names, and live locking
+
+### Findings resolved
+
+- Manual conversion now finds a scheduled review by both `reviewId` and the current `capture.id`; a crafted review ID belonging to another Capture cannot be settled.
+- `projectId`-only Entity Note/Doc aliases normalize without weakening `normalizeDestination()`. The API then loads the Project, derives its required Area, and passes the complete pair to `resolveVerifiedDestination()`.
+- Added `resolveAreaReference()` so a supplied but unresolved `areaName` throws `Area not found.` for Task create/patch and Project patch. Absent names still preserve existing Project Area on patch; blank names remain equivalent to omission.
+- Capture processing and manual conversion now use 64-bit `hashtextextended(value, 0)` advisory keys instead of 32-bit `hashtext(value)`.
+- Added a guarded, loopback-only disposable PostgreSQL integration probe for simultaneous retry replay and transaction rollback.
+
+### Second review RED evidence
+
+After adding the regression assertions and before implementation:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+AssertionError [ERR_ASSERTION]: idempotent capture processing must acquire a transaction-scoped database lock
+```
+
+The first disposable integration run also caught a real adapter incompatibility in the initial lock implementation:
+
+```text
+PrismaClientKnownRequestError P2010
+Failed to deserialize column of type 'void'
+```
+
+The fix uses `$executeRaw` for the advisory-lock `SELECT`, avoiding deserialization of PostgreSQL's `void` return type.
+
+### Second review GREEN evidence
+
+Focused and full tests:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+exit 0
+
+npm test
+tests 47; pass 47; fail 0
+```
+
+Behavioral destination coverage now includes `projectId`-only parent aliases, paired parent fields, conflicting aliases, missing Areas, missing Projects, and Project/Area mismatch rejection.
+
+Disposable local PostgreSQL integration:
+
+```text
+createdb -h 127.0.0.1 <unique-disposable-db>
+DATABASE_URL=<loopback-disposable-url> npx prisma migrate deploy
+AREA_FIRST_DISPOSABLE_DATABASE=1 DATABASE_URL=<loopback-disposable-url> npx tsx scripts/area-first-idempotency.integration.ts
+dropdb -h 127.0.0.1 --if-exists <unique-disposable-db>
+exit 0
+```
+
+The integration launched two simultaneous `submitCapture()` calls with the same UUID and asserted identical replay results, one Capture row, and one Task row. It then submitted an explicit nonexistent Area and asserted rollback left zero Capture and Task rows. A final database catalog query confirmed zero matching disposable databases remained.
+
+Scoped quality gates:
+
+```text
+npx eslint scripts/area-first-runtime.test.ts scripts/area-first-idempotency.integration.ts src/lib/destinations.ts src/lib/capture/service.ts src/app/actions.ts 'src/app/api/v1/[...path]/route.ts'
+exit 0
+
+git diff --check
+exit 0
+
+npx tsc --noEmit
+131 diagnostics remain outside the changed Task 3 runtime/integration files; filtering those files returns no diagnostics.
+```
+
+No UI, schema/migration, Railway, production, main-checkout, or iOS file was modified.

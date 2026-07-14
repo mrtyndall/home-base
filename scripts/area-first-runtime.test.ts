@@ -49,6 +49,10 @@ async function verifyDestinationContract() {
     normalizeParentDestination({ parentType: "area", parentId: "area-1" }),
     { areaId: "area-1", projectId: null },
   );
+  assert.deepEqual(
+    normalizeParentDestination({ projectId: "project-1" }),
+    { areaId: null, projectId: "project-1" },
+  );
   assert.throws(
     () => normalizeParentDestination({ parentType: "area" }),
     /provided together/,
@@ -110,9 +114,11 @@ assert.match(captureSource, /Project captures require an Area/, "capture Project
 assert.match(captureSource, /project\?\.areaId/, "Project selection must derive the mirrored Area");
 assert.match(
   captureSource,
-  /pg_advisory_xact_lock/,
+  /pg_advisory_xact_lock\(hashtextextended\([^,]+,\s*0\)\)/,
   "idempotent capture processing must acquire a transaction-scoped database lock",
 );
+assert.doesNotMatch(captureSource, /pg_advisory_xact_lock\(hashtext\(/,
+  "capture locks must not use collision-prone 32-bit hashtext keys");
 assert.match(
   captureSource,
   /\$transaction[\s\S]*executeActions[\s\S]*capture\.update/,
@@ -145,8 +151,13 @@ const conversionSource = actionsSource.slice(
 );
 assert.match(conversionSource, /\$transaction/,
   "manual capture conversion must be atomic");
-assert.match(conversionSource, /pg_advisory_xact_lock/,
+assert.match(conversionSource, /pg_advisory_xact_lock\(hashtextextended\([^,]+,\s*0\)\)/,
   "manual capture conversion must lock the Capture row across retries");
+assert.match(
+  conversionSource,
+  /scheduledReview\.findFirst\([\s\S]{0,180}captureId:\s*capture\.id/,
+  "manual conversion must scope a review lookup to the current Capture",
+);
 assert.doesNotMatch(
   conversionSource.replace("prisma.$transaction", "transaction"),
   /\bprisma\./,
@@ -166,5 +177,15 @@ assert.match(quickTaskSource, /if \(projectId && !project\)/,
   "quick Task API must reject an explicitly invalid Project");
 assert.match(quickTaskSource, /if \([^)]*areaId[^)]*&&[^)]*!area/,
   "quick Task API must reject an explicitly invalid Area");
+
+const apiSource = readFileSync("src/app/api/v1/[...path]/route.ts", "utf8");
+assert.match(
+  apiSource,
+  /async function resolveAreaReference[\s\S]*Area not found/,
+  "supplied-but-unresolved Area names must be rejected",
+);
+assert.doesNotMatch(apiSource, /const nextAreaId = areaId \?\? existing\.areaId/,
+  "an unresolved Project patch Area name must not preserve the existing Area",
+);
 
 void verifyDestinationContract();

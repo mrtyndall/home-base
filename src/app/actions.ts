@@ -1182,7 +1182,7 @@ export async function convertPendingCapture(formData: FormData) {
   }
 
   const converted = await prisma.$transaction(async (client) => {
-    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${captureId}))`;
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${captureId}, 0))`;
     const [capture, area] = await Promise.all([
       client.capture.findUnique({ where: { id: captureId } }),
       areaId
@@ -1290,8 +1290,8 @@ export async function convertPendingCapture(formData: FormData) {
 
   // Converting from a "Needs review" row settles the review too.
   if (reviewId) {
-    const review = await client.scheduledReview.findUnique({
-      where: { id: reviewId },
+    const review = await client.scheduledReview.findFirst({
+      where: { id: reviewId, captureId: capture.id },
       select: { id: true, status: true },
     });
     if (review && review.status !== "done" && review.status !== "dismissed") {
