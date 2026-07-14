@@ -28,8 +28,11 @@ export class MutationChannel<Value> {
 
   reconcile(value: Value) {
     if (this.pendingCount > 0) return;
+    const matchesCommitted = this.equal(this.committed, value);
     this.committed = value;
-    this.update({ value, pending: false, error: null, retryValue: null, undo: null });
+    this.update(matchesCommitted
+      ? { ...this.state, value }
+      : { value, pending: false, error: null, retryValue: null, undo: null });
   }
 
   mutate(next: Value, write: (value: Value) => Promise<Value>): Promise<void> {

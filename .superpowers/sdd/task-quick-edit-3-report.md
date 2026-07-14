@@ -50,3 +50,19 @@ Complete. Task detail, Tasks, and Today now share one adaptive `TaskQuickEdit` s
 - `npx eslint src/components/task-quick-edit.tsx src/lib/task-quick-edit-coordinator.ts scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts src/components/app-dock.tsx src/lib/today.ts src/app/today/page.tsx src/app/tasks/page.tsx` — PASS (0 errors, 0 warnings).
 - `npm run build` — PASS; optimized compilation, TypeScript, 19 static pages, route generation, and standalone asset copy completed.
 - `git diff --check` — PASS.
+
+## Final reconciliation follow-up
+
+- `MutationChannel.reconcile` now distinguishes equivalent committed values from genuine external changes. Equivalent values refresh the visible authoritative value/label while retaining the active Undo or persistent error/Retry state; genuinely different server values replace the committed value and clear stale recovery.
+- Location equivalence is based on destination identity rather than display label, allowing hierarchy-label refreshes without discarding recovery state.
+- The shared dock token now reserves 8.25rem (132px) of collapsed chrome before adding the baseline/device safe-area inset.
+- Added behavioral coverage for success followed by same-value prop reconciliation retaining Undo, failed schedule followed by unrelated location refresh retaining schedule Retry, and genuinely different external state clearing recovery.
+
+### Final follow-up verification
+
+- `npx tsx --test scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts` — PASS (12/12).
+- `npm test` — PASS (128/128, 0 failures).
+- `npx tsc --noEmit` — PASS.
+- `npx eslint src/components/task-quick-edit.tsx src/lib/task-quick-edit-coordinator.ts scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts` — PASS (0 errors, 0 warnings).
+- `npm run build` — PASS; optimized compilation, TypeScript, 19 static pages, route generation, and standalone asset copy completed.
+- `git diff --check` — PASS.

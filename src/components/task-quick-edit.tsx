@@ -393,7 +393,7 @@ function sameSchedule(a: TaskScheduleValue, b: TaskScheduleValue) {
 }
 
 function sameLocation(a: LocationValue, b: LocationValue) {
-  return a.areaId === b.areaId && a.projectId === b.projectId && a.label === b.label;
+  return a.areaId === b.areaId && a.projectId === b.projectId;
 }
 
 function safeStorage() {

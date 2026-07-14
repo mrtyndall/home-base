@@ -80,6 +80,38 @@ test("changed server props reconcile only when optimistic work is idle", async (
   assert.equal(channel.snapshot().value, "fresh prop");
 });
 
+test("same-value prop reconcile preserves Undo while refreshing the authoritative label", async () => {
+  type Location = { id: string; label: string };
+  const channel = new MutationChannel<Location>(
+    { id: "inbox", label: "Inbox" },
+    (left, right) => left.id === right.id,
+  );
+  await channel.mutate({ id: "work", label: "Work" }, async (value) => value);
+  channel.reconcile({ id: "work", label: "Work / Client" });
+  assert.equal(channel.snapshot().value.label, "Work / Client");
+  assert.ok(channel.snapshot().undo);
+});
+
+test("failed schedule keeps Retry when an unrelated location refresh causes same-value reconciliation", async () => {
+  const schedule = new MutationChannel("No date", (left, right) => left === right);
+  const location = new MutationChannel("Inbox", (left, right) => left === right);
+  await schedule.mutate("Today", async () => { throw new Error("offline"); });
+  location.reconcile("Work");
+  schedule.reconcile("No date");
+  assert.equal(schedule.snapshot().error, "Couldn’t update task");
+  assert.equal(schedule.snapshot().retryValue, "Today");
+});
+
+test("genuinely different external values clear stale recovery state", async () => {
+  const channel = new MutationChannel("No date", (left, right) => left === right);
+  await channel.mutate("Today", async () => { throw new Error("offline"); });
+  channel.reconcile("Tomorrow");
+  assert.equal(channel.snapshot().value, "Tomorrow");
+  assert.equal(channel.snapshot().error, null);
+  assert.equal(channel.snapshot().retryValue, null);
+  assert.equal(channel.snapshot().undo, null);
+});
+
 test("request coordinator aborts old work and rejects stale success and failure", () => {
   const requests = new LatestRequestCoordinator();
   const first = requests.begin();

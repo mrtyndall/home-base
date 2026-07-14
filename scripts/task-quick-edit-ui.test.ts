@@ -21,6 +21,7 @@ assert.match(component, /\[overflow-wrap:anywhere\]/);
 assert.match(component, /--app-dock-clearance/);
 assert.match(dock, /--app-dock-clearance/);
 assert.match(globals, /--app-dock-clearance/);
+assert.match(globals, /8\.25rem/, "Dock clearance must reserve at least 132px before the safe area.");
 assert.match(component, /locationTriggerRef/);
 assert.match(component, /scheduleTriggerRef/);
 assert.match(component, /data-dialog-initial/);
