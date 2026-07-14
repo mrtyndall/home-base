@@ -47,7 +47,7 @@ export default function NewAreaPage() {
         <div className="mt-6 flex justify-end">
           <button
             type="submit"
-            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-[18px] text-sm font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-[18px] text-sm font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           >
             <Plus size={14} />
             Create area

@@ -56,17 +56,16 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
               name="name"
               required
               autoFocus
-              className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
+              className="mt-1 h-11 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
             />
           </label>
           <AreaPicker
             areas={result.areas}
             defaultAreaId={scopedArea?.id}
-            lockedAreaId={scopedArea?.id}
           />
           <label className="block text-[13px] font-medium text-stone-600">
             <span>Target date</span>
-            <input type="date" name="targetDate" className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700" />
+            <input type="date" name="targetDate" className="mt-1 h-11 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700" />
           </label>
           <fieldset>
             <legend className="text-[13px] font-medium text-stone-600">Start mode</legend>
@@ -84,7 +83,7 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
             </div>
           </fieldset>
           <div className="flex justify-end">
-            <button type="submit" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-[18px] text-sm font-medium text-white transition hover:bg-teal-800">
+            <button type="submit" className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-[18px] text-sm font-medium text-white transition hover:bg-teal-800">
               <Plus size={14} /> Create project
             </button>
           </div>

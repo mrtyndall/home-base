@@ -958,6 +958,8 @@ export async function updateAreaParent(formData: FormData) {
 
   revalidatePath("/projects");
   revalidatePath("/areas/inbox");
+  revalidatePath("/areas/[areaId]", "page");
+  revalidatePath("/projects/[projectId]", "page");
   revalidatePath(`/areas/${areaId}`);
   if (previous.parentAreaId) revalidatePath(`/areas/${previous.parentAreaId}`);
   if (parentAreaId) revalidatePath(`/areas/${parentAreaId}`);

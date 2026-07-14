@@ -44,14 +44,14 @@ export default async function ProjectsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/projects/new"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#D8DDD5] bg-white px-4 text-[13px] font-medium text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#D8DDD5] bg-white px-4 text-[13px] font-medium text-stone-700 transition hover:border-teal-700/50 hover:text-teal-700"
           >
             <Plus size={14} />
             New project
           </Link>
           <Link
             href="/areas/new"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
           >
             <Plus size={14} />
             New area
@@ -83,7 +83,7 @@ function AreaShelves({ areas }: { areas: AreaListItem[] }) {
           </p>
           <Link
             href="/areas/new"
-            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
+            className="mt-4 inline-flex h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800"
           >
             <Plus size={14} />
             New area
@@ -111,10 +111,10 @@ function AreaTreeBranch({
 }) {
   const area = areasById.get(node.id);
   if (!area) return null;
-  const visualDepth = Math.min(depth, 3);
+  const indentationStep = depth > 0 && depth <= 3 ? 12 : 0;
 
   return (
-    <div style={{ paddingInlineStart: `${visualDepth * 12}px` }}>
+    <div style={{ paddingInlineStart: `${indentationStep}px` }}>
       <AreaCard area={area} />
       {node.children.length > 0 ? (
         <details open className="group mt-1">
@@ -122,7 +122,7 @@ function AreaTreeBranch({
             <span aria-hidden="true" className="transition group-open:rotate-90">›</span>
             {node.children.length} subarea{node.children.length === 1 ? "" : "s"}
           </summary>
-          <div className="space-y-3 border-l border-[#DDE2DA] pl-1">
+          <div className="space-y-3">
             {node.children.map((child) => (
               <AreaTreeBranch key={child.id} node={child} areasById={areasById} depth={depth + 1} />
             ))}
@@ -155,7 +155,7 @@ function AreaCard({ area }: { area: AreaListItem }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-[18px] font-medium leading-[1.25] text-stone-950">
+          <h3 className="break-words text-[18px] font-medium leading-[1.25] text-stone-950 [overflow-wrap:anywhere]">
             {area.name}
           </h3>
           <p className="mt-1 text-xs text-[#9AA096]">{facts.join(" · ")}</p>

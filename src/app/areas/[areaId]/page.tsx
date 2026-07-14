@@ -61,23 +61,23 @@ export default async function AreaPage({ params }: AreaPageProps) {
   return (
     <div className="space-y-6">
       <header className="space-y-3 border-b border-[#DDE2DA] pb-5">
-        <nav aria-label="Area path" className="flex min-h-11 flex-wrap items-center gap-x-1.5 text-sm text-stone-500">
+        <nav aria-label="Area path" className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-1.5 text-sm text-stone-500">
           <Link href="/projects" className="inline-flex h-11 items-center gap-2 rounded-sm font-medium transition hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
             <ArrowLeft size={15} /> Areas
           </Link>
           {areaBreadcrumb.map((crumb) => (
-            <span key={crumb.id} className="inline-flex items-center gap-1.5">
+            <span key={crumb.id} className="inline-flex min-w-0 items-center gap-1.5">
               <span aria-hidden="true" className="text-[#B0B6AD]">/</span>
-              <Link href={`/areas/${crumb.id}`} aria-current={crumb.id === area.id ? "page" : undefined} className="rounded-sm py-2 transition hover:text-teal-700">{crumb.name}</Link>
+              <Link href={`/areas/${crumb.id}`} aria-current={crumb.id === area.id ? "page" : undefined} className="min-w-0 break-words rounded-sm py-2 [overflow-wrap:anywhere] transition hover:text-teal-700">{crumb.name}</Link>
             </span>
           ))}
         </nav>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            <p className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096] [overflow-wrap:anywhere]">
               {areaPath}
             </p>
-            <h1 className="mt-1.5 font-serif text-[30px] font-medium leading-[1.15] tracking-[-0.015em] text-stone-950 lg:text-[36px]">
+            <h1 className="mt-1.5 break-words font-serif text-[30px] font-medium leading-[1.15] tracking-[-0.015em] text-stone-950 [overflow-wrap:anywhere] lg:text-[36px]">
               {area.name}
             </h1>
             <p className="mt-1.5 text-[13px] text-stone-500">
@@ -93,7 +93,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
           <div className="flex shrink-0 items-center gap-1.5">
             <Link
               href={`/projects/new?areaId=${area.id}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              className="inline-flex h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
             >
               <Plus size={14} />
               New project

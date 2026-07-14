@@ -60,19 +60,19 @@ export default async function ProjectDetailPage({
   return (
     <div className="space-y-6">
       <header className="space-y-3 border-b border-[#DDE2DA] pb-5">
-        <nav aria-label="Project path" className="flex min-h-11 flex-wrap items-center gap-1.5 text-sm text-stone-500">
+        <nav aria-label="Project path" className="flex min-h-11 min-w-0 flex-wrap items-center gap-1.5 text-sm text-stone-500">
           <Link href="/projects" className="inline-flex h-11 items-center gap-2 font-medium transition hover:text-stone-950"><ArrowLeft size={15} />Areas</Link>
           <span aria-hidden="true" className="text-[#B0B6AD]">/</span>
-          {project.area ? <Link href={`/areas/${project.area.id}`} className="py-2 transition hover:text-teal-700">{projectPath}</Link> : <span className="py-2">No area yet</span>}
+          {project.area ? <Link href={`/areas/${project.area.id}`} className="min-w-0 break-words py-2 [overflow-wrap:anywhere] transition hover:text-teal-700">{projectPath}</Link> : <span className="py-2">No area yet</span>}
           <span aria-hidden="true" className="text-[#B0B6AD]">/</span>
-          <span aria-current="page" className="min-w-0 truncate py-2 text-stone-700">{project.name}</span>
+          <span aria-current="page" className="min-w-0 break-words py-2 text-stone-700 [overflow-wrap:anywhere]">{project.name}</span>
         </nav>
         <div className="flex items-start justify-between gap-5">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            <p className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096] [overflow-wrap:anywhere]">
               {projectPath ?? "No area yet"} · Project
             </p>
-            <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950 lg:text-[32px]">
+            <h1 className="mt-1.5 break-words font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950 [overflow-wrap:anywhere] lg:text-[32px]">
               {project.name}
             </h1>
             {latestCheckIn ? (
