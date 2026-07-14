@@ -26,27 +26,16 @@ function makeClient(existing: StoredReference | null = null) {
     findFirst: unknown[];
     create: Array<{ data: Record<string, unknown> }>;
     update: Array<{ where: unknown; data: Record<string, unknown> }>;
+    updateMany: Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>;
     area: unknown[];
     project: unknown[];
-  } = { findFirst: [], create: [], update: [], area: [], project: [] };
+  } = { findFirst: [], create: [], update: [], updateMany: [], area: [], project: [] };
   let stored = existing;
 
-  const client = {
-    area: {
-      async findFirst(args: unknown) {
-        calls.area.push(args);
-        return { id: "area-1" };
-      },
-    },
-    project: {
-      async findFirst(args: unknown) {
-        calls.project.push(args);
-        return { id: "project-1", areaId: "area-1" };
-      },
-    },
-    reference: {
-      async findFirst(args: unknown) {
+  const reference = {
+      async findFirst(args: { where: Record<string, unknown> }) {
         calls.findFirst.push(args);
+        if (args.where.kind && stored?.kind !== args.where.kind) return null;
         return stored;
       },
       async create(args: { data: Record<string, unknown> }) {
@@ -73,6 +62,31 @@ function makeClient(existing: StoredReference | null = null) {
         stored = { ...stored, ...args.data } as StoredReference;
         return stored;
       },
+      async updateMany(args: { where: Record<string, unknown>; data: Record<string, unknown> }) {
+        calls.updateMany.push(args);
+        if (!stored || (args.where.kind && stored.kind !== args.where.kind)) return { count: 0 };
+        if (args.where.readAt === null && stored.readAt !== null) return { count: 0 };
+        if (typeof args.where.readAt === "object" && args.where.readAt && stored.readAt === null) return { count: 0 };
+        stored = { ...stored, ...args.data } as StoredReference;
+        return { count: 1 };
+      },
+  };
+  const client = {
+    area: {
+      async findFirst(args: unknown) {
+        calls.area.push(args);
+        return { id: "area-1" };
+      },
+    },
+    project: {
+      async findFirst(args: unknown) {
+        calls.project.push(args);
+        return { id: "project-1", areaId: "area-1" };
+      },
+    },
+    reference,
+    async $transaction<T>(operation: (transaction: { reference: typeof reference }) => Promise<T>) {
+      return operation({ reference });
     },
   };
 
@@ -130,49 +144,44 @@ test("returns an existing unread or read queue item instead of duplicating it", 
 
 test("validates the destination and preserves a URL when metadata enrichment fails", async () => {
   const { client, calls } = makeClient();
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => { throw new Error("offline"); };
-  try {
-    const result = await createReadLater({
+  const result = await createReadLater({
       url: "https://example.com/article?utm_medium=social",
       areaId: " area-1 ",
       tags: ["web"],
-    }, client);
+    }, client, { scheduleEnrichment() {} });
 
-    assert.equal(result.url, "https://example.com/article?utm_medium=social");
-    assert.equal(result.normalizedUrl, "https://example.com/article");
-    assert.equal(result.body, "https://example.com/article?utm_medium=social");
-    assert.equal(result.title, null);
-    assert.equal(result.areaId, "area-1");
-    assert.equal(calls.area.length, 1);
-    assert.equal(calls.create.length, 1);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  assert.equal(result.url, "https://example.com/article?utm_medium=social");
+  assert.equal(result.normalizedUrl, "https://example.com/article");
+  assert.equal(result.body, "https://example.com/article?utm_medium=social");
+  assert.equal(result.title, null);
+  assert.equal(result.areaId, "area-1");
+  assert.equal(calls.area.length, 1);
+  assert.equal(calls.create.length, 1);
 });
 
 test("uses best-effort page metadata without overriding submitted content", async () => {
-  const { client } = makeClient();
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(
-    '<html><head><title>Fetched title</title><meta name="description" content="Fetched summary"><meta property="og:site_name" content="Example News"></head></html>',
-    { headers: { "content-type": "text/html; charset=utf-8" } },
-  );
-  try {
-    const result = await createReadLater({
+  const { client, calls } = makeClient();
+  let enrichment: (() => Promise<void>) | undefined;
+  const result = await createReadLater({
       url: "https://example.com/article",
       title: "My title",
-    }, client);
-
-    assert.equal(result.title, "My title");
-    assert.equal(result.body, "Fetched summary");
-    assert.deepEqual(result.metadata, {
-      description: "Fetched summary",
-      siteName: "Example News",
+    }, client, {
+      scheduleEnrichment(job) { enrichment = job; },
+      fetchMetadata: async () => ({
+        title: "Fetched title",
+        description: "Fetched summary",
+        siteName: "Example News",
+      }),
     });
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+
+  assert.equal(result.title, "My title");
+  assert.equal(result.body, "https://example.com/article");
+  assert.ok(enrichment);
+  await enrichment();
+  assert.deepEqual(calls.update[0].data, {
+    body: "Fetched summary",
+    metadata: { description: "Fetched summary", siteName: "Example News" },
+  });
 });
 
 test("read status transitions keep readAt consistent and preserve it on archive", async () => {
@@ -203,7 +212,7 @@ test("read status transitions keep readAt consistent and preserve it on archive"
   const unread = await setReadLaterStatus("item-1", "unread", client);
   assert.equal(unread.readStatus, "unread");
   assert.equal(unread.readAt, null);
-  assert.deepEqual(calls.update[2].data, { readStatus: "unread", readAt: null });
+  assert.deepEqual(calls.updateMany.at(-1)?.data, { readStatus: "unread", readAt: null });
 });
 
 test("status changes reject invalid states and non-read-later references", async () => {
