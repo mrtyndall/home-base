@@ -40,15 +40,15 @@ const areas: SeedArea[] = [
   },
   {
     name: "Ham Radio",
-    sortOrder: 10,
+    sortOrder: 50,
   },
   {
     name: "Homelab",
-    sortOrder: 20,
+    sortOrder: 60,
   },
   {
     name: "Magic/Pokemon",
-    sortOrder: 30,
+    sortOrder: 70,
   },
 ];
 

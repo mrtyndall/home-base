@@ -100,3 +100,11 @@ Follow-up TDD evidence:
 - `npm run lint`, `npx tsc --noEmit`, and `npm run build` exited successfully.
 
 Disposable PostgreSQL 17 integration QA migrated a fresh loopback database, changed the existing System row to a non-default ID, created an Area through `createCompatibleArea`, and verified its name, next sort order, physical foreign key, non-system visibility, and Domain-free return shape. It also ran both seed implementations against that row. The throwaway database was dropped and absence was verified afterward.
+
+## Final seed-parity cleanup
+
+- Added a source-contract parity assertion that extracts each seed's flat Area dataset and compares both against the canonical order: Home 10, Family 20, Health 30, Creative 40, Ham Radio 50, Homelab 60, Magic/Pokemon 70.
+- Corrected the Prisma seed's duplicated 10/20/30 sort orders for its final three Areas.
+- Added the explicit `CONTRACT_RELEASE_DELETE` marker beside the runtime seed's Domain compatibility SQL so the Release B contract work can find and remove it.
+- TDD RED evidence: the focused test first failed on the Prisma seed's 10/20/30 mismatch; after that correction, it failed on the absent deletion marker.
+- TDD GREEN evidence: `npx tsx --test scripts/seed-area-compat.test.ts` passed 1/1.

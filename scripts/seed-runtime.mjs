@@ -34,6 +34,7 @@ const pool = new pg.Pool({
 });
 
 try {
+  // CONTRACT_RELEASE_DELETE: remove Domain compatibility SQL when areas.domain_id is removed.
   const compatibilityDomain = await pool.query(
     `
     INSERT INTO domains (id, name, description, sort_order, is_system, active)
