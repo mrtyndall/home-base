@@ -30,12 +30,18 @@ export async function POST(request: Request) {
         select: { id: true, areaId: true },
       })
     : null;
+  if (projectId && !project) {
+    return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  }
   const area = !project && areaId
     ? await prisma.area.findFirst({
         where: { id: areaId, status: "active" },
         select: { id: true },
       })
     : null;
+  if (areaId && !project && !area) {
+    return NextResponse.json({ error: "Area not found." }, { status: 404 });
+  }
 
   const task = await createTask(
     { title, dueDate, areaId: project?.areaId ?? area?.id, projectId: project?.id },

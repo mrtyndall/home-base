@@ -109,6 +109,7 @@ export async function createQuickTask(formData: FormData) {
         select: { id: true, areaId: true },
       })
     : null;
+  if (projectId && !project) return;
   const area =
     !project && selectedAreaId
       ? await prisma.area.findFirst({
@@ -116,6 +117,7 @@ export async function createQuickTask(formData: FormData) {
           select: { id: true },
         })
       : null;
+  if (selectedAreaId && !project && !area) return;
 
   await createTask(
     {
@@ -153,6 +155,7 @@ export async function updateTaskDetail(formData: FormData) {
         select: { id: true, areaId: true },
       })
     : null;
+  if (projectId && !validProject) return;
 
   const dueDate = getTrimmedString(formData, "dueDate");
   const dueTime = getTrimmedString(formData, "dueTime");
@@ -342,10 +345,10 @@ export async function setEntityNoteStarred(formData: FormData) {
   });
 
   revalidatePath("/");
-  if (updated.parentType === "area") {
+  if (updated.parentType === "area" && updated.parentId) {
     revalidatePath(`/areas/${updated.parentId}`);
     revalidatePath("/projects");
-  } else {
+  } else if (updated.parentType === "project" && updated.parentId) {
     revalidatePath(`/projects/${updated.parentId}`);
   }
 }
@@ -1081,8 +1084,12 @@ export async function updateEntityNote(formData: FormData) {
   }
 }
 
-async function getEffectiveCaptureText(captureId: string, rawText: string) {
-  const latestEdit = await prisma.captureTextEdit.findFirst({
+async function getEffectiveCaptureText(
+  captureId: string,
+  rawText: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+) {
+  const latestEdit = await client.captureTextEdit.findFirst({
     where: { captureId },
     orderBy: { createdAt: "desc" },
     select: { text: true },
@@ -1174,22 +1181,27 @@ export async function convertPendingCapture(formData: FormData) {
     return;
   }
 
-  const [capture, area] = await Promise.all([
-    prisma.capture.findUnique({ where: { id: captureId } }),
-    areaId
-      ? prisma.area.findFirst({ where: { id: areaId, status: "active" } })
-      : Promise.resolve(null),
-  ]);
-  if (!capture || (areaId && !area)) return;
-  const existingItems = normalizeCreatedItems(capture.createdItems);
-  const alreadyConverted = existingItems.find(
-    (existing) => existing.type !== "pending_capture" && existing.type !== "notification",
-  );
-  if (alreadyConverted) return;
-  const captureText = await getEffectiveCaptureText(
-    capture.id,
-    capture.rawText,
-  );
+  const converted = await prisma.$transaction(async (client) => {
+    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${captureId}))`;
+    const [capture, area] = await Promise.all([
+      client.capture.findUnique({ where: { id: captureId } }),
+      areaId
+        ? client.area.findFirst({ where: { id: areaId, status: "active" } })
+        : Promise.resolve(null),
+    ]);
+    if (!capture || (areaId && !area)) return null;
+    await resolveVerifiedDestination({ areaId: area?.id ?? null }, client);
+    const existingItems = normalizeCreatedItems(capture.createdItems);
+    const alreadyConverted = existingItems.find(
+      (existing) =>
+        existing.type !== "pending_capture" && existing.type !== "notification",
+    );
+    if (alreadyConverted) return { captureId: capture.id, areaId: area?.id ?? null };
+    const captureText = await getEffectiveCaptureText(
+      capture.id,
+      capture.rawText,
+      client,
+    );
 
   let item: CreatedItemRef;
   if (targetType === "task") {
@@ -1201,10 +1213,11 @@ export async function convertPendingCapture(formData: FormData) {
         source: "manual",
       },
       { source: "manual" },
+      client,
     );
     item = { type: "task", id: task.id, label: `Task added to ${area?.name ?? "Inbox"}` };
   } else if (targetType === "idea") {
-    const idea = await prisma.idea.create({
+    const idea = await client.idea.create({
       data: {
         title: captureText,
         body: captureText,
@@ -1215,7 +1228,7 @@ export async function convertPendingCapture(formData: FormData) {
     });
     item = { type: "idea", id: idea.id, label: `Idea saved to ${area?.name ?? "Inbox"}` };
   } else if (targetType === "note") {
-    const note = await prisma.entityNote.create({
+    const note = await client.entityNote.create({
       data: {
         parentType: area ? "area" : null,
         parentId: area?.id ?? null,
@@ -1229,9 +1242,9 @@ export async function convertPendingCapture(formData: FormData) {
       id: note.id,
       label: `Note added to ${area?.name ?? "Inbox"}`,
     };
-    await syncReferenceMentions("entity_note", note.id, captureText);
+    await syncReferenceMentions("entity_note", note.id, captureText, client);
   } else {
-    const reference = await prisma.reference.create({
+    const reference = await client.reference.create({
       data: {
         body: captureText,
         areaId: area?.id,
@@ -1244,10 +1257,10 @@ export async function convertPendingCapture(formData: FormData) {
       id: reference.id,
       label: `Reference saved to ${area?.name ?? "Inbox"}`,
     };
-    await syncReferenceMentions("reference", reference.id, captureText);
+    await syncReferenceMentions("reference", reference.id, captureText, client);
   }
 
-  await prisma.capture.update({
+  await client.capture.update({
     where: { id: capture.id },
     data: {
       parseStatus: "parsed",
@@ -1260,7 +1273,7 @@ export async function convertPendingCapture(formData: FormData) {
     },
   });
 
-  await prisma.notification.create({
+  await client.notification.create({
     data: {
       type: "capture_converted",
       title: "Capture converted",
@@ -1277,16 +1290,16 @@ export async function convertPendingCapture(formData: FormData) {
 
   // Converting from a "Needs review" row settles the review too.
   if (reviewId) {
-    const review = await prisma.scheduledReview.findUnique({
+    const review = await client.scheduledReview.findUnique({
       where: { id: reviewId },
       select: { id: true, status: true },
     });
     if (review && review.status !== "done" && review.status !== "dismissed") {
-      await prisma.scheduledReview.update({
+      await client.scheduledReview.update({
         where: { id: review.id },
         data: { status: "done" },
       });
-      await prisma.notification.create({
+      await client.notification.create({
         data: {
           type: "review_done",
           title: "Review converted",
@@ -1302,7 +1315,7 @@ export async function convertPendingCapture(formData: FormData) {
   }
 
   if (proposalId) {
-    const proposal = await prisma.captureReviewProposal.findFirst({
+    const proposal = await client.captureReviewProposal.findFirst({
       where: {
         id: proposalId,
         captureId: capture.id,
@@ -1311,11 +1324,11 @@ export async function convertPendingCapture(formData: FormData) {
       select: { id: true },
     });
     if (proposal) {
-      await prisma.captureReviewProposal.update({
+      await client.captureReviewProposal.update({
         where: { id: proposal.id },
         data: { status: "accepted", resolvedAt: new Date() },
       });
-      await prisma.notification.create({
+      await client.notification.create({
         data: {
           type: "capture_review_accepted",
           title: "Capture review accepted",
@@ -1330,12 +1343,15 @@ export async function convertPendingCapture(formData: FormData) {
       });
     }
   }
+    return { captureId: capture.id, areaId: area?.id ?? null };
+  });
+  if (!converted) return;
 
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/search");
-  revalidatePath(`/captures/${capture.id}`);
-  if (area) revalidatePath(`/areas/${area.id}`);
+  revalidatePath(`/captures/${converted.captureId}`);
+  if (converted.areaId) revalidatePath(`/areas/${converted.areaId}`);
 }
 
 export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {

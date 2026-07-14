@@ -257,8 +257,9 @@ export async function completeRoutineById(
   routineId: string,
   actor: { source: "manual" | "capture" | "api"; label?: string },
   value?: string | null,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const routine = await prisma.routine.findUnique({
+  const routine = await client.routine.findUnique({
     where: { id: routineId },
     select: { id: true, name: true, status: true },
   });
@@ -268,7 +269,7 @@ export async function completeRoutineById(
 
   // One completion per day; a second tap is a no-op, never an error state.
   const todayStr = localDateString();
-  const latest = await prisma.routineCompletion.findFirst({
+  const latest = await client.routineCompletion.findFirst({
     where: { routineId, undoneAt: null },
     orderBy: { completedAt: "desc" },
   });
@@ -276,11 +277,11 @@ export async function completeRoutineById(
     return { routine, completion: latest, repeated: true as const };
   }
 
-  const completion = await prisma.routineCompletion.create({
+  const completion = await client.routineCompletion.create({
     data: { routineId, value: value ?? undefined },
   });
 
-  await prisma.notification.create({
+  await client.notification.create({
     data: {
       type: "routine_completed",
       title: "Routine completed",
@@ -344,8 +345,9 @@ export async function completeRoutineByMatch(
   routineMatch: string,
   actor: { source: "manual" | "capture" | "api"; label?: string },
   value?: string | null,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const routine = await prisma.routine.findFirst({
+  const routine = await client.routine.findFirst({
     where: {
       status: "active",
       name: { contains: routineMatch, mode: "insensitive" },
@@ -356,7 +358,7 @@ export async function completeRoutineByMatch(
   if (!routine) {
     throw new Error(`No active routine matched "${routineMatch}".`);
   }
-  return completeRoutineById(routine.id, actor, value);
+  return completeRoutineById(routine.id, actor, value, client);
 }
 
 export async function getRoutinesWithState(todayStr = localDateString()) {

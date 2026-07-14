@@ -9,8 +9,11 @@ export type PersonActor = {
   label?: string;
 };
 
-export async function findPersonByMatch(personMatch: string) {
-  return prisma.person.findFirst({
+export async function findPersonByMatch(
+  personMatch: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+) {
+  return client.person.findFirst({
     where: {
       status: "active",
       name: { contains: personMatch, mode: "insensitive" },
@@ -30,8 +33,9 @@ export async function createPersonRecord(
     areaId?: string | null;
   },
   actor: PersonActor,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const person = await prisma.person.create({
+  const person = await client.person.create({
     data: {
       name: input.name,
       relationshipType: input.relationshipType ?? undefined,
@@ -43,7 +47,7 @@ export async function createPersonRecord(
     },
   });
 
-  await prisma.notification.create({
+  await client.notification.create({
     data: {
       type: "person_created",
       title: "Person added",

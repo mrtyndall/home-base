@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 export type ReferenceMentionTarget = {
@@ -19,15 +20,16 @@ export async function syncReferenceMentions(
   sourceType: SourceType,
   sourceId: string,
   text: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  await prisma.referenceMention.updateMany({
+  await client.referenceMention.updateMany({
     where: { sourceType, sourceId, status: "active" },
     data: { status: "inactive" },
   });
 
-  const targets = await resolveReferenceMentions(text);
+  const targets = await resolveReferenceMentions(text, client);
   for (const target of targets) {
-    await prisma.referenceMention.upsert({
+    await client.referenceMention.upsert({
       where: {
         sourceType_sourceId_targetType_targetId: {
           sourceType,
@@ -131,22 +133,25 @@ export async function loadReferenceMentions(
   return grouped;
 }
 
-async function resolveReferenceMentions(text: string) {
+async function resolveReferenceMentions(
+  text: string,
+  client: Prisma.TransactionClient | typeof prisma,
+) {
   if (!text.includes("@")) {
     return [];
   }
 
   const explicitMentions = parseExplicitMentionTokens(text);
   const [people, references, calendarEvents] = await Promise.all([
-    prisma.person.findMany({
+    client.person.findMany({
       where: { status: "active" },
       select: { id: true, name: true },
     }),
-    prisma.reference.findMany({
+    client.reference.findMany({
       where: { title: { not: null } },
       select: { id: true, title: true },
     }),
-    prisma.calendarEvent.findMany({
+    client.calendarEvent.findMany({
       where: { status: { not: "cancelled" } },
       select: { id: true, title: true, start: true },
       orderBy: { start: "desc" },

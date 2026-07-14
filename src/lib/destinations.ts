@@ -5,6 +5,35 @@ export type DestinationInput = {
   projectId?: string | null;
 };
 
+export type ParentDestinationInput = DestinationInput & {
+  parentType?: "area" | "project" | null;
+  parentId?: string | null;
+};
+
+export function normalizeParentDestination(input: ParentDestinationInput) {
+  const parentType = input.parentType ?? null;
+  const parentId = input.parentId?.trim() || null;
+  if ((parentType === null) !== (parentId === null)) {
+    throw new Error("parentType and parentId must be provided together.");
+  }
+
+  const areaId = input.areaId?.trim() || null;
+  const projectId = input.projectId?.trim() || null;
+  if (parentType === "area") {
+    if (projectId || (areaId && areaId !== parentId)) {
+      throw new Error("Conflicting destination fields.");
+    }
+    return { areaId: parentId, projectId: null };
+  }
+  if (parentType === "project") {
+    if (areaId || (projectId && projectId !== parentId)) {
+      throw new Error("Conflicting destination fields.");
+    }
+    return { areaId: null, projectId: parentId };
+  }
+  return normalizeDestination({ areaId, projectId });
+}
+
 export function normalizeDestination(input: DestinationInput) {
   const areaId = input.areaId?.trim() || null;
   const projectId = input.projectId?.trim() || null;

@@ -36,9 +36,10 @@ export async function createTask(
 export async function createTaskWithAudit(
   input: CreateTaskInput,
   actor: WriteActor,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const destination = await resolveVerifiedDestination(input);
-  const task = await prisma.task.create({
+  const destination = await resolveVerifiedDestination(input, client);
+  const task = await client.task.create({
     data: {
       title: input.title,
       notes: input.notes ?? undefined,
@@ -57,7 +58,7 @@ export async function createTaskWithAudit(
     include: { area: true, project: true },
   });
 
-  await prisma.notification.create({
+  await client.notification.create({
     data: {
       type: "task_created",
       title: "Task created",
@@ -74,8 +75,13 @@ export async function createTaskWithAudit(
   return task;
 }
 
-export async function completeTaskById(taskId: string, actor: WriteActor) {
-  const task = await prisma.task.findUnique({
+export async function completeTaskById(
+  taskId: string,
+  actor: WriteActor,
+  client?: Prisma.TransactionClient,
+) {
+  const db = client ?? prisma;
+  const task = await db.task.findUnique({
     where: { id: taskId },
     include: { subtasks: { where: { status: "open" } } },
   });
@@ -91,7 +97,7 @@ export async function completeTaskById(taskId: string, actor: WriteActor) {
   const completedAt = new Date();
   const nextDue = getNextRecurrenceDue(task);
 
-  const [completed, nextInstance] = await prisma.$transaction(async (tx) => {
+  const execute = async (tx: Prisma.TransactionClient) => {
     const completedTask = await tx.task.update({
       where: { id: task.id },
       data: {
@@ -137,13 +143,21 @@ export async function completeTaskById(taskId: string, actor: WriteActor) {
     });
 
     return [completedTask, nextTask] as const;
-  });
+  };
+  const [completed, nextInstance] = client
+    ? await execute(client)
+    : await prisma.$transaction(execute);
 
   return { completed, nextInstance };
 }
 
-export async function completeTaskByMatch(taskMatch: string, actor: WriteActor) {
-  const task = await prisma.task.findFirst({
+export async function completeTaskByMatch(
+  taskMatch: string,
+  actor: WriteActor,
+  client?: Prisma.TransactionClient,
+) {
+  const db = client ?? prisma;
+  const task = await db.task.findFirst({
     where: {
       status: "open",
       title: { contains: taskMatch, mode: "insensitive" },
@@ -155,15 +169,17 @@ export async function completeTaskByMatch(taskMatch: string, actor: WriteActor) 
     throw new Error(`No open task matched "${taskMatch}".`);
   }
 
-  return completeTaskById(task.id, actor);
+  return completeTaskById(task.id, actor, client);
 }
 
 export async function setTaskStarredByMatch(
   taskMatch: string,
   starred: boolean,
   actor: WriteActor,
+  client?: Prisma.TransactionClient,
 ) {
-  const task = await prisma.task.findFirst({
+  const db = client ?? prisma;
+  const task = await db.task.findFirst({
     where: {
       status: "open",
       title: { contains: taskMatch, mode: "insensitive" },
@@ -175,12 +191,12 @@ export async function setTaskStarredByMatch(
     throw new Error(`No open task matched "${taskMatch}".`);
   }
 
-  const updated = await prisma.task.update({
+  const updated = await db.task.update({
     where: { id: task.id },
     data: { starred },
   });
 
-  await prisma.notification.create({
+  await db.notification.create({
     data: {
       type: starred ? "task_starred" : "task_unstarred",
       title: starred ? "Task starred" : "Task unstarred",

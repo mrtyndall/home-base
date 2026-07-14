@@ -124,3 +124,72 @@ No UI component/page file was modified.
 - Confirmed repeated capture UUIDs return prior parsed results and reused UUIDs with different content are rejected.
 - Known limitation: two truly concurrent first submissions with the same UUID can both observe an unparsed row before either finishes. Sequential offline/client retries are idempotent; fully serialized concurrent execution would require a database claim/lock field in a later schema task.
 - Known boundary: global Inbox presentation and Domain-page removal are not buildable until Task 4 completes the reserved UI cutover.
+
+## Review fixes — concurrency, validation, and atomicity
+
+### Findings resolved
+
+- Capture processing now validates trusted API actor context before parsing or writing a Capture row.
+- Each capture UUID is serialized with `pg_advisory_xact_lock(hashtext(captureId))` inside an interactive Prisma transaction.
+- Capture creation, all action side effects, notifications/mentions, and the final `parseStatus`/`createdItems` update use the same transaction client. A crash or thrown action rolls the entire attempt back; the failed/pending fallback is written in a fresh locked transaction.
+- Transaction-client propagation was added to the Task, check-in, reference-mention, person, routine, and resurfacing helpers used by capture execution. Existing non-capture callers retain the default Prisma client.
+- Manual capture conversion now locks by Capture ID and performs the duplicate check, target creation, mention updates, review/proposal settlement, notification, and `createdItems` update in one transaction.
+- Capture Note/Entity Doc destinations now pass through `resolveVerifiedDestination()` with the transaction client, so a parked Area is rejected rather than accepted by the fuzzy matcher.
+- Explicit invalid Area/Project values are rejected by quick Task actions/API, Task editing, bearer API writes, and explicit capture-intent processing. Only omitted/blank destinations become unfiled.
+- Added `normalizeParentDestination()` with behavioral checks for paired `parentType`/`parentId` and conflicting legacy/alias destination fields.
+- Unfiled note starring/editing no longer constructs or revalidates `/projects/null`.
+
+### Review RED evidence
+
+After adding the new regression contracts and before implementation:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+AssertionError [ERR_ASSERTION]: idempotent capture processing must acquire a transaction-scoped database lock
+```
+
+The expanded contract covers advisory-lock structure, transaction-scoped action/final-state writes, absence of global Prisma writes in capture execution helpers, trusted-actor validation order, explicit-invalid capture rejection, locked conversion structure, null-safe revalidation, quick API invalid-destination rejection, resolver use, and behavioral destination/parent normalization failures.
+
+### Review GREEN evidence
+
+Focused runtime contract:
+
+```text
+npx tsx scripts/area-first-runtime.test.ts
+exit 0
+```
+
+Full suite:
+
+```text
+npm test
+tests 47; pass 47; fail 0
+```
+
+Scoped lint and diff hygiene:
+
+```text
+npx eslint scripts/area-first-runtime.test.ts src/lib/destinations.ts src/lib/capture/service.ts src/lib/tasks.ts src/lib/people.ts src/lib/reference-mentions.ts src/lib/checkins.ts src/lib/routines.ts src/lib/resurfacing.ts src/app/actions.ts 'src/app/api/v1/[...path]/route.ts' src/app/api/tasks/quick/route.ts
+exit 0
+
+git diff --check
+exit 0
+```
+
+Compile audit:
+
+```text
+npx tsc --noEmit
+129 diagnostics remain, all outside the Task 3 runtime files; filtering for every changed Task 3 runtime file returns no diagnostics.
+```
+
+Production build boundary is unchanged:
+
+```text
+npm run build
+Turbopack build failed with 2 errors in src/app/domains/[domainId]/page.tsx:
+- cannot resolve the deleted @/lib/domains module
+- removed updateDomainDescription export is still imported
+```
+
+No Task 4 UI, schema/migration, Railway, production, main-checkout, or iOS file was modified during review fixes.

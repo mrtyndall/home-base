@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
 import { localDateString } from "@/lib/dates";
@@ -26,6 +27,7 @@ type AreaContext = {
 };
 
 type ExecutionContext = {
+  client: Prisma.TransactionClient;
   captureId: string;
   rawText: string;
   captureSource: CaptureInput["source"];
@@ -40,49 +42,16 @@ export async function submitCapture(
   trustedActor?: { apiKeyLabel: string },
 ): Promise<CaptureConfirmation> {
   const parsedInput = captureInputSchema.parse(input);
-
-  const capture = parsedInput.idempotencyKey
-    ? await prisma.capture.upsert({
-        where: { id: parsedInput.idempotencyKey },
-        update: {},
-        create: {
-          id: parsedInput.idempotencyKey,
-          rawText: parsedInput.rawText,
-          source: parsedInput.source,
-          deviceContext: parsedInput.deviceContext as Prisma.InputJsonValue,
-        },
-      })
-    : await prisma.capture.create({ data: {
-      rawText: parsedInput.rawText,
-      source: parsedInput.source,
-      deviceContext: parsedInput.deviceContext as Prisma.InputJsonValue,
-    } });
-
-  if (
-    capture.rawText !== parsedInput.rawText ||
-    capture.source !== parsedInput.source
-  ) {
-    throw new Error("Idempotency key was already used for a different capture.");
-  }
-
-  if (capture.parseStatus) {
-    return {
-      captureId: capture.id,
-      status: capture.parseStatus,
-      message: buildConfirmationMessage(
-        capture.parseStatus,
-        (capture.createdItems as CreatedItemRef[] | null) ?? [],
-      ),
-      createdItems: (capture.createdItems as CreatedItemRef[] | null) ?? [],
-    };
-  }
+  const actorContext = validateCaptureActor(parsedInput, trustedActor);
+  const captureId = parsedInput.idempotencyKey ?? randomUUID();
 
   let actions: ParserAction[] = [];
   let status: CaptureParseStatus = "parsed";
-  let createdItems: CreatedItemRef[] = [];
+  let areas: AreaContext[] = [];
 
   try {
     const parserContext = await buildParserContext(parsedInput.source);
+    areas = parserContext.areas;
     actions =
       parsedInput.captureIntent === "auto"
         ? await parseCaptureWithContext(parsedInput.rawText, parserContext)
@@ -94,20 +63,6 @@ export async function submitCapture(
     const failed = actions.some((action) => "error" in action);
     status = ambiguous ? "ambiguous" : failed ? "failed" : "parsed";
 
-    const executableActions = actions.filter(isExecutableAction);
-    const context: ExecutionContext = {
-      captureId: capture.id,
-      rawText: parsedInput.rawText,
-      captureSource: parsedInput.source,
-      areas: parserContext.areas,
-      ...buildActorContext(parsedInput, trustedActor),
-    };
-
-    if (status === "parsed" && executableActions.length > 0) {
-      createdItems = await executeActions(executableActions, context);
-    } else {
-      createdItems = await markCapturePending(context);
-    }
   } catch (error) {
     status = "failed";
     actions = [
@@ -117,30 +72,98 @@ export async function submitCapture(
       },
     ];
 
-    createdItems = await markCapturePending({
-      captureId: capture.id,
-      rawText: parsedInput.rawText,
-      captureSource: parsedInput.source,
-      areas: [],
-      ...buildActorContext(parsedInput, trustedActor),
-    });
   }
 
-  await prisma.capture.update({
-    where: { id: capture.id },
-    data: {
-      parseStatus: status,
-      parsedActions: actions as Prisma.InputJsonValue,
-      createdItems: createdItems as Prisma.InputJsonValue,
-    },
-  });
+  try {
+    return await persistCaptureAtomically({
+      captureId,
+      input: parsedInput,
+      actorContext,
+      actions,
+      status,
+      areas,
+    });
+  } catch (error) {
+    if (parsedInput.captureAreaId || parsedInput.captureProjectId) {
+      throw error;
+    }
+    return persistCaptureAtomically({
+      captureId,
+      input: parsedInput,
+      actorContext,
+      actions: [{ error: error instanceof Error ? error.message : "Capture processing failed." }],
+      status: "failed",
+      areas: [],
+    });
+  }
+}
 
-  return {
-    captureId: capture.id,
-    status,
-    message: buildConfirmationMessage(status, createdItems),
-    createdItems,
-  };
+type ActorContext = ReturnType<typeof validateCaptureActor>;
+
+async function persistCaptureAtomically(input: {
+  captureId: string;
+  input: CaptureInput;
+  actorContext: ActorContext;
+  actions: ParserAction[];
+  status: CaptureParseStatus;
+  areas: AreaContext[];
+}) {
+  return prisma.$transaction(async (client) => {
+    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${input.captureId}))`;
+    const existing = await client.capture.findUnique({ where: { id: input.captureId } });
+    if (existing) {
+      if (existing.rawText !== input.input.rawText || existing.source !== input.input.source) {
+        throw new Error("Idempotency key was already used for a different capture.");
+      }
+      if (existing.parseStatus) {
+        const createdItems = (existing.createdItems as CreatedItemRef[] | null) ?? [];
+        return {
+          captureId: existing.id,
+          status: existing.parseStatus,
+          message: buildConfirmationMessage(existing.parseStatus, createdItems),
+          createdItems,
+        };
+      }
+    } else {
+      await client.capture.create({
+        data: {
+          id: input.captureId,
+          rawText: input.input.rawText,
+          source: input.input.source,
+          deviceContext: input.input.deviceContext as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    const context: ExecutionContext = {
+      client,
+      captureId: input.captureId,
+      rawText: input.input.rawText,
+      captureSource: input.input.source,
+      areas: input.areas,
+      ...input.actorContext,
+    };
+    const executableActions = input.actions.filter(isExecutableAction);
+    const createdItems =
+      input.status === "parsed" && executableActions.length > 0
+        ? await executeActions(executableActions, context)
+        : await markCapturePending(context);
+
+    await client.capture.update({
+      where: { id: input.captureId },
+      data: {
+        parseStatus: input.status,
+        parsedActions: input.actions as Prisma.InputJsonValue,
+        createdItems: createdItems as Prisma.InputJsonValue,
+      },
+    });
+    return {
+      captureId: input.captureId,
+      status: input.status,
+      message: buildConfirmationMessage(input.status, createdItems),
+      createdItems,
+    };
+  });
 }
 
 async function buildParserContext(source: string) {
@@ -186,7 +209,7 @@ function isExecutableAction(action: ParserAction): action is ExecutableAction {
   return "type" in action;
 }
 
-function buildActorContext(
+function validateCaptureActor(
   input: CaptureInput,
   trustedActor?: { apiKeyLabel: string },
 ) {
@@ -281,6 +304,7 @@ async function executeActions(
           action.task_match,
           starred,
           context.actor,
+          context.client,
         );
         createdItems.push({
           type: "task",
@@ -344,6 +368,7 @@ async function executeActions(
           action.routine_match,
           context.actor,
           action.value,
+          context.client,
         );
         createdItems.push({
           type: "routine_completion",
@@ -355,7 +380,7 @@ async function executeActions(
         break;
       }
       case "boost_resurface": {
-        const boosted = await boostResurfaceByMatch(action.item_match);
+        const boosted = await boostResurfaceByMatch(action.item_match, context.client);
         if (!boosted) {
           throw new Error(
             `No idea or journal entry matched "${action.item_match}" to boost.`,
@@ -378,7 +403,7 @@ async function executeActions(
   }
 
   if (createdItems.length > 0) {
-    const notification = await prisma.notification.create({
+    const notification = await context.client.notification.create({
       data: {
         type: "capture_processed",
         title: "Capture processed",
@@ -403,7 +428,7 @@ async function executeActions(
 }
 
 async function markCapturePending(context: ExecutionContext) {
-  const notification = await prisma.notification.create({
+  const notification = await context.client.notification.create({
     data: {
       type: "capture_needs_review",
       title: "Capture saved to Inbox",
@@ -435,16 +460,16 @@ async function createTask(
   action: Extract<ExecutableAction, { type: "create_task" }>,
   context: ExecutionContext,
 ) {
-  const project = await resolveProject(action.project_id, action.project_match);
+  const project = await resolveProject(action.project_id, action.project_match, context);
   const areaId =
     project?.areaId ??
     (await resolveAreaId(action.area_id, action.area_match, context));
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
-  });
+  }, context.client);
 
-  const task = await prisma.task.create({
+  const task = await context.client.task.create({
     data: {
       title: action.title,
       notes: action.notes,
@@ -473,7 +498,7 @@ async function createArea(
   action: Extract<ExecutableAction, { type: "create_area" }>,
   context: ExecutionContext,
 ) {
-  const area = await prisma.area.create({
+  const area = await context.client.area.create({
     data: {
       name: action.name,
       currentState: "Created from capture. Current state needs detail.",
@@ -481,7 +506,7 @@ async function createArea(
     },
   });
 
-  const note = await prisma.entityNote.create({
+  const note = await context.client.entityNote.create({
     data: {
       parentType: "area",
       parentId: area.id,
@@ -508,7 +533,7 @@ async function updateAreaState(
     throw new Error(`No area matched "${action.area_match}".`);
   }
 
-  const area = await prisma.area.update({
+  const area = await context.client.area.update({
     where: { id: areaId },
     data: {
       currentState: action.current_state,
@@ -517,7 +542,7 @@ async function updateAreaState(
     },
   });
 
-  const note = await prisma.entityNote.create({
+  const note = await context.client.entityNote.create({
     data: {
       parentType: "area",
       parentId: area.id,
@@ -553,6 +578,7 @@ async function updateAreaState(
         captureId: context.captureId,
       },
       context.actor,
+      context.client,
     );
     items.push({
       type: "check_in",
@@ -568,6 +594,7 @@ async function completeTask(taskMatch: string, context: ExecutionContext) {
   const { completed, nextInstance } = await completeTaskByMatch(
     taskMatch,
     context.actor,
+    context.client,
   );
 
   return {
@@ -587,9 +614,9 @@ async function createProject(
   if (!areaId) {
     throw new Error("Project captures require an Area.");
   }
-  await resolveVerifiedDestination({ areaId });
+  await resolveVerifiedDestination({ areaId }, context.client);
 
-  const project = await prisma.project.create({
+  const project = await context.client.project.create({
     data: {
       name: action.name,
       areaId,
@@ -617,13 +644,13 @@ async function updateProjectState(
   action: Extract<ExecutableAction, { type: "update_project_state" }>,
   context: ExecutionContext,
 ) {
-  const projectId = await matchProjectId(action.project_match);
+  const projectId = await matchProjectId(action.project_match, context);
   if (!projectId) {
     throw new Error(`No project matched "${action.project_match}".`);
   }
 
   const now = new Date();
-  const project = await prisma.project.update({
+  const project = await context.client.project.update({
     where: { id: projectId },
     data: {
       currentState: action.current_state,
@@ -640,7 +667,7 @@ async function updateProjectState(
     },
   });
 
-  const activity = await prisma.projectActivity.create({
+  const activity = await context.client.projectActivity.create({
     data: {
       projectId,
       entry: action.log_entry ?? context.rawText,
@@ -682,6 +709,7 @@ async function updateProjectState(
         captureId: context.captureId,
       },
       context.actor,
+      context.client,
     );
     items.push({
       type: "check_in",
@@ -697,7 +725,7 @@ async function createCalendarEvent(
   action: Extract<ExecutableAction, { type: "create_calendar_event" }>,
   context: ExecutionContext,
 ) {
-  const event = await prisma.calendarEvent.create({
+  const event = await context.client.calendarEvent.create({
     data: {
       title: action.title,
       start: parseDateTime(action.start),
@@ -719,15 +747,15 @@ async function createIdea(
   action: Extract<ExecutableAction, { type: "create_idea" }>,
   context: ExecutionContext,
 ) {
-  const project = await resolveProject(action.project_id, action.project_match);
+  const project = await resolveProject(action.project_id, action.project_match, context);
   const areaId =
     project?.areaId ??
     (await resolveAreaId(action.area_id, action.area_match, context));
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
-  });
-  const idea = await prisma.idea.create({
+  }, context.client);
+  const idea = await context.client.idea.create({
     data: {
       title: action.title,
       body: action.body,
@@ -751,7 +779,7 @@ async function appendToIdea(
   action: Extract<ExecutableAction, { type: "append_to_idea" }>,
   context: ExecutionContext,
 ) {
-  const idea = await prisma.idea.findFirst({
+  const idea = await context.client.idea.findFirst({
     where: {
       title: { contains: action.idea_match, mode: "insensitive" },
       status: { in: ["seed", "developing"] },
@@ -763,7 +791,7 @@ async function appendToIdea(
     throw new Error(`No idea matched "${action.idea_match}".`);
   }
 
-  const note = await prisma.ideaNote.create({
+  const note = await context.client.ideaNote.create({
     data: {
       ideaId: idea.id,
       body: action.body,
@@ -783,7 +811,7 @@ async function convertIdea(
   action: Extract<ExecutableAction, { type: "convert_idea" }>,
   context: ExecutionContext,
 ) {
-  const idea = await prisma.idea.findFirst({
+  const idea = await context.client.idea.findFirst({
     where: {
       title: { contains: action.idea_match, mode: "insensitive" },
       status: { in: ["seed", "developing"] },
@@ -805,7 +833,7 @@ async function convertIdea(
       context,
     );
 
-    await prisma.idea.update({
+    await context.client.idea.update({
       where: { id: idea.id },
       data: {
         status: "converted",
@@ -830,7 +858,7 @@ async function convertIdea(
     context,
   );
 
-  await prisma.idea.update({
+  await context.client.idea.update({
     where: { id: idea.id },
     data: {
       status: "converted",
@@ -849,15 +877,15 @@ async function createReference(
   action: Extract<ExecutableAction, { type: "create_reference" }>,
   context: ExecutionContext,
 ) {
-  const project = await resolveProject(action.project_id, action.project_match);
+  const project = await resolveProject(action.project_id, action.project_match, context);
   const areaId =
     project?.areaId ??
     (await resolveAreaId(action.area_id, action.area_match, context));
   const destination = await resolveVerifiedDestination({
     areaId,
     projectId: project?.id,
-  });
-  const reference = await prisma.reference.create({
+  }, context.client);
+  const reference = await context.client.reference.create({
     data: {
       body: action.body,
       url: action.url,
@@ -871,7 +899,7 @@ async function createReference(
     },
     include: { area: true, project: true },
   });
-  await syncReferenceMentions("reference", reference.id, action.body);
+  await syncReferenceMentions("reference", reference.id, action.body, context.client);
 
   return {
     type: "reference" as const,
@@ -893,7 +921,7 @@ async function createEntityNote(
     context,
   );
 
-  const note = await prisma.entityNote.create({
+  const note = await context.client.entityNote.create({
     data: {
       parentType: parent?.type ?? null,
       parentId: parent?.id ?? null,
@@ -902,7 +930,7 @@ async function createEntityNote(
       captureId: context.captureId,
     },
   });
-  await syncReferenceMentions("entity_note", note.id, action.body_md);
+  await syncReferenceMentions("entity_note", note.id, action.body_md, context.client);
 
   return {
     type: "entity_note" as const,
@@ -924,7 +952,7 @@ async function createEntityDoc(
     context,
   );
 
-  const doc = await prisma.entityDoc.create({
+  const doc = await context.client.entityDoc.create({
     data: {
       parentType: parent?.type ?? null,
       parentId: parent?.id ?? null,
@@ -955,13 +983,13 @@ function matchAreaId(areaMatch: string | undefined, areas: AreaContext[]) {
     ?.id;
 }
 
-async function matchProjectId(projectMatch: string) {
-  const project = await matchProject(projectMatch);
+async function matchProjectId(projectMatch: string, context: ExecutionContext) {
+  const project = await matchProject(projectMatch, context);
   return project?.id;
 }
 
-async function matchProject(projectMatch: string) {
-  const project = await prisma.project.findFirst({
+async function matchProject(projectMatch: string, context: ExecutionContext) {
+  const project = await context.client.project.findFirst({
     where: {
       status: { in: ["active", "someday", "parked"] },
       name: { contains: projectMatch, mode: "insensitive" },
@@ -987,6 +1015,7 @@ async function executeCreatePerson(
       areaId: matchAreaId(action.area_match, context.areas),
     },
     context.actor,
+    context.client,
   );
 
   return {
@@ -1000,11 +1029,15 @@ async function resolveOrCreatePerson(
   personMatch: string,
   context: ExecutionContext,
 ): Promise<{ person: { id: string; name: string }; created: boolean }> {
-  const existing = await findPersonByMatch(personMatch);
+  const existing = await findPersonByMatch(personMatch, context.client);
   if (existing) {
     return { person: existing, created: false };
   }
-  const person = await createPersonRecord({ name: personMatch }, context.actor);
+  const person = await createPersonRecord(
+    { name: personMatch },
+    context.actor,
+    context.client,
+  );
   return { person, created: true };
 }
 
@@ -1017,7 +1050,7 @@ async function executeCreatePersonFact(
     context,
   );
 
-  const fact = await prisma.personFact.create({
+  const fact = await context.client.personFact.create({
     data: {
       personId: person.id,
       factType: action.fact_type ?? "note",
@@ -1053,7 +1086,7 @@ async function executeLogInteraction(
     context,
   );
 
-  const interaction = await prisma.personInteraction.create({
+  const interaction = await context.client.personInteraction.create({
     data: {
       personId: person.id,
       interactionType: action.interaction_type ?? "touchpoint",
@@ -1091,7 +1124,7 @@ async function executeCreateRoutine(
     action.frequency ??
     (action.days && action.days.length > 0 ? "custom" : "daily");
 
-  const routine = await prisma.routine.create({
+  const routine = await context.client.routine.create({
     data: {
       name: action.name,
       description: action.description,
@@ -1132,7 +1165,7 @@ async function executeScheduleReview(
     throw new Error("schedule_review needs a date or a condition.");
   }
 
-  const review = await prisma.scheduledReview.create({
+  const review = await context.client.scheduledReview.create({
     data: {
       captureId: context.captureId,
       reviewAt,
@@ -1154,7 +1187,7 @@ async function executeJournal(
   context: ExecutionContext,
 ) {
   const today = new Date(`${localDateString()}T00:00:00.000Z`);
-  const entry = await prisma.journalEntry.create({
+  const entry = await context.client.journalEntry.create({
     data: {
       entryDate: parseDateOnly(action.entry_date) ?? today,
       bodyMd: action.body_md,
@@ -1163,7 +1196,7 @@ async function executeJournal(
       captureId: context.captureId,
     },
   });
-  await syncReferenceMentions("journal_entry", entry.id, action.body_md);
+  await syncReferenceMentions("journal_entry", entry.id, action.body_md, context.client);
 
   return {
     type: "journal_entry" as const,
@@ -1192,7 +1225,7 @@ async function executeCheckIn(
     );
   } else {
     if (action.project_match) {
-      const project = await matchProject(action.project_match);
+      const project = await matchProject(action.project_match, context);
       if (project) {
         parent = { type: "project", id: project.id, label: project.name };
       }
@@ -1222,6 +1255,7 @@ async function executeCheckIn(
       captureId: context.captureId,
     },
     context.actor,
+    context.client,
   );
 
   return {
@@ -1239,12 +1273,20 @@ async function resolveEntityParent(
   projectMatch: string | undefined,
   context: ExecutionContext,
 ) {
+  if (parentType === "area" && (projectId || projectMatch)) {
+    throw new Error("Conflicting destination fields.");
+  }
   if (parentType === "project" || projectId || projectMatch) {
-    const project = await resolveProject(projectId, projectMatch);
+    const project = await resolveProject(projectId, projectMatch, context);
     if (!project) {
       throw new Error("Project note/doc requires a valid project.");
     }
 
+    const requestedAreaId = await resolveAreaId(areaId, areaMatch, context);
+    await resolveVerifiedDestination(
+      { areaId: requestedAreaId ?? project.areaId, projectId: project.id },
+      context.client,
+    );
     return { type: "project" as const, id: project.id, label: project.name };
   }
 
@@ -1254,6 +1296,7 @@ async function resolveEntityParent(
   if (!resolvedAreaId) {
     throw new Error(`No area matched "${areaMatch ?? ""}".`);
   }
+  await resolveVerifiedDestination({ areaId: resolvedAreaId }, context.client);
 
   const area = context.areas.find((candidate) => candidate.id === resolvedAreaId);
   return { type: "area" as const, id: resolvedAreaId, label: area?.name ?? "area" };
@@ -1265,7 +1308,7 @@ async function resolveAreaId(
   context: ExecutionContext,
 ) {
   if (areaId) {
-    const area = await prisma.area.findFirst({
+    const area = await context.client.area.findFirst({
       where: { id: areaId, status: { in: ["active", "parked"] } },
       select: { id: true },
     });
@@ -1281,9 +1324,10 @@ async function resolveAreaId(
 async function resolveProject(
   projectId: string | undefined,
   projectMatch: string | undefined,
+  context: ExecutionContext,
 ) {
   if (projectId) {
-    const project = await prisma.project.findFirst({
+    const project = await context.client.project.findFirst({
       where: { id: projectId, status: { in: ["active", "someday", "parked"] } },
       select: { id: true, areaId: true, name: true },
     });
@@ -1293,7 +1337,7 @@ async function resolveProject(
     return project;
   }
 
-  return projectMatch ? matchProject(projectMatch) : undefined;
+  return projectMatch ? matchProject(projectMatch, context) : undefined;
 }
 
 function normalizeMatch(value: string) {

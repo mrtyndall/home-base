@@ -1,4 +1,4 @@
-import type { ResurfaceItemType } from "@prisma/client";
+import type { Prisma, ResurfaceItemType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dateOnlyFromString, localDateString } from "@/lib/dates";
 
@@ -220,14 +220,15 @@ const MAX_WEIGHT = 8;
 export async function boostResurfaceWeight(
   itemType: ResurfaceItemType,
   itemId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
   if (itemType === "journal_entry") {
-    const entry = await prisma.journalEntry.findUnique({
+    const entry = await client.journalEntry.findUnique({
       where: { id: itemId },
       select: { resurfaceWeight: true },
     });
     if (!entry) return null;
-    return prisma.journalEntry.update({
+    return client.journalEntry.update({
       where: { id: itemId },
       data: {
         resurfaceWeight: Math.min(entry.resurfaceWeight * BOOST_FACTOR, MAX_WEIGHT),
@@ -235,12 +236,12 @@ export async function boostResurfaceWeight(
     });
   }
 
-  const idea = await prisma.idea.findUnique({
+  const idea = await client.idea.findUnique({
     where: { id: itemId },
     select: { resurfaceWeight: true },
   });
   if (!idea) return null;
-  return prisma.idea.update({
+  return client.idea.update({
     where: { id: itemId },
     data: {
       resurfaceWeight: Math.min(idea.resurfaceWeight * BOOST_FACTOR, MAX_WEIGHT),
@@ -249,8 +250,11 @@ export async function boostResurfaceWeight(
 }
 
 /** Fuzzy-match a resurfaceable item by text for the boost_resurface capture action. */
-export async function boostResurfaceByMatch(itemMatch: string) {
-  const idea = await prisma.idea.findFirst({
+export async function boostResurfaceByMatch(
+  itemMatch: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+) {
+  const idea = await client.idea.findFirst({
     where: {
       status: { in: ["seed", "developing"] },
       title: { contains: itemMatch, mode: "insensitive" },
@@ -259,11 +263,11 @@ export async function boostResurfaceByMatch(itemMatch: string) {
     select: { id: true, title: true },
   });
   if (idea) {
-    await boostResurfaceWeight("idea", idea.id);
+    await boostResurfaceWeight("idea", idea.id, client);
     return { itemType: "idea" as const, id: idea.id, label: idea.title };
   }
 
-  const entry = await prisma.journalEntry.findFirst({
+  const entry = await client.journalEntry.findFirst({
     where: {
       status: "active",
       bodyMd: { contains: itemMatch, mode: "insensitive" },
@@ -272,7 +276,7 @@ export async function boostResurfaceByMatch(itemMatch: string) {
     select: { id: true, bodyMd: true },
   });
   if (entry) {
-    await boostResurfaceWeight("journal_entry", entry.id);
+    await boostResurfaceWeight("journal_entry", entry.id, client);
     return {
       itemType: "journal_entry" as const,
       id: entry.id,

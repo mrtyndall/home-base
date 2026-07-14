@@ -10,7 +10,10 @@ import { createCheckInRecord, draftCheckInFromActivity } from "@/lib/checkins";
 import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { getAreaAggregate } from "@/lib/areas";
-import { resolveVerifiedDestination } from "@/lib/destinations";
+import {
+  normalizeParentDestination,
+  resolveVerifiedDestination,
+} from "@/lib/destinations";
 import { createPersonRecord } from "@/lib/people";
 import {
   boostResurfaceWeight,
@@ -420,6 +423,7 @@ export async function POST(request: Request, context: RouteCtx) {
               select: { areaId: true },
             })
           : null;
+        if (parsed.projectId && !project) throw new Error("Project not found.");
         const areaId = project?.areaId ?? await findAreaId(parsed.areaId, parsed.areaName);
         const task = await createTaskWithAudit(
           {
@@ -1334,8 +1338,7 @@ async function resolveApiParent(input: {
   areaId?: string | null;
   projectId?: string | null;
 }) {
-  const areaId = input.areaId ?? (input.parentType === "area" ? input.parentId : null);
-  const projectId = input.projectId ?? (input.parentType === "project" ? input.parentId : null);
+  const { areaId, projectId } = normalizeParentDestination(input);
   const destination = await resolveApiDestination({ areaId, projectId });
   return destination.projectId
     ? { parentType: "project" as const, parentId: destination.projectId }

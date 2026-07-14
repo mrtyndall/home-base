@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { CheckInSource, EntityParentType } from "@prisma/client";
+import type { CheckInSource, EntityParentType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { syncReferenceMentions } from "@/lib/reference-mentions";
 
@@ -20,13 +20,14 @@ export async function createCheckInRecord(
     captureId?: string | null;
   },
   actor: CheckInActor,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  const parentName = await getParentName(input.parentType, input.parentId);
+  const parentName = await getParentName(input.parentType, input.parentId, client);
   if (!parentName) {
     throw new Error(`No ${input.parentType} found for check-in.`);
   }
 
-  const checkIn = await prisma.checkIn.create({
+  const checkIn = await client.checkIn.create({
     data: {
       parentType: input.parentType,
       parentId: input.parentId,
@@ -35,9 +36,9 @@ export async function createCheckInRecord(
       captureId: input.captureId ?? undefined,
     },
   });
-  await syncReferenceMentions("check_in", checkIn.id, input.bodyMd);
+  await syncReferenceMentions("check_in", checkIn.id, input.bodyMd, client);
 
-  await prisma.notification.create({
+  await client.notification.create({
     data: {
       type: "check_in_posted",
       title: "Check-in posted",
@@ -222,16 +223,20 @@ Return only the check-in body, no preamble or headings.`,
     : { ok: false, reason: "The model returned an empty draft." };
 }
 
-async function getParentName(parentType: EntityParentType, parentId: string) {
+async function getParentName(
+  parentType: EntityParentType,
+  parentId: string,
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+) {
   if (parentType === "project") {
-    const project = await prisma.project.findUnique({
+    const project = await client.project.findUnique({
       where: { id: parentId },
       select: { name: true },
     });
     return project?.name ?? null;
   }
 
-  const area = await prisma.area.findUnique({
+  const area = await client.area.findUnique({
     where: { id: parentId },
     select: { name: true },
   });

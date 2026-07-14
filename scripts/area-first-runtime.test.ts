@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { resolveVerifiedDestination } from "../src/lib/destinations";
+import {
+  normalizeParentDestination,
+  resolveVerifiedDestination,
+} from "../src/lib/destinations";
 
 const runtimeFiles = [
   "src/lib/tasks.ts",
@@ -42,6 +45,23 @@ const client: FakeClient = {
 };
 
 async function verifyDestinationContract() {
+  assert.deepEqual(
+    normalizeParentDestination({ parentType: "area", parentId: "area-1" }),
+    { areaId: "area-1", projectId: null },
+  );
+  assert.throws(
+    () => normalizeParentDestination({ parentType: "area" }),
+    /provided together/,
+  );
+  assert.throws(
+    () =>
+      normalizeParentDestination({
+        parentType: "area",
+        parentId: "area-1",
+        projectId: "project-1",
+      }),
+    /Conflicting destination fields/,
+  );
   assert.deepEqual(await resolveVerifiedDestination({}, client), {
     areaId: null,
     projectId: null,
@@ -60,6 +80,26 @@ async function verifyDestinationContract() {
     ),
     /Project does not belong to the selected Area/,
   );
+  await assert.rejects(
+    resolveVerifiedDestination(
+      { areaId: "missing-area" },
+      {
+        area: { findFirst: async () => null },
+        project: client.project,
+      },
+    ),
+    /Area not found/,
+  );
+  await assert.rejects(
+    resolveVerifiedDestination(
+      { areaId: "area-1", projectId: "missing-project" },
+      {
+        area: client.area,
+        project: { findFirst: async () => null },
+      },
+    ),
+    /Project does not belong to the selected Area/,
+  );
 }
 
 const taskSource = readFileSync("src/lib/tasks.ts", "utf8");
@@ -68,5 +108,63 @@ assert.match(taskSource, /areaId\?: string \| null/, "task creation must accept 
 const captureSource = readFileSync("src/lib/capture/service.ts", "utf8");
 assert.match(captureSource, /Project captures require an Area/, "capture Project creation must remain Area-required");
 assert.match(captureSource, /project\?\.areaId/, "Project selection must derive the mirrored Area");
+assert.match(
+  captureSource,
+  /pg_advisory_xact_lock/,
+  "idempotent capture processing must acquire a transaction-scoped database lock",
+);
+assert.match(
+  captureSource,
+  /\$transaction[\s\S]*executeActions[\s\S]*capture\.update/,
+  "capture side effects and final state must share one transaction",
+);
+assert.ok(
+  captureSource.indexOf("validateCaptureActor") < captureSource.indexOf("capture.create"),
+  "untrusted API audit identity must be rejected before any Capture row write",
+);
+assert.match(
+  captureSource,
+  /captureAreaId \|\| parsedInput\.captureProjectId[\s\S]{0,80}throw error/,
+  "explicit invalid capture destinations must reject instead of becoming unfiled",
+);
+assert.doesNotMatch(
+  captureSource.slice(captureSource.indexOf("async function executeActions")),
+  /\bprisma\./,
+  "capture execution helpers must use the transaction client, not the global client",
+);
+assert.match(
+  captureSource,
+  /resolveVerifiedDestination\([\s\S]{0,180}client/,
+  "capture destinations must be verified through the shared resolver with the transaction client",
+);
+
+const actionsSource = readFileSync("src/app/actions.ts", "utf8");
+const conversionSource = actionsSource.slice(
+  actionsSource.indexOf("export async function convertPendingCapture"),
+  actionsSource.indexOf("export async function snoozeCaptureReviewProposalOneDay"),
+);
+assert.match(conversionSource, /\$transaction/,
+  "manual capture conversion must be atomic");
+assert.match(conversionSource, /pg_advisory_xact_lock/,
+  "manual capture conversion must lock the Capture row across retries");
+assert.doesNotMatch(
+  conversionSource.replace("prisma.$transaction", "transaction"),
+  /\bprisma\./,
+  "manual conversion side effects must all use the locked transaction client",
+);
+assert.match(actionsSource, /if \(note\.parentType && note\.parentId\)/,
+  "unfiled notes must not revalidate a null Project path");
+assert.match(actionsSource, /if \(projectId && !project\) return/,
+  "quick Task action must reject an explicitly invalid Project");
+assert.match(actionsSource, /if \(selectedAreaId && !project && !area\) return/,
+  "quick Task action must reject an explicitly invalid Area");
+assert.match(source, /Conflicting destination fields/,
+  "parent aliases must reject conflicting destinations");
+
+const quickTaskSource = readFileSync("src/app/api/tasks/quick/route.ts", "utf8");
+assert.match(quickTaskSource, /if \(projectId && !project\)/,
+  "quick Task API must reject an explicitly invalid Project");
+assert.match(quickTaskSource, /if \([^)]*areaId[^)]*&&[^)]*!area/,
+  "quick Task API must reject an explicitly invalid Area");
 
 void verifyDestinationContract();
