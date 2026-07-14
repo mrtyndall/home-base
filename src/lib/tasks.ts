@@ -83,31 +83,41 @@ export async function completeTaskById(
   actor: WriteActor,
   client?: Prisma.TransactionClient,
 ) {
-  const db = client ?? prisma;
-  const task = await db.task.findUnique({
-    where: { id: taskId },
-    include: { subtasks: { where: { status: "open" } } },
-  });
-
-  if (!task) {
-    throw new Error("Task not found.");
-  }
-
-  if (task.status !== "open") {
-    return { completed: task, nextInstance: null };
-  }
-
-  const completedAt = new Date();
-  const nextDue = getNextRecurrenceDue(task);
-
   const execute = async (tx: Prisma.TransactionClient) => {
-    const completedTask = await tx.task.update({
-      where: { id: task.id },
+    const task = await tx.task.findUnique({
+      where: { id: taskId },
+      include: { subtasks: { where: { status: "open" } } },
+    });
+
+    if (!task) {
+      throw new Error("Task not found.");
+    }
+
+    if (task.status !== "open") {
+      return [task, null] as const;
+    }
+
+    const completedAt = new Date();
+    const claim = await tx.task.updateMany({
+      where: { id: task.id, status: "open" },
       data: {
         status: "completed",
         completedAt,
       },
     });
+
+    if (claim.count === 0) {
+      const alreadyCompleted = await tx.task.findUniqueOrThrow({
+        where: { id: task.id },
+        include: { subtasks: { where: { status: "open" } } },
+      });
+      return [alreadyCompleted, null] as const;
+    }
+
+    const completedTask = await tx.task.findUniqueOrThrow({
+      where: { id: task.id },
+    });
+    const nextDue = getNextRecurrenceDue(task);
 
     const nextTask = nextDue
       ? await tx.task.create({
