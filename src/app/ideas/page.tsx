@@ -19,7 +19,7 @@ export default async function LibraryPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { ideas, journalEntries, people, books, movies, references } = result;
+  const { ideas, journalEntries, people, books, movies, references, readLater } = result;
 
   return (
     <div className="space-y-8">
@@ -33,6 +33,7 @@ export default async function LibraryPage() {
         books={books}
         movies={movies}
         references={references}
+        readLater={readLater}
       />
       <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr] lg:gap-10">
         <JournalSection entries={journalEntries} />
@@ -61,13 +62,21 @@ function ReferenceDatabaseOverview({
   books,
   movies,
   references,
+  readLater,
 }: {
   people: PeopleListItem[];
   books: LibraryReference[];
   movies: LibraryReference[];
   references: LibraryReference[];
+  readLater: LibraryReference[];
 }) {
   const databases = [
+    {
+      href: "/ideas/read-later",
+      label: "Read Later",
+      count: readLater.length,
+      detail: latestReferenceLine(readLater[0]) ?? "No unread links waiting.",
+    },
     {
       href: "/ideas/people",
       label: "People",
@@ -108,7 +117,7 @@ function ReferenceDatabaseOverview({
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Reference databases
       </h2>
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
         {databases.map((database) => (
           <Link
             key={database.label}
@@ -516,7 +525,7 @@ function ReferenceCover({ reference }: { reference: LibraryReference }) {
 
 async function loadIdeas() {
   try {
-    const [ideas, rawJournalEntries, people, books, movies, references] =
+    const [ideas, rawJournalEntries, people, books, movies, references, readLater] =
       await Promise.all([
         prisma.idea.findMany({
           where: { status: { in: ["seed", "developing"] } },
@@ -554,6 +563,11 @@ async function loadIdeas() {
           orderBy: [{ createdAt: "desc" }],
           take: 12,
         }),
+        prisma.reference.findMany({
+          where: { kind: "read_later", readStatus: "unread" },
+          orderBy: { savedAt: "desc" },
+          take: 500,
+        }),
       ]);
     const journalAttachments =
       rawJournalEntries.length > 0
@@ -585,6 +599,7 @@ async function loadIdeas() {
       books,
       movies,
       references,
+      readLater,
     };
   } catch {
     return {
@@ -595,6 +610,7 @@ async function loadIdeas() {
       books: [],
       movies: [],
       references: [],
+      readLater: [],
     };
   }
 }

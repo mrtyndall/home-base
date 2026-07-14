@@ -5,9 +5,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { createReferenceFromLookup } from "@/app/actions";
+import { ReadLaterForm, type ReadLaterProjectOption } from "@/components/read-later-form";
+import { ReadLaterList } from "@/components/read-later-list";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { flattenAreaOptions } from "@/lib/hierarchy";
+import type { ReadLaterStatus } from "@/lib/read-later";
 import {
   searchReferenceCandidates,
   type ReferenceLookupCandidate,
@@ -75,6 +79,44 @@ export default async function LibraryDatabasePage({
     );
   }
 
+  if (database === "read-later") {
+    const result = await loadReadLater(filters.status);
+    if (!result.ok) {
+      return <SetupNotice reason="Read Later is not migrated or reachable." />;
+    }
+    return (
+      <DatabaseShell title="Read Later">
+        <ReadLaterForm areas={result.areas} projects={result.projects} />
+        <nav aria-label="Read Later status" className="flex flex-wrap gap-1.5">
+          {([
+            ["unread", "Unread"],
+            ["read", "Read"],
+            ["archived", "Archived"],
+          ] as const).map(([value, label]) => (
+            <Link
+              key={value}
+              href={value === "unread" ? "/ideas/read-later" : `/ideas/read-later?status=${value}`}
+              aria-current={result.status === value ? "page" : undefined}
+              className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[13px] font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+                result.status === value
+                  ? "border-teal-700/30 bg-[#E8F5F0] text-teal-900"
+                  : "border-[#DCE2DA] bg-white text-stone-600 hover:border-teal-700/40 hover:text-teal-800"
+              }`}
+            >
+              {label} <span className="ml-1.5 text-[11px] text-[#879087]">{result.counts[value]}</span>
+            </Link>
+          ))}
+        </nav>
+        <ReadLaterList
+          items={result.items}
+          status={result.status}
+          areas={result.areas}
+          projects={result.projects}
+        />
+      </DatabaseShell>
+    );
+  }
+
   const kind = databaseKind(database);
   if (!kind) {
     notFound();
@@ -121,6 +163,73 @@ export default async function LibraryDatabasePage({
       ) : null}
     </DatabaseShell>
   );
+}
+
+async function loadReadLater(requestedStatus?: string) {
+  const status: ReadLaterStatus =
+    requestedStatus === "read"
+      ? "read"
+      : requestedStatus === "archived"
+        ? "archived"
+        : "unread";
+  try {
+    const [references, groupedCounts, areas, rawProjects] = await Promise.all([
+      prisma.reference.findMany({
+        where: { kind: "read_later", readStatus: status },
+        include: { area: true, project: true },
+        orderBy: { savedAt: "desc" },
+        take: 500,
+      }),
+      prisma.reference.groupBy({
+        by: ["readStatus"],
+        where: { kind: "read_later" },
+        _count: { _all: true },
+      }),
+      prisma.area.findMany({
+        where: { status: "active", isSystem: false },
+        select: { id: true, name: true, parentAreaId: true, sortOrder: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      }),
+      prisma.project.findMany({
+        where: { status: { in: ["active", "parked", "someday"] } },
+        select: { id: true, name: true, areaId: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+    const areaPaths = new Map(flattenAreaOptions(areas).map((area) => [area.id, area.path]));
+    const projects: ReadLaterProjectOption[] = rawProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      areaPath: project.areaId ? areaPaths.get(project.areaId) ?? null : null,
+    }));
+    const counts: Record<ReadLaterStatus, number> = { unread: 0, read: 0, archived: 0 };
+    for (const group of groupedCounts) {
+      if (group.readStatus === "unread" || group.readStatus === "read" || group.readStatus === "archived") {
+        counts[group.readStatus] = group._count._all;
+      }
+    }
+    return {
+      ok: true as const,
+      status,
+      counts,
+      areas,
+      projects,
+      items: references.map((reference) => ({
+        id: reference.id,
+        title: reference.title,
+        body: reference.body,
+        url: reference.url,
+        readStatus: reference.readStatus,
+        savedAt: reference.savedAt,
+        areaId: reference.areaId,
+        projectId: reference.projectId,
+        areaPath: reference.areaId ? areaPaths.get(reference.areaId) ?? reference.area?.name ?? null : null,
+        projectName: reference.project?.name ?? null,
+      })),
+    };
+  } catch {
+    return { ok: false as const };
+  }
 }
 
 function DatabaseShell({

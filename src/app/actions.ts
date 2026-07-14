@@ -2,11 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { createCompatibleArea } from "@/lib/area-compat";
 import { assertValidAreaParent, fileProject } from "@/lib/hierarchy";
 import { resolveVerifiedDestination } from "@/lib/destinations";
+import {
+  createReadLater,
+  normalizeReadLaterUrl,
+  setReadLaterStatus,
+  type ReadLaterStatus,
+} from "@/lib/read-later";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
@@ -575,6 +582,125 @@ export async function createReferenceFromLookup(formData: FormData) {
     `/ideas/${kind === "book" ? "books" : kind === "movie" ? "movies" : "references"}`,
   );
   redirect(`/references/${reference.id}`);
+}
+
+export type ReadLaterFormState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export async function saveReadLaterAction(
+  _previousState: ReadLaterFormState,
+  formData: FormData,
+): Promise<ReadLaterFormState> {
+  const url = getTrimmedString(formData, "url");
+  const areaId = getTrimmedString(formData, "areaId") || null;
+  const projectId = getTrimmedString(formData, "projectId") || null;
+
+  try {
+    const normalizedUrl = normalizeReadLaterUrl(url);
+    const existing = await prisma.reference.findFirst({
+      where: {
+        kind: "read_later",
+        normalizedUrl,
+        readStatus: { in: ["unread", "read"] },
+      },
+      select: { id: true },
+    });
+    const reference = await createReadLater(
+      {
+        url,
+        source: "manual",
+        ...(areaId || projectId ? { areaId, projectId } : {}),
+      },
+      undefined,
+      { scheduleEnrichment: (job) => after(job) },
+    );
+
+    revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
+    return {
+      status: "success",
+      message: existing
+        ? areaId || projectId
+          ? "Already saved. Filing updated."
+          : "Already saved."
+        : "Saved to Read Later.",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: readLaterActionMessage(error),
+    };
+  }
+}
+
+export async function setReadLaterStatusAction(formData: FormData) {
+  const referenceId = getTrimmedString(formData, "referenceId");
+  const status = getTrimmedString(formData, "status") as ReadLaterStatus;
+  if (!referenceId) return;
+
+  try {
+    const reference = await setReadLaterStatus(referenceId, status);
+    revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
+  } catch {
+    return;
+  }
+}
+
+export async function fileReadLaterAction(formData: FormData) {
+  const referenceId = getTrimmedString(formData, "referenceId");
+  const destinationValue = getTrimmedString(formData, "destination");
+  if (!referenceId) return;
+
+  const current = await prisma.reference.findFirst({
+    where: { id: referenceId, kind: "read_later" },
+    select: { id: true, areaId: true, projectId: true },
+  });
+  if (!current) return;
+
+  const [kind, rawId] = destinationValue.split(":", 2);
+  if (destinationValue && !rawId) return;
+  const input = destinationValue
+    ? kind === "area"
+      ? { areaId: rawId, projectId: null }
+      : kind === "project"
+        ? { areaId: null, projectId: rawId }
+        : null
+    : { areaId: null, projectId: null };
+  if (!input) return;
+
+  try {
+    const destination = await resolveVerifiedDestination(input);
+    const reference = await prisma.reference.update({
+      where: { id: current.id },
+      data: destination,
+    });
+    revalidateReadLaterPaths(current.id, current.areaId, current.projectId);
+    revalidateReadLaterPaths(reference.id, reference.areaId, reference.projectId);
+  } catch {
+    return;
+  }
+}
+
+function revalidateReadLaterPaths(
+  referenceId: string,
+  areaId: string | null,
+  projectId: string | null,
+) {
+  revalidatePath("/ideas");
+  revalidatePath("/ideas/read-later");
+  revalidatePath(`/references/${referenceId}`);
+  if (areaId) revalidatePath(`/areas/${areaId}`);
+  if (projectId) revalidatePath(`/projects/${projectId}`);
+}
+
+function readLaterActionMessage(error: unknown) {
+  if (!(error instanceof Error)) return "Could not save this link. Try again.";
+  if (/valid HTTP\(S\) URL/.test(error.message)) return error.message;
+  if (/Area not found|Project not found|selected Area/.test(error.message)) {
+    return "That filing destination is no longer available.";
+  }
+  return "Could not save this link. Try again.";
 }
 
 export async function syncBookLoreSnippetsAction(formData: FormData) {

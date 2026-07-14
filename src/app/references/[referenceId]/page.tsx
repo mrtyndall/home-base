@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, RefreshCw, Star } from "lucide-react";
 import {
+  setReadLaterStatusAction,
   setReferenceSnippetStarred,
   syncBookLoreSnippetsAction,
 } from "@/app/actions";
@@ -42,6 +43,8 @@ export default async function ReferenceDetailPage({
       ? "/ideas/books"
       : reference.kind === "movie"
         ? "/ideas/movies"
+        : reference.kind === "read_later"
+          ? "/ideas/read-later"
         : "/ideas/references";
 
   return (
@@ -56,6 +59,8 @@ export default async function ReferenceDetailPage({
             ? "Books"
             : reference.kind === "movie"
               ? "Movies"
+              : reference.kind === "read_later"
+                ? "Read Later"
               : "References"}
         </Link>
         <div className="flex gap-4">
@@ -69,7 +74,10 @@ export default async function ReferenceDetailPage({
             />
           ) : null}
           <div className="min-w-0">
-            <h1 className="font-serif text-[25px] font-medium leading-[1.15] tracking-[-0.01em] text-stone-950">
+            <h1
+              className="font-serif text-[25px] font-medium leading-[1.15] tracking-[-0.01em] text-stone-950"
+              style={{ overflowWrap: "anywhere" }}
+            >
               {reference.title ?? reference.body}
             </h1>
             {metadataCreator(reference) || metadataYear(reference) ? (
@@ -108,9 +116,47 @@ export default async function ReferenceDetailPage({
                 <ArrowUpRight size={11} strokeWidth={2.5} />
               </a>
             ) : null}
+            {reference.kind === "read_later" ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {reference.url ? (
+                  <a
+                    href={reference.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-[13px] font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                  >
+                    Open <ArrowUpRight size={13} strokeWidth={2.4} />
+                  </a>
+                ) : null}
+                <form action={setReadLaterStatusAction}>
+                  <input type="hidden" name="referenceId" value={reference.id} />
+                  <input
+                    type="hidden"
+                    name="status"
+                    value={reference.readStatus === "unread" ? "read" : "unread"}
+                  />
+                  <button className="min-h-11 rounded-full border border-[#DCE2DA] bg-white px-4 text-[13px] font-medium text-stone-700 transition hover:border-teal-700/40 hover:text-teal-800">
+                    {reference.readStatus === "unread" ? "Mark read" : "Mark unread"}
+                  </button>
+                </form>
+              </div>
+            ) : null}
           </div>
         </div>
       </header>
+
+      {reference.kind === "read_later" ? (
+        <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            Filing
+          </p>
+          <p className="mt-1 text-sm text-stone-700">
+            {reference.project
+              ? `${reference.area?.name ?? "No area yet"} / ${reference.project.name}`
+              : reference.area?.name ?? "No filing yet"}
+          </p>
+        </section>
+      ) : null}
 
       {reference.body?.trim() ? (
         <section className="max-w-xl space-y-2">
@@ -257,6 +303,8 @@ async function loadReference(referenceId: string) {
     const reference = await prisma.reference.findUnique({
       where: { id: referenceId },
       include: {
+        area: true,
+        project: true,
         snippets: {
           orderBy: [
             { starred: "desc" },
@@ -441,6 +489,7 @@ function sourceHost(url: string) {
 }
 
 function kindLabel(kind: string) {
+  if (kind === "read_later") return "Read Later";
   return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
