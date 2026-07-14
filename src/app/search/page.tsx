@@ -6,10 +6,12 @@ import { SetupNotice } from "@/components/setup-notice";
 import { toReferenceSearchResult } from "@/lib/reference-search-result";
 import {
   MIN_SEARCH_QUERY_LENGTH,
+  exactTextWhere,
+  loadReferenceStrongRows,
   mergeSearchCandidates,
+  prefixTextWhere,
   rankSearchResults,
   searchResultHref,
-  strongTextWhere,
   type SearchCandidate,
 } from "@/lib/search-results";
 import type { Prisma } from "@prisma/client";
@@ -216,34 +218,40 @@ async function runSearch(query: string) {
       }),
     ]);
 
-    // A small exact/prefix band prevents an older strong match from being
-    // discarded by each model's broader, recent-first twenty-row window.
+    // Separate exact and prefix bands ensure prefixes can never evict an older
+    // exact match before the global relevance ranking runs.
     const [
-      strongCaptures,
-      strongTasks,
-      strongProjects,
-      strongIdeas,
+      exactCaptures, exactTasks, exactProjects, exactIdeas,
+      exactReferenceSnippets, exactEntityNotes, exactEntityDocs,
+      exactCheckIns, exactJournalEntries, exactPeople, exactPersonFacts,
+      prefixCaptures, prefixTasks, prefixProjects, prefixIdeas,
+      prefixReferenceSnippets, prefixEntityNotes, prefixEntityDocs,
+      prefixCheckIns, prefixJournalEntries, prefixPeople, prefixPersonFacts,
       strongReferences,
-      strongReferenceSnippets,
-      strongEntityNotes,
-      strongEntityDocs,
-      strongCheckIns,
-      strongJournalEntries,
-      strongPeople,
-      strongPersonFacts,
     ] = await Promise.all([
-      prisma.capture.findMany({ where: strongTextWhere<Prisma.CaptureWhereInput>("rawText", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.task.findMany({ where: strongTextWhere<Prisma.TaskWhereInput>("title", query), orderBy: { updatedAt: "desc" }, take: 8 }),
-      prisma.project.findMany({ where: strongTextWhere<Prisma.ProjectWhereInput>("name", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.idea.findMany({ where: strongTextWhere<Prisma.IdeaWhereInput>("title", query), orderBy: { updatedAt: "desc" }, take: 8 }),
-      prisma.reference.findMany({ where: strongTextWhere<Prisma.ReferenceWhereInput>("title", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.referenceSnippet.findMany({ where: strongTextWhere<Prisma.ReferenceSnippetWhereInput>("quote", query), include: { reference: { select: { title: true, body: true } } }, orderBy: [{ starred: "desc" }, { createdAt: "desc" }], take: 8 }),
-      prisma.entityNote.findMany({ where: strongTextWhere<Prisma.EntityNoteWhereInput>("bodyMd", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.entityDoc.findMany({ where: { status: "active", ...strongTextWhere<Prisma.EntityDocWhereInput>("title", query) }, orderBy: { updatedAt: "desc" }, take: 8 }),
-      prisma.checkIn.findMany({ where: strongTextWhere<Prisma.CheckInWhereInput>("bodyMd", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.journalEntry.findMany({ where: strongTextWhere<Prisma.JournalEntryWhereInput>("bodyMd", query), orderBy: { createdAt: "desc" }, take: 8 }),
-      prisma.person.findMany({ where: strongTextWhere<Prisma.PersonWhereInput>("name", query), orderBy: { name: "asc" }, take: 8 }),
-      prisma.personFact.findMany({ where: strongTextWhere<Prisma.PersonFactWhereInput>("factValue", query), include: { person: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.capture.findMany({ where: exactTextWhere<Prisma.CaptureWhereInput>(["rawText"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.task.findMany({ where: exactTextWhere<Prisma.TaskWhereInput>(["title"], query), orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.project.findMany({ where: exactTextWhere<Prisma.ProjectWhereInput>(["name"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.idea.findMany({ where: exactTextWhere<Prisma.IdeaWhereInput>(["title"], query), orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.referenceSnippet.findMany({ where: exactTextWhere<Prisma.ReferenceSnippetWhereInput>(["quote"], query), include: { reference: { select: { title: true, body: true } } }, orderBy: [{ starred: "desc" }, { createdAt: "desc" }], take: 8 }),
+      prisma.entityNote.findMany({ where: exactTextWhere<Prisma.EntityNoteWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.entityDoc.findMany({ where: { status: "active", ...exactTextWhere<Prisma.EntityDocWhereInput>(["title"], query) }, orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.checkIn.findMany({ where: exactTextWhere<Prisma.CheckInWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.journalEntry.findMany({ where: exactTextWhere<Prisma.JournalEntryWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.person.findMany({ where: exactTextWhere<Prisma.PersonWhereInput>(["name"], query), orderBy: { name: "asc" }, take: 8 }),
+      prisma.personFact.findMany({ where: exactTextWhere<Prisma.PersonFactWhereInput>(["factValue"], query), include: { person: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.capture.findMany({ where: prefixTextWhere<Prisma.CaptureWhereInput>(["rawText"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.task.findMany({ where: prefixTextWhere<Prisma.TaskWhereInput>(["title"], query), orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.project.findMany({ where: prefixTextWhere<Prisma.ProjectWhereInput>(["name"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.idea.findMany({ where: prefixTextWhere<Prisma.IdeaWhereInput>(["title"], query), orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.referenceSnippet.findMany({ where: prefixTextWhere<Prisma.ReferenceSnippetWhereInput>(["quote"], query), include: { reference: { select: { title: true, body: true } } }, orderBy: [{ starred: "desc" }, { createdAt: "desc" }], take: 8 }),
+      prisma.entityNote.findMany({ where: prefixTextWhere<Prisma.EntityNoteWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.entityDoc.findMany({ where: { status: "active", ...prefixTextWhere<Prisma.EntityDocWhereInput>(["title"], query) }, orderBy: { updatedAt: "desc" }, take: 8 }),
+      prisma.checkIn.findMany({ where: prefixTextWhere<Prisma.CheckInWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.journalEntry.findMany({ where: prefixTextWhere<Prisma.JournalEntryWhereInput>(["bodyMd"], query), orderBy: { createdAt: "desc" }, take: 8 }),
+      prisma.person.findMany({ where: prefixTextWhere<Prisma.PersonWhereInput>(["name"], query), orderBy: { name: "asc" }, take: 8 }),
+      prisma.personFact.findMany({ where: prefixTextWhere<Prisma.PersonFactWhereInput>(["factValue"], query), include: { person: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" }, take: 8 }),
+      loadReferenceStrongRows(prisma, query),
     ]);
 
     const broadCandidates: SearchCandidate[] = buildCandidates({
@@ -260,22 +268,20 @@ async function runSearch(query: string) {
       people,
       personFacts,
     });
-    const strongCandidates: SearchCandidate[] = buildCandidates({
-      captures: strongCaptures,
-      tasks: strongTasks,
-      projects: strongProjects,
-      ideas: strongIdeas,
-      references: strongReferences,
-      referenceSnippets: strongReferenceSnippets,
-      entityNotes: strongEntityNotes,
-      entityDocs: strongEntityDocs,
-      checkIns: strongCheckIns,
-      journalEntries: strongJournalEntries,
-      people: strongPeople,
-      personFacts: strongPersonFacts,
+    const exactCandidates: SearchCandidate[] = buildCandidates({
+      captures: exactCaptures, tasks: exactTasks, projects: exactProjects, ideas: exactIdeas,
+      references: strongReferences.exact, referenceSnippets: exactReferenceSnippets,
+      entityNotes: exactEntityNotes, entityDocs: exactEntityDocs, checkIns: exactCheckIns,
+      journalEntries: exactJournalEntries, people: exactPeople, personFacts: exactPersonFacts,
+    });
+    const prefixCandidates: SearchCandidate[] = buildCandidates({
+      captures: prefixCaptures, tasks: prefixTasks, projects: prefixProjects, ideas: prefixIdeas,
+      references: strongReferences.prefix, referenceSnippets: prefixReferenceSnippets,
+      entityNotes: prefixEntityNotes, entityDocs: prefixEntityDocs, checkIns: prefixCheckIns,
+      journalEntries: prefixJournalEntries, people: prefixPeople, personFacts: prefixPersonFacts,
     });
     const results = rankSearchResults(
-      mergeSearchCandidates(strongCandidates, broadCandidates),
+      mergeSearchCandidates(exactCandidates, mergeSearchCandidates(prefixCandidates, broadCandidates)),
       query,
       40,
     ).map(({ type, id, title, detail, href }) => ({ type, id, title, detail, href }));

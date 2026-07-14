@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   MIN_SEARCH_QUERY_LENGTH,
+  exactTextWhere,
+  loadReferenceStrongRows,
   mergeSearchCandidates,
+  prefixTextWhere,
   rankSearchResults,
   searchResultHref,
   strongTextWhere,
@@ -11,6 +14,7 @@ import {
 } from "../src/lib/search-results";
 import {
   loadIdeaSearchDetail,
+  loadDocSearchDetail,
   loadJournalSearchDetail,
 } from "../src/lib/search-detail-loaders";
 import { buildCandidates, type SearchRows } from "../src/app/search/page";
@@ -42,10 +46,10 @@ test("every searchable result kind maps to a precise entity or anchored parent",
       "/references/r1",
       "/references/r1#snippet-h1",
       "/notes/n1",
-      "/areas/a1#doc-d1",
-      "/projects/p1#doc-d2",
-      "/journal/j1#doc-d4",
-      "/areas/inbox#doc-d3",
+      "/docs/d1",
+      "/docs/d2",
+      "/docs/d4",
+      "/docs/d3",
       "/check-ins/ci1",
       "/journal/j1",
       "/people/person1",
@@ -76,6 +80,41 @@ test("detail loaders return killed Ideas and archived old Journal entries by ID"
   );
   assert.deepEqual(ideaCalls, [{ where: { id: "old-idea" }, include: { area: true, project: true } }]);
   assert.deepEqual(journalCalls, [{ where: { id: "old-journal" } }]);
+});
+
+test("an Entity Doc older than every parent-page cap remains directly reachable", async () => {
+  const calls: unknown[] = [];
+  const oldDoc = { id: "old-doc", title: "Old field guide", bodyMd: "Still useful" };
+  const result = await loadDocSearchDetail(
+    { entityDoc: { findUnique: async (args) => (calls.push(args), oldDoc) } },
+    "old-doc",
+  );
+  assert.equal(result, oldDoc);
+  assert.deepEqual(calls, [{ where: { id: "old-doc" } }]);
+  assert.equal(searchResultHref({ kind: "doc", id: "old-doc", parentType: "area", parentId: "a1" }), "/docs/old-doc");
+});
+
+test("exact and prefix database bands are separate and include a titleless Reference body", async () => {
+  const calls: unknown[] = [];
+  type ReferenceRow = { id: string; title: string | null; body: string };
+  const oldExact: ReferenceRow = { id: "exact", title: null, body: "Radio" };
+  const newerPrefixes: ReferenceRow[] = Array.from({ length: 9 }, (_, index) => ({ id: `prefix-${index}`, title: `Radio ${index}`, body: "" }));
+  const client = {
+    reference: {
+      findMany: async (args: unknown) => {
+        calls.push(args);
+        return calls.length === 1 ? [oldExact] : newerPrefixes.slice(0, 8);
+      },
+    },
+  };
+
+  const rows = await loadReferenceStrongRows(client, "Radio");
+  assert.equal(rows.exact[0], oldExact);
+  assert.equal(rows.prefix.length, 8);
+  assert.deepEqual(calls, [
+    { where: exactTextWhere(["title", "body"], "Radio"), orderBy: { createdAt: "desc" }, take: 8 },
+    { where: prefixTextWhere(["title", "body"], "Radio"), orderBy: { createdAt: "desc" }, take: 8 },
+  ]);
 });
 
 test("an older exact result survives more than twenty recent weak matches", () => {
@@ -113,6 +152,15 @@ test("short queries are not useful and strong bands are exact-or-prefix", () => 
       { title: { equals: "Radio", mode: "insensitive" } },
       { title: { startsWith: "Radio", mode: "insensitive" } },
     ],
+  });
+  assert.deepEqual(exactTextWhere(["title", "body"], "Radio"), {
+    OR: [
+      { title: { equals: "Radio", mode: "insensitive" } },
+      { body: { equals: "Radio", mode: "insensitive" } },
+    ],
+  });
+  assert.deepEqual(prefixTextWhere(["title"], "Radio"), {
+    OR: [{ title: { startsWith: "Radio", mode: "insensitive" } }],
   });
 });
 
@@ -160,9 +208,11 @@ test("search rows and anchored parent targets are mobile and keyboard accessible
   assert.match(search, /break-words/);
   assert.doesNotMatch(search, /result\.href \?/);
   assert.match(search, /MIN_SEARCH_QUERY_LENGTH/);
-  assert.match(search, /strongTextWhere/);
+  assert.match(search, /exactTextWhere/);
+  assert.match(search, /prefixTextWhere/);
   assert.match(readFileSync("src/app/ideas/items/[ideaId]/page.tsx", "utf8"), /loadIdeaSearchDetail/);
   assert.match(readFileSync("src/app/journal/[entryId]/page.tsx", "utf8"), /loadJournalSearchDetail/);
+  assert.match(readFileSync("src/app/docs/[docId]/page.tsx", "utf8"), /loadDocSearchDetail/);
   assert.match(depth, /id=\{`doc-\$\{doc\.id\}`\}/);
   assert.match(areas, /anchorId: `doc-\$\{item\.id\}`/);
 });

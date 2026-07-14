@@ -35,13 +35,7 @@ export function searchResultHref(location: SearchResultLocation) {
     case "note":
       return `/notes/${id}`;
     case "doc": {
-      if (location.parentType === "journal_entry" && location.parentId) {
-        return `/journal/${encodeURIComponent(location.parentId)}#doc-${id}`;
-      }
-      const parent = location.parentType && location.parentId
-        ? `/${location.parentType === "area" ? "areas" : "projects"}/${encodeURIComponent(location.parentId)}`
-        : "/areas/inbox";
-      return `${parent}#doc-${id}`;
+      return `/docs/${id}`;
     }
     case "check-in":
       return `/check-ins/${id}`;
@@ -74,6 +68,41 @@ export function strongTextWhere<T = Record<string, unknown>>(field: string, quer
       { [field]: { startsWith: query, mode: "insensitive" as const } },
     ],
   } as T;
+}
+
+export function exactTextWhere<T = Record<string, unknown>>(fields: string[], query: string): T {
+  return {
+    OR: fields.map((field) => ({
+      [field]: { equals: query, mode: "insensitive" as const },
+    })),
+  } as T;
+}
+
+export function prefixTextWhere<T = Record<string, unknown>>(fields: string[], query: string): T {
+  return {
+    OR: fields.map((field) => ({
+      [field]: { startsWith: query, mode: "insensitive" as const },
+    })),
+  } as T;
+}
+
+type ReferenceStrongClient<T> = {
+  reference: {
+    findMany(args: {
+      where: Record<string, unknown>;
+      orderBy: { createdAt: "desc" };
+      take: number;
+    }): Promise<T[]>;
+  };
+};
+
+export async function loadReferenceStrongRows<T>(client: ReferenceStrongClient<T>, query: string) {
+  const orderBy = { createdAt: "desc" as const };
+  const [exact, prefix] = await Promise.all([
+    client.reference.findMany({ where: exactTextWhere(["title", "body"], query), orderBy, take: 8 }),
+    client.reference.findMany({ where: prefixTextWhere(["title", "body"], query), orderBy, take: 8 }),
+  ]);
+  return { exact, prefix };
 }
 
 export function rankSearchResults(

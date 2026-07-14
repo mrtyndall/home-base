@@ -19,6 +19,12 @@ type JournalDetailClient = {
   };
 };
 
+type DocDetailClient = {
+  entityDoc: {
+    findUnique(args: { where: { id: string } }): Promise<unknown>;
+  };
+};
+
 export function loadIdeaSearchDetail(client: IdeaDetailClient, id: string) {
   return client.idea.findUnique({
     where: { id },
@@ -28,4 +34,8 @@ export function loadIdeaSearchDetail(client: IdeaDetailClient, id: string) {
 
 export function loadJournalSearchDetail(client: JournalDetailClient, id: string) {
   return client.journalEntry.findUnique({ where: { id } }) as Promise<JournalEntry | null>;
+}
+
+export function loadDocSearchDetail(client: DocDetailClient, id: string) {
+  return client.entityDoc.findUnique({ where: { id } }) as Promise<Prisma.EntityDocGetPayload<object> | null>;
 }
