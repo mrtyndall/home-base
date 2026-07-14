@@ -8,6 +8,8 @@ export type HierarchyReleaseCounts = {
   taskProjectAreaMismatchCount: string;
   ideaProjectAreaMismatchCount: string;
   referenceProjectAreaMismatchCount: string;
+  duplicateActiveReadLaterUrlCount: string;
+  invalidReadLaterStatusCount: string;
   bookCount: string;
   movieCount: string;
   areaCount: string;
@@ -69,6 +71,8 @@ export function evaluateHierarchyRelease(
     ["Task/Project Area mismatches", counts.taskProjectAreaMismatchCount],
     ["Idea/Project Area mismatches", counts.ideaProjectAreaMismatchCount],
     ["Reference/Project Area mismatches", counts.referenceProjectAreaMismatchCount],
+    ["duplicate active Read Later normalized URLs", counts.duplicateActiveReadLaterUrlCount],
+    ["invalid Read Later statuses", counts.invalidReadLaterStatusCount],
   ] as const) {
     if (Number(value) !== 0) failures.push(`${label}: ${value}`);
   }
@@ -90,20 +94,35 @@ export function evaluateHierarchyRelease(
   return failures;
 }
 
-async function hasParentAreaIdColumn(client: ReleaseQueryClient) {
+async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
   const result = await client.query(`
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = 'areas'
-        AND column_name = 'parent_area_id'
-    ) AS "hasParentAreaId"
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'areas'
+          AND column_name = 'parent_area_id'
+      ) AS "hasParentAreaId",
+      (
+        SELECT COUNT(*) = 4
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'references'
+          AND column_name IN ('normalized_url', 'read_status', 'saved_at', 'read_at')
+      ) AS "hasReadLaterColumns"
   `);
-  return (result.rows[0] as { hasParentAreaId?: boolean } | undefined)?.hasParentAreaId === true;
+  const row = result.rows[0] as {
+    hasParentAreaId?: boolean;
+    hasReadLaterColumns?: boolean;
+  } | undefined;
+  return {
+    hasParentAreaId: row?.hasParentAreaId === true,
+    hasReadLaterColumns: row?.hasReadLaterColumns === true,
+  };
 }
 
-const sharedCountSelect = `
+const retainedCountSelect = `
       (
         SELECT COUNT(*) FROM "projects" p
         LEFT JOIN "areas" a ON a."id" = p."area_id"
@@ -134,10 +153,40 @@ const sharedCountSelect = `
       (SELECT COUNT(*) FROM "references")::text AS "referenceCount"
 `;
 
+const legacyReadLaterCountSelect = `
+      0::text AS "duplicateActiveReadLaterUrlCount",
+      0::text AS "invalidReadLaterStatusCount",
+`;
+
+const readLaterIntegritySelect = `
+      (
+        SELECT COUNT(*)
+        FROM (
+          SELECT "normalized_url"
+          FROM "references"
+          WHERE "kind" = 'read_later'
+            AND "normalized_url" IS NOT NULL
+            AND "read_status" IN ('unread', 'read')
+          GROUP BY "normalized_url"
+          HAVING COUNT(*) > 1
+        ) duplicates
+      )::text AS "duplicateActiveReadLaterUrlCount",
+      (
+        SELECT COUNT(*)
+        FROM "references"
+        WHERE "kind" = 'read_later'
+          AND ("read_status" IS NULL OR "read_status" NOT IN ('unread', 'read', 'archived'))
+      )::text AS "invalidReadLaterStatusCount",
+`;
+
 async function collectHierarchyReleaseCounts(
   client: ReleaseQueryClient,
   hasParentAreaId: boolean,
+  hasReadLaterColumns: boolean,
 ) {
+  const readLaterCountSelect = hasReadLaterColumns
+    ? readLaterIntegritySelect
+    : legacyReadLaterCountSelect;
   const sql = hasParentAreaId ? `
     WITH RECURSIVE "areaWalk" AS (
       SELECT
@@ -166,12 +215,14 @@ async function collectHierarchyReleaseCounts(
         LEFT JOIN "areas" parent ON parent."id" = child."parent_area_id"
         WHERE child."parent_area_id" IS NOT NULL AND parent."id" IS NULL
       )::text AS "orphanAreaParentCount",
-      ${sharedCountSelect}
+      ${readLaterCountSelect}
+      ${retainedCountSelect}
   ` : `
     SELECT
       0::text AS "areaCycleCount",
       0::text AS "orphanAreaParentCount",
-      ${sharedCountSelect}
+      ${readLaterCountSelect}
+      ${retainedCountSelect}
   `;
   const result = await client.query(sql);
 
@@ -202,13 +253,22 @@ export async function runHierarchyReleaseVerification(
 
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
-    const hasParentAreaId = await hasParentAreaIdColumn(client);
+    const { hasParentAreaId, hasReadLaterColumns } = await releaseSchemaCapabilities(client);
     if (baseline !== null && !hasParentAreaId) {
       throw new Error(
         "Hierarchy release verification failed: areas.parent_area_id is missing; run strict postflight after the hierarchy migration.",
       );
     }
-    const counts = await collectHierarchyReleaseCounts(client, hasParentAreaId);
+    if (baseline !== null && !hasReadLaterColumns) {
+      throw new Error(
+        "Hierarchy release verification failed: Read Later columns are missing; run strict postflight after the Read Later migration.",
+      );
+    }
+    const counts = await collectHierarchyReleaseCounts(
+      client,
+      hasParentAreaId,
+      hasReadLaterColumns,
+    );
     const failures = evaluateHierarchyRelease(counts, baseline);
     if (failures.length > 0) {
       throw new Error(`Hierarchy release verification failed:\n- ${failures.join("\n- ")}`);

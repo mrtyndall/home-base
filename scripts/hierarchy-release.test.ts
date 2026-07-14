@@ -14,6 +14,8 @@ const cleanCounts: HierarchyReleaseCounts = {
   taskProjectAreaMismatchCount: "0",
   ideaProjectAreaMismatchCount: "0",
   referenceProjectAreaMismatchCount: "0",
+  duplicateActiveReadLaterUrlCount: "0",
+  invalidReadLaterStatusCount: "0",
   bookCount: "12",
   movieCount: "8",
   areaCount: "5",
@@ -43,7 +45,7 @@ test("strict verification requires and parses all five preservation counts", () 
   );
 });
 
-test("verification rejects cycles, orphans, every Project-child mismatch, and count drift", () => {
+test("verification rejects hierarchy failures, Read Later corruption, and count drift", () => {
   const failures = evaluateHierarchyRelease(
     {
       ...cleanCounts,
@@ -53,6 +55,8 @@ test("verification rejects cycles, orphans, every Project-child mismatch, and co
       taskProjectAreaMismatchCount: "4",
       ideaProjectAreaMismatchCount: "5",
       referenceProjectAreaMismatchCount: "6",
+      duplicateActiveReadLaterUrlCount: "7",
+      invalidReadLaterStatusCount: "8",
       bookCount: "11",
       movieCount: "9",
       areaCount: "4",
@@ -69,6 +73,8 @@ test("verification rejects cycles, orphans, every Project-child mismatch, and co
     "Task/Project Area mismatches: 4",
     "Idea/Project Area mismatches: 5",
     "Reference/Project Area mismatches: 6",
+    "duplicate active Read Later normalized URLs: 7",
+    "invalid Read Later statuses: 8",
     "Book count changed: expected 12, found 11",
     "Movie count changed: expected 8, found 9",
     "Area count changed: expected 5, found 4",
@@ -83,7 +89,9 @@ test("database verification uses one read-only transaction and always rolls it b
   const client = {
     async query(sql: string) {
       queries.push(sql);
-      if (/information_schema\.columns/.test(sql)) return { rows: [{ hasParentAreaId: true }] };
+      if (/information_schema\.columns/.test(sql)) {
+        return { rows: [{ hasParentAreaId: true, hasReadLaterColumns: true }] };
+      }
       if (/WITH RECURSIVE/.test(sql)) return { rows: [cleanCounts] };
       return { rows: [] };
     },
@@ -97,6 +105,8 @@ test("database verification uses one read-only transaction and always rolls it b
   assert.match(queries[2], /FROM "tasks"/);
   assert.match(queries[2], /FROM "ideas"/);
   assert.match(queries[2], /FROM "references"/);
+  assert.match(queries[2], /"normalized_url"/);
+  assert.match(queries[2], /"read_status"/);
   assert.equal(queries.at(-1), "ROLLBACK");
   assert.match(output.join("\n"), /--expected-books=12/);
   assert.match(output.join("\n"), /--expected-references=23/);
@@ -118,12 +128,38 @@ test("preflight uses a legacy-safe count query before parent_area_id exists", as
 
   assert.match(queries[1], /information_schema\.columns/);
   assert.doesNotMatch(queries[2], /parent_area_id|WITH RECURSIVE/);
+  assert.doesNotMatch(queries[2], /normalized_url|read_status/);
   assert.match(queries[2], /0::text AS "areaCycleCount"/);
   assert.match(queries[2], /FROM "tasks"/);
   assert.match(queries[2], /FROM "ideas"/);
   assert.match(queries[2], /FROM "references"/);
   assert.equal(queries.at(-1), "ROLLBACK");
   assert.match(output.join("\n"), /--expected-areas=5/);
+});
+
+test("strict postflight requires the additive Read Later columns", async () => {
+  const queries: string[] = [];
+  const client = {
+    async query(sql: string) {
+      queries.push(sql);
+      if (/information_schema\.columns/.test(sql)) {
+        return { rows: [{ hasParentAreaId: true, hasReadLaterColumns: false }] };
+      }
+      return { rows: [] };
+    },
+  };
+
+  await assert.rejects(
+    runHierarchyReleaseVerification(client, [
+      "--expected-books=12",
+      "--expected-movies=8",
+      "--expected-areas=5",
+      "--expected-projects=7",
+      "--expected-references=23",
+    ]),
+    /Read Later columns are missing/,
+  );
+  assert.equal(queries.at(-1), "ROLLBACK");
 });
 
 test("database verification rolls back before surfacing an integrity failure", async () => {
