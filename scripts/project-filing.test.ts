@@ -13,6 +13,12 @@ type ProjectRow = {
   nextStep: string | null;
 };
 
+type AreaRow = {
+  id: string;
+  status: "active" | "retired";
+  isSystem: boolean;
+};
+
 function filingClient(initialAreaId: string | null = null) {
   const calls: string[] = [];
   const project: ProjectRow = {
@@ -23,13 +29,28 @@ function filingClient(initialAreaId: string | null = null) {
     currentState: null,
     nextStep: null,
   };
-  const validAreas = new Set(["area-1", "area-2"]);
+  const areas = new Map<string, AreaRow>([
+    ["area-1", { id: "area-1", status: "active", isSystem: false }],
+    ["area-2", { id: "area-2", status: "active", isSystem: false }],
+    ["inactive", { id: "inactive", status: "retired", isSystem: false }],
+    ["system", { id: "system", status: "active", isSystem: true }],
+  ]);
 
   const transaction = {
     area: {
-      findFirst: async ({ where }: { where: { id: string } }) => {
+      findFirst: async ({
+        where,
+      }: {
+        where: { id: string; status?: string; isSystem?: boolean };
+      }) => {
         calls.push(`area:${where.id}`);
-        return validAreas.has(where.id) ? { id: where.id } : null;
+        const area = areas.get(where.id);
+        if (!area) return null;
+        if (where.status !== undefined && area.status !== where.status) return null;
+        if (where.isSystem !== undefined && area.isSystem !== where.isSystem) {
+          return null;
+        }
+        return { id: area.id };
       },
     },
     project: {
@@ -40,19 +61,40 @@ function filingClient(initialAreaId: string | null = null) {
       },
     },
     task: {
-      updateMany: async ({ data }: { data: { areaId: string | null } }) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { projectId: string };
+        data: { areaId: string | null };
+      }) => {
+        assert.deepEqual(where, { projectId: "project-1" });
         calls.push(`tasks:${data.areaId}`);
         return { count: 1 };
       },
     },
     idea: {
-      updateMany: async ({ data }: { data: { areaId: string | null } }) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { projectId: string };
+        data: { areaId: string | null };
+      }) => {
+        assert.deepEqual(where, { projectId: "project-1" });
         calls.push(`ideas:${data.areaId}`);
         return { count: 1 };
       },
     },
     reference: {
-      updateMany: async ({ data }: { data: { areaId: string | null } }) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { projectId: string };
+        data: { areaId: string | null };
+      }) => {
+        assert.deepEqual(where, { projectId: "project-1" });
         calls.push(`references:${data.areaId}`);
         return { count: 1 };
       },
@@ -124,7 +166,7 @@ test("fileProject unfiles a Project and its children", async () => {
   assert.ok(fake.calls.includes("references:null"));
 });
 
-test("fileProject rejects an inactive, system, or missing Area before writes", async () => {
+test("fileProject rejects a missing Area before writes", async () => {
   const fake = filingClient("area-1");
 
   await assert.rejects(
@@ -133,6 +175,30 @@ test("fileProject rejects an inactive, system, or missing Area before writes", a
   );
 
   assert.deepEqual(fake.calls, ["transaction", "area:missing"]);
+  assert.equal(fake.project.areaId, "area-1");
+});
+
+test("fileProject rejects an inactive Area before writes", async () => {
+  const fake = filingClient("area-1");
+
+  await assert.rejects(
+    fileProject("project-1", "inactive", fake.client as never),
+    /Area not found/,
+  );
+
+  assert.deepEqual(fake.calls, ["transaction", "area:inactive"]);
+  assert.equal(fake.project.areaId, "area-1");
+});
+
+test("fileProject rejects a system Area before writes", async () => {
+  const fake = filingClient("area-1");
+
+  await assert.rejects(
+    fileProject("project-1", "system", fake.client as never),
+    /Area not found/,
+  );
+
+  assert.deepEqual(fake.calls, ["transaction", "area:system"]);
   assert.equal(fake.project.areaId, "area-1");
 });
 
