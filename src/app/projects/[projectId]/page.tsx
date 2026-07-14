@@ -60,7 +60,7 @@ export default async function ProjectDetailPage({
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
           <ArrowLeft size={15} />
-          Projects
+          Areas
         </Link>
         <div className="flex items-start justify-between gap-5">
           <div className="min-w-0">

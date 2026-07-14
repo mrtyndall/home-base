@@ -115,7 +115,7 @@ export function CaptureBar() {
       : (captureOptions?.projects ?? []);
   const areaPickerGroups: PickerGroup[] = [
     {
-      label: "System",
+      label: "Global",
       options: [{ value: "", label: "Inbox" }],
     },
     ...(captureOptions?.areas.length
@@ -385,7 +385,7 @@ export function CaptureBar() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <CapturePicker
-              label="Area"
+              label="Destination"
               valueLabel={selectedAreaName ?? "Inbox"}
               selectedValue={captureAreaId}
               groups={areaPickerGroups}

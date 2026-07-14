@@ -108,3 +108,12 @@ Disposable PostgreSQL 17 integration QA migrated a fresh loopback database, chan
 - Added the explicit `CONTRACT_RELEASE_DELETE` marker beside the runtime seed's Domain compatibility SQL so the Release B contract work can find and remove it.
 - TDD RED evidence: the focused test first failed on the Prisma seed's 10/20/30 mismatch; after that correction, it failed on the absent deletion marker.
 - TDD GREEN evidence: `npx tsx --test scripts/seed-area-compat.test.ts` passed 1/1.
+
+## Browser-QA taxonomy follow-up
+
+Browser review found two remaining Area-first wording leaks. Project detail now labels its `/projects` back-link as `Areas`. The capture assignment control now reads `Destination`, presents Inbox under `Global`, and keeps the API-supplied flat Areas under `Areas`; it no longer exposes a `System` group or implies that global Inbox is itself an Area. The separate Project picker and its filtering/selection behavior were left unchanged.
+
+TDD evidence:
+
+- RED: `npx tsx --test scripts/project-area-creation-ui.test.ts scripts/capture-bar-picker-ui.test.ts` failed 2/2 on the old `Projects`, `Area`, and `System` labels.
+- GREEN: the same focused command passed 2/2 after the minimal copy/grouping correction.
