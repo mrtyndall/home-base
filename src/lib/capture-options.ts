@@ -45,3 +45,15 @@ export function normalizeCaptureOptions(value: unknown): CaptureOptions {
     : [];
   return { areas, projects };
 }
+
+export function retainedProjectIdForDestination(
+  destinationAreaId: string,
+  currentProjectId: string,
+  projects: CaptureOptions["projects"],
+): string {
+  if (!destinationAreaId) return "";
+  const currentProject = projects.find(
+    (project) => project.id === currentProjectId,
+  );
+  return currentProject?.areaId === destinationAreaId ? currentProjectId : "";
+}

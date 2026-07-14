@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   normalizeCaptureOptions,
+  retainedProjectIdForDestination,
   type CaptureOptions,
 } from "@/lib/capture-options";
 
@@ -395,16 +396,14 @@ export function CaptureBar() {
                 setOpenPicker(openPicker === "area" ? null : "area");
               }}
               onSelect={(nextAreaId) => {
-                  setCaptureAreaId(nextAreaId);
-                  setCaptureProjectId((currentProjectId) => {
-                    const currentProject = captureOptions?.projects.find(
-                      (project) => project.id === currentProjectId,
-                    );
-                    return currentProject &&
-                      (!nextAreaId || currentProject.areaId === nextAreaId)
-                      ? currentProjectId
-                      : "";
-                  });
+                setCaptureAreaId(nextAreaId);
+                setCaptureProjectId((currentProjectId) =>
+                  retainedProjectIdForDestination(
+                    nextAreaId,
+                    currentProjectId,
+                    captureOptions?.projects ?? [],
+                  ),
+                );
                 setOpenPicker(null);
               }}
             />

@@ -7,7 +7,16 @@ assert.ok(
 );
 
 async function main() {
-  const { normalizeCaptureOptions } = await import("../src/lib/capture-options");
+  const captureOptionModule = await import("../src/lib/capture-options");
+  const { normalizeCaptureOptions } = captureOptionModule;
+  const retainedProjectIdForDestination = (
+    captureOptionModule as Record<string, unknown>
+  ).retainedProjectIdForDestination;
+  assert.equal(
+    typeof retainedProjectIdForDestination,
+    "function",
+    "Capture destination changes need an explicit Project-retention rule.",
+  );
   const options = normalizeCaptureOptions({
     areas: [
       { id: "area-home", name: "Home", status: "active" },
@@ -27,9 +36,32 @@ async function main() {
     projects: [],
   });
 
+  const retainProject = retainedProjectIdForDestination as (
+    destinationAreaId: string,
+    currentProjectId: string,
+    projects: typeof options.projects,
+  ) => string;
+  assert.equal(
+    retainProject("", "project-garden", options.projects),
+    "",
+    "Selecting global Inbox must clear the selected Project before submission.",
+  );
+  assert.equal(
+    retainProject("area-health", "project-garden", options.projects),
+    "",
+    "Selecting another Area must clear a Project from the previous Area.",
+  );
+  assert.equal(
+    retainProject("area-home", "project-garden", options.projects),
+    "project-garden",
+    "A Project may remain selected only inside its own nonempty Area.",
+  );
+
   const route = readFileSync("src/app/api/capture/options/route.ts", "utf8");
   const component = readFileSync("src/components/capture-bar.tsx", "utf8");
   assert.doesNotMatch(component, /\bdomains\b|\bdomainName\b/);
+  assert.doesNotMatch(component, /!nextAreaId\s*\|\|/);
+  assert.match(component, /retainedProjectIdForDestination/);
   assert.match(component, /normalizeCaptureOptions/);
   assert.match(route, /isSystem:\s*false/);
 }

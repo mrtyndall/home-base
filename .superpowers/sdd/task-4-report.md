@@ -117,3 +117,12 @@ TDD evidence:
 
 - RED: `npx tsx --test scripts/project-area-creation-ui.test.ts scripts/capture-bar-picker-ui.test.ts` failed 2/2 on the old `Projects`, `Area`, and `System` labels.
 - GREEN: the same focused command passed 2/2 after the minimal copy/grouping correction.
+
+## Capture destination interaction follow-up
+
+Browser interaction QA exposed a state bug after the taxonomy copy fix: choosing Global → Inbox retained the current Project because the Area handler treated an empty `nextAreaId` as a valid match. The stale Project then repopulated both Area and Project submission fields.
+
+The destination transition now uses a tested retention rule: an empty Inbox destination always clears Project; a different Area clears a Project outside that Area; and only the selected Project's own nonempty Area retains it. Project-picker selection behavior remains unchanged.
+
+- RED: `npx tsx --test scripts/capture-options-runtime.test.ts` failed because the explicit Project-retention behavior did not exist.
+- GREEN: `npx tsx --test scripts/capture-options-runtime.test.ts scripts/capture-bar-picker-ui.test.ts` passed 2/2, covering all three transitions plus the picker taxonomy contract.
