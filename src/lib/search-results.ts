@@ -9,10 +9,12 @@ export type SearchCandidate = {
   updatedAt: Date | string;
 };
 
+export const MIN_SEARCH_QUERY_LENGTH = 2;
+
 type SearchResultLocation =
   | { kind: "capture" | "task" | "project" | "idea" | "reference" | "note" | "check-in" | "journal" | "person"; id: string }
   | { kind: "highlight"; id: string; referenceId: string }
-  | { kind: "doc"; id: string; parentType: "area" | "project" | null; parentId: string | null }
+  | { kind: "doc"; id: string; parentType: "area" | "project" | "journal_entry" | null; parentId: string | null }
   | { kind: "person-fact"; id: string; personId: string };
 
 export function searchResultHref(location: SearchResultLocation) {
@@ -25,7 +27,7 @@ export function searchResultHref(location: SearchResultLocation) {
     case "project":
       return `/projects/${id}`;
     case "idea":
-      return `/ideas#idea-${id}`;
+      return `/ideas/items/${id}`;
     case "reference":
       return `/references/${id}`;
     case "highlight":
@@ -33,6 +35,9 @@ export function searchResultHref(location: SearchResultLocation) {
     case "note":
       return `/notes/${id}`;
     case "doc": {
+      if (location.parentType === "journal_entry" && location.parentId) {
+        return `/journal/${encodeURIComponent(location.parentId)}#doc-${id}`;
+      }
       const parent = location.parentType && location.parentId
         ? `/${location.parentType === "area" ? "areas" : "projects"}/${encodeURIComponent(location.parentId)}`
         : "/areas/inbox";
@@ -41,12 +46,34 @@ export function searchResultHref(location: SearchResultLocation) {
     case "check-in":
       return `/check-ins/${id}`;
     case "journal":
-      return `/ideas#journal-${id}`;
+      return `/journal/${id}`;
     case "person":
       return `/people/${id}`;
     case "person-fact":
       return `/people/${encodeURIComponent(location.personId)}/facts/${id}`;
   }
+}
+
+export function mergeSearchCandidates(
+  strong: SearchCandidate[],
+  broad: SearchCandidate[],
+) {
+  const seen = new Set<string>();
+  return [...strong, ...broad].filter((candidate) => {
+    const key = `${candidate.type}\u0000${candidate.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function strongTextWhere<T = Record<string, unknown>>(field: string, query: string): T {
+  return {
+    OR: [
+      { [field]: { equals: query, mode: "insensitive" as const } },
+      { [field]: { startsWith: query, mode: "insensitive" as const } },
+    ],
+  } as T;
 }
 
 export function rankSearchResults(
