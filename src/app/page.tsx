@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { Archive, ArrowRight, CheckCircle2, Repeat } from "lucide-react";
+import {
+  Archive,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  ListTodo,
+  Repeat,
+} from "lucide-react";
 import { SetupNotice } from "@/components/setup-notice";
 import {
   HomeRoutineCheck,
@@ -69,7 +76,36 @@ export default async function HomePage() {
       />
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-5 lg:order-2">
+        <div className="space-y-5">
+          <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+            <SectionHeader title="Today" href="/today" />
+            <div className="mt-3">
+              <HomeTodayList
+                events={todayData.todayEvents.map((event) => ({
+                  id: event.id,
+                  title: event.title,
+                  time: formatTime(event.start),
+                }))}
+                tasks={todayData.dueToday.map((task) => ({
+                  id: task.id,
+                  title: task.title,
+                  detail: [
+                    task.area?.name ?? "Inbox",
+                    task.project?.name,
+                    task.dueDate ? formatDateOnly(task.dueDate) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" / "),
+                  starred: task.starred,
+                }))}
+              />
+            </div>
+          </section>
+
+          <UpcomingCard items={todayData.upcomingCommitments} />
+        </div>
+
+        <div className="space-y-5">
           {todayData.topTasks.length > 0 ? (
             <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
               <SectionHeader title="Top tasks" href="/tasks?starred=1" />
@@ -83,31 +119,6 @@ export default async function HomePage() {
 
           <RoutinesLine routines={todayData.routinesDueToday} />
         </div>
-
-        <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4 lg:order-1">
-          <SectionHeader title="Today" href="/today" />
-          <div className="mt-3">
-            <HomeTodayList
-              events={todayData.todayEvents.map((event) => ({
-                id: event.id,
-                title: event.title,
-                time: formatTime(event.start),
-              }))}
-              tasks={todayData.dueToday.map((task) => ({
-                id: task.id,
-                title: task.title,
-                detail: [
-                  task.area?.name ?? "Inbox",
-                  task.project?.name,
-                  task.dueDate ? formatDateOnly(task.dueDate) : null,
-                ]
-                  .filter(Boolean)
-                  .join(" / "),
-                starred: task.starred,
-              }))}
-            />
-          </div>
-        </section>
       </div>
 
       <MemoryCard item={todayData.resurfacedItem} />
@@ -120,6 +131,61 @@ type ReadyToday = Awaited<ReturnType<typeof getTodayDashboard>> & {
 };
 
 type HomeTask = ReadyToday["dueToday"][number];
+
+function UpcomingCard({
+  items,
+}: {
+  items: ReadyToday["upcomingCommitments"];
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+      <SectionHeader title="Upcoming" href="/today" />
+      <div className="mt-3 divide-y divide-[#EEF1EC]">
+        {items.map((item) => {
+          const Icon = item.kind === "event" ? CalendarDays : ListTodo;
+          const href =
+            item.kind === "event"
+              ? `/calendar-events/${item.id}`
+              : `/tasks/${item.id}`;
+          const date =
+            item.kind === "event"
+              ? formatShortDate(item.date)
+              : formatDateOnly(item.date);
+          const time =
+            item.kind === "event"
+              ? formatTime(item.at)
+              : item.time
+                ? formatTime(item.at)
+                : null;
+
+          return (
+            <Link
+              key={`${item.kind}-${item.id}`}
+              href={href}
+              className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3 first:pt-0 last:pb-0"
+            >
+              <Icon size={17} className="text-teal-700" aria-hidden="true" />
+              <span className="min-w-0 truncate text-[15px] font-medium text-stone-950 transition group-hover:text-teal-700">
+                {item.title}
+              </span>
+              <span className="text-right text-[12px] leading-tight text-[#6B7268]">
+                <span className="block">{date}</span>
+                <span className="block">
+                  {item.kind === "event" ? "Event" : "Task"}
+                  {time ? ` · ${time}` : ""}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function StatusLine({
   dueTodayCount,
