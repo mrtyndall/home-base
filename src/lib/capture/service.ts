@@ -608,11 +608,13 @@ async function createProject(
   action: Extract<ExecutableAction, { type: "create_project" }>,
   context: ExecutionContext,
 ) {
-  const areaId = matchAreaId(action.area_match, context.areas);
-  if (!areaId) {
-    throw new Error("Project captures require an Area.");
+  const areaId = action.area_match
+    ? matchAreaId(action.area_match, context.areas)
+    : null;
+  if (action.area_match && !areaId) {
+    throw new Error(`No area matched "${action.area_match}".`);
   }
-  await resolveVerifiedDestination({ areaId }, context.client);
+  if (areaId) await resolveVerifiedDestination({ areaId }, context.client);
 
   const project = await context.client.project.create({
     data: {
@@ -634,7 +636,7 @@ async function createProject(
   return {
     type: "project" as const,
     id: project.id,
-    label: `Project saved to ${project.area?.name ?? "Area"}`,
+    label: `Project saved to ${project.area?.name ?? "Unfiled"}`,
   };
 }
 

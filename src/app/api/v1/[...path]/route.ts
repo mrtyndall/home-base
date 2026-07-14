@@ -16,6 +16,12 @@ import {
 } from "@/lib/destinations";
 import { createPersonRecord } from "@/lib/people";
 import {
+  assertValidAreaParent,
+  fileProject,
+  flattenAreaOptions,
+  HierarchyValidationError,
+} from "@/lib/hierarchy";
+import {
   boostResurfaceWeight,
   getDailyResurfacedItem,
 } from "@/lib/resurfacing";
@@ -51,8 +57,8 @@ export async function GET(request: Request, context: RouteCtx) {
         return { aggregate: await getAreaAggregate(id) };
       }
       if (id) {
-        return {
-          area: await prisma.area.findUnique({
+        const [area, paths] = await Promise.all([
+          prisma.area.findUnique({
             where: { id },
             include: {
               tasks: {
@@ -63,6 +69,10 @@ export async function GET(request: Request, context: RouteCtx) {
               ideas: { orderBy: { updatedAt: "desc" } },
             },
           }),
+          getAreaPathMap(),
+        ]);
+        return {
+          area: area ? { ...area, path: paths.get(area.id) ?? area.name } : null,
           notes: await prisma.entityNote.findMany({
             where: { parentType: "area", parentId: id },
             orderBy: { createdAt: "desc" },
@@ -78,11 +88,18 @@ export async function GET(request: Request, context: RouteCtx) {
         };
       }
 
+      const areas = await prisma.area.findMany({
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        take: 100,
+      });
+      const paths = new Map(
+        flattenAreaOptions(areas).map((area) => [area.id, area.path]),
+      );
       return {
-        areas: await prisma.area.findMany({
-          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          take: 100,
-        }),
+        areas: areas.map((area) => ({
+          ...area,
+          path: paths.get(area.id) ?? area.name,
+        })),
       };
     }
 
@@ -451,15 +468,19 @@ export async function POST(request: Request, context: RouteCtx) {
 
       if (resource === "areas") {
         const parsed = createAreaSchema.parse(body);
-        const area = await prisma.area.create({
-          data: {
-            name: parsed.name,
-            status: parsed.status ?? "active",
-            currentState: parsed.currentState,
-            nextStep: parsed.nextStep,
-            tendingCadence: parsed.tendingCadence,
-            sortOrder: parsed.sortOrder,
-          },
+        const area = await prisma.$transaction(async (transaction) => {
+          await assertValidAreaParent("", parsed.parentAreaId ?? null, transaction);
+          return transaction.area.create({
+            data: {
+              name: parsed.name,
+              status: parsed.status ?? "active",
+              currentState: parsed.currentState,
+              nextStep: parsed.nextStep,
+              tendingCadence: parsed.tendingCadence,
+              sortOrder: parsed.sortOrder,
+              parentAreaId: parsed.parentAreaId,
+            },
+          });
         });
         await auditApiWrite(apiKey, "area_created", "Area created", {
           type: "area",
@@ -493,8 +514,7 @@ export async function POST(request: Request, context: RouteCtx) {
       if (resource === "projects") {
         const parsed = createProjectSchema.parse(body);
         const areaId = await resolveAreaReference(parsed.areaId, parsed.areaName);
-        if (!areaId) throw new Error("Project creation requires an active Area.");
-        await resolveVerifiedDestination({ areaId });
+        if (areaId) await resolveVerifiedDestination({ areaId });
         const now = new Date();
         const status = parsed.status ?? "active";
         const project = await prisma.project.create({
@@ -577,8 +597,9 @@ export async function POST(request: Request, context: RouteCtx) {
         }
 
         const projectAreaId = parsed.areaId ?? idea.areaId;
-        if (!projectAreaId) throw new Error("Project creation requires an active Area.");
-        await resolveVerifiedDestination({ areaId: projectAreaId });
+        if (projectAreaId) {
+          await resolveVerifiedDestination({ areaId: projectAreaId });
+        }
         const project = await prisma.project.create({
           data: {
             name: parsed.title ?? idea.title,
@@ -1071,14 +1092,11 @@ export async function PATCH(request: Request, context: RouteCtx) {
         ? await resolveAreaReference(parsed.areaId, parsed.areaName)
         : parsed.areaId;
       const nextAreaId = areaId === undefined ? existing.areaId : areaId;
-      if (!nextAreaId) throw new Error("Project creation requires an active Area.");
-      await resolveVerifiedDestination({ areaId: nextAreaId });
-      const project = await prisma.$transaction(async (tx) => {
-        const updated = await tx.project.update({
-          where: { id },
-          data: {
+      if (areaId !== undefined) await fileProject(id, nextAreaId);
+      const project = await prisma.project.update({
+        where: { id },
+        data: {
           name: parsed.name,
-          areaId: nextAreaId,
           status: parsed.status,
           currentState: parsed.currentState,
           nextStep: parsed.nextStep,
@@ -1091,16 +1109,7 @@ export async function PATCH(request: Request, context: RouteCtx) {
                 : undefined,
           completedAt: parsed.status === "completed" ? now : undefined,
           killedAt: parsed.status === "killed" ? now : undefined,
-          },
-        });
-        if (nextAreaId !== existing.areaId) {
-          await Promise.all([
-            tx.task.updateMany({ where: { projectId: id }, data: { areaId: nextAreaId } }),
-            tx.idea.updateMany({ where: { projectId: id }, data: { areaId: nextAreaId } }),
-            tx.reference.updateMany({ where: { projectId: id }, data: { areaId: nextAreaId } }),
-          ]);
-        }
-        return updated;
+        },
       });
       await prisma.projectActivity.create({
         data: {
@@ -1125,16 +1134,22 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (resource === "areas") {
       const parsed = patchAreaSchema.parse(body);
-      const area = await prisma.area.update({
-        where: { id },
-        data: {
-          name: parsed.name,
-          status: parsed.status,
-          currentState: parsed.currentState,
-          nextStep: parsed.nextStep,
-          tendingCadence: parsed.tendingCadence,
-          sortOrder: parsed.sortOrder,
-        },
+      const area = await prisma.$transaction(async (transaction) => {
+        if (parsed.parentAreaId !== undefined) {
+          await assertValidAreaParent(id, parsed.parentAreaId, transaction);
+        }
+        return transaction.area.update({
+          where: { id },
+          data: {
+            name: parsed.name,
+            status: parsed.status,
+            currentState: parsed.currentState,
+            nextStep: parsed.nextStep,
+            tendingCadence: parsed.tendingCadence,
+            sortOrder: parsed.sortOrder,
+            parentAreaId: parsed.parentAreaId,
+          },
+        });
       });
       await auditApiWrite(apiKey, "area_updated", "Area updated", {
         type: "area",
@@ -1291,6 +1306,25 @@ async function handleApi(
       return Response.json({ error: z.treeifyError(error) }, { status: 400 });
     }
 
+    if (error instanceof HierarchyValidationError) {
+      return Response.json(
+        {
+          error: {
+            code: error.code,
+            message: hierarchyValidationMessage(error.code),
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof Error && error.message === "Area not found.") {
+      return Response.json(
+        { error: { code: "area_not_found", message: error.message } },
+        { status: 400 },
+      );
+    }
+
     return Response.json(
       { error: error instanceof Error ? error.message : "API request failed." },
       { status: 500 },
@@ -1308,6 +1342,29 @@ async function readJson(request: Request) {
 
 function notFound() {
   return Response.json({ error: "Not found." }, { status: 404 });
+}
+
+async function getAreaPathMap() {
+  const areas = await prisma.area.findMany({
+    select: {
+      id: true,
+      name: true,
+      parentAreaId: true,
+      sortOrder: true,
+    },
+  });
+  return new Map(flattenAreaOptions(areas).map((area) => [area.id, area.path]));
+}
+
+function hierarchyValidationMessage(code: HierarchyValidationError["code"]) {
+  switch (code) {
+    case "self_parent":
+      return "An Area cannot be its own parent.";
+    case "cycle":
+      return "That parent would create an Area cycle.";
+    case "parent_not_found":
+      return "Parent Area not found.";
+  }
 }
 
 async function resolveAreaReference(
@@ -1525,7 +1582,7 @@ const patchTaskSchema = createTaskSchema.partial().extend({
 
 const createProjectSchema = z.object({
   name: z.string().min(1),
-  areaId: z.string().optional(),
+  areaId: z.string().nullable().optional(),
   areaName: z.string().optional(),
   status: z
     .enum(["someday", "active", "parked", "completed", "killed"])
@@ -1541,6 +1598,7 @@ const patchProjectSchema = createProjectSchema.partial().extend({
 
 const createAreaSchema = z.object({
   name: z.string().min(1),
+  parentAreaId: z.string().nullable().optional(),
   status: z.enum(["active", "parked", "retired"]).optional(),
   currentState: z.string().optional(),
   nextStep: z.string().optional(),

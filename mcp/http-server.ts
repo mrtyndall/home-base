@@ -77,7 +77,7 @@ function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "list_areas",
     {
-      description: "List Home Base areas, including their parent domains.",
+      description: "List Home Base Areas with parent IDs and full hierarchy paths.",
       inputSchema: z.object({}),
     },
     async () => toToolResult(await apiFetch(bearerToken, "/areas")),
@@ -95,17 +95,33 @@ function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "create_area",
     {
-      description: "Create an area under an existing or named domain.",
+      description: "Create an Area, optionally nested under another Area.",
       inputSchema: z.object({
         name: z.string().min(1),
-        domainId: z.string().optional(),
-        domainName: z.string().optional(),
+        parentAreaId: z.string().nullable().optional(),
         currentState: z.string().optional(),
         nextStep: z.string().optional(),
         tendingCadence: z.string().optional(),
       }),
     },
     async (input) => toToolResult(await apiFetch(bearerToken, "/areas", "POST", input)),
+  );
+
+  server.registerTool(
+    "reparent_area",
+    {
+      description: "Move an Area under another Area, or null to make it a root.",
+      inputSchema: z.object({
+        areaId: z.string().min(1),
+        parentAreaId: z.string().nullable(),
+      }),
+    },
+    async ({ areaId, parentAreaId }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/areas/${areaId}`, "PATCH", {
+          parentAreaId,
+        }),
+      ),
   );
 
   server.registerTool(
@@ -127,10 +143,10 @@ function registerTools(server: McpServer, bearerToken: string) {
   server.registerTool(
     "create_project",
     {
-      description: "Create a project in an area. Projects can start active or someday.",
+      description: "Create a Project, optionally filed in an Area. Projects can start active or someday.",
       inputSchema: z.object({
         name: z.string().min(1),
-        areaId: z.string().optional(),
+        areaId: z.string().nullable().optional(),
         areaName: z.string().optional(),
         status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
         currentState: z.string().optional(),
@@ -147,7 +163,7 @@ function registerTools(server: McpServer, bearerToken: string) {
       description: "Update project current state, next step, status, and activity log.",
       inputSchema: z.object({
         projectId: z.string().min(1),
-        areaId: z.string().optional(),
+        areaId: z.string().nullable().optional(),
         areaName: z.string().optional(),
         currentState: z.string().optional(),
         nextStep: z.string().optional(),
@@ -157,6 +173,23 @@ function registerTools(server: McpServer, bearerToken: string) {
     },
     async ({ projectId, ...body }) =>
       toToolResult(await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
+    "file_project",
+    {
+      description: "File a Project in an Area, or null to leave it unfiled.",
+      inputSchema: z.object({
+        projectId: z.string().min(1),
+        areaId: z.string().nullable(),
+      }),
+    },
+    async ({ projectId, areaId }) =>
+      toToolResult(
+        await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", {
+          areaId,
+        }),
+      ),
   );
 
   server.registerTool(
@@ -603,16 +636,6 @@ function registerTools(server: McpServer, bearerToken: string) {
       ),
   );
 
-  server.registerTool(
-    "read_domain_page",
-    {
-      description:
-        "Read a domain's derived aggregate: areas with latest check-ins, project facts, task pulse.",
-      inputSchema: z.object({ domainId: z.string().min(1) }),
-    },
-    async ({ domainId }) =>
-      toToolResult(await apiFetch(bearerToken, `/domains/${domainId}/aggregate`)),
-  );
 }
 
 async function apiFetch(

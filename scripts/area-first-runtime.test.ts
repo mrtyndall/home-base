@@ -110,7 +110,16 @@ const taskSource = readFileSync("src/lib/tasks.ts", "utf8");
 assert.match(taskSource, /areaId\?: string \| null/, "task creation must accept an unfiled destination");
 
 const captureSource = readFileSync("src/lib/capture/service.ts", "utf8");
-assert.match(captureSource, /Project captures require an Area/, "capture Project creation must remain Area-required");
+assert.doesNotMatch(
+  captureSource,
+  /Project captures require an Area/,
+  "capture Project creation must allow an omitted Area",
+);
+assert.match(
+  captureSource,
+  /Project saved to \$\{project\.area\?\.name \?\? "Unfiled"\}/,
+  "capture-created Projects must report an unfiled destination when no Area was named",
+);
 assert.match(
   captureSource,
   /resolveVerifiedDestination\(\{[\s\S]{0,100}areaId,[\s\S]{0,100}projectId: project\?\.id/,

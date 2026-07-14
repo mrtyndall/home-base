@@ -58,6 +58,7 @@ Rules:
 - Use area_match, project_match, task_match, and idea_match as fuzzy names from context.
 - If the named container matches a known project from context, use project_match, never area_match. Only use area_match for known areas.
 - If the user gives no area or project, omit area_match and project_match so eligible content remains unfiled.
+- A Project may be created unfiled. When no known Area is named, omit area_match; never invent or create an Area just to file a Project.
 - Capture classifies, never coerces. Do not manufacture a task from non-task input.
 - Clear action intent ("do", "buy", "call", "fix", "schedule", "renew") creates a task.
 - A thought, opinion, or possibility ("what if", "I wonder", "idea:") creates an idea.

@@ -7,6 +7,7 @@ import {
   localDateString,
 } from "@/lib/dates";
 import { getTaskSlipDays, projectLastActivityFact, taskOpenSinceFact } from "@/lib/slippage";
+import { flattenAreaOptions } from "@/lib/hierarchy";
 
 const DEFAULT_CHAT_MODEL = "claude-sonnet-4-6";
 const MAX_TOOL_ROUNDS = 6;
@@ -43,6 +44,12 @@ const tools: Anthropic.Tool[] = [
     name: "list_slipping",
     description:
       "Everything currently slipping: long-open tasks (past the slip threshold) and active projects past their per-project inactivity threshold.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "list_areas",
+    description:
+      "List Areas in hierarchy order with full path labels, parent IDs, and status.",
     input_schema: { type: "object" as const, properties: {} },
   },
   {
@@ -98,6 +105,8 @@ async function runTool(name: string, input: Record<string, unknown>) {
       return toolAllClear();
     case "list_slipping":
       return toolSlipping();
+    case "list_areas":
+      return toolAreas();
     case "read_person":
       return toolPerson(String(input.person_match ?? ""));
     case "read_journal":
@@ -115,6 +124,28 @@ async function runTool(name: string, input: Record<string, unknown>) {
     default:
       return { error: `Unknown tool ${name}.` };
   }
+}
+
+async function toolAreas() {
+  const areas = await prisma.area.findMany({
+    select: {
+      id: true,
+      name: true,
+      parentAreaId: true,
+      sortOrder: true,
+      status: true,
+    },
+  });
+  const byId = new Map(areas.map((area) => [area.id, area]));
+  return {
+    areas: flattenAreaOptions(areas).map((option) => ({
+      id: option.id,
+      path: option.path,
+      parent_area_id: byId.get(option.id)?.parentAreaId ?? null,
+      status: byId.get(option.id)?.status,
+      href: `/areas/${option.id}`,
+    })),
+  };
 }
 
 async function toolSearch(query: string) {
