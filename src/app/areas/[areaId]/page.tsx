@@ -11,6 +11,7 @@ import {
   snoozeCaptureReviewProposalOneDay,
   updateCaptureText,
   updateAreaParent,
+  updateProjectArea,
   unparkAreaById,
 } from "@/app/actions";
 import { AreaPicker } from "@/components/area-picker";
@@ -171,7 +172,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
 type GlobalInboxData = Extract<Awaited<ReturnType<typeof loadGlobalInbox>>, { ok: true }>;
 
 function GlobalInbox({ data }: { data: GlobalInboxData }) {
-  const unfiledCount = data.tasks.length + data.ideas.length + data.references.length + data.notes.length + data.entityDocs.length + data.documents.length;
+  const unfiledCount = data.tasks.length + data.projects.length + data.ideas.length + data.references.length + data.notes.length + data.entityDocs.length + data.documents.length;
   const total = data.pendingCaptures.length + data.reviewProposals.length + data.reviews.length + unfiledCount;
   return (
     <div className="space-y-6">
@@ -223,6 +224,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
               ))}
             </InboxPanel>
           ) : null}
+          {data.projects.length ? <ProjectInboxGroup projects={data.projects} areas={data.areas} /> : null}
           {data.tasks.length ? <SimpleInboxGroup title="Tasks" items={data.tasks.map((item) => ({ id: item.id, label: item.title, href: `/tasks/${item.id}` }))} /> : null}
           {data.ideas.length ? <SimpleInboxGroup title="Ideas" items={data.ideas.map((item) => ({ id: item.id, label: item.title, href: "/ideas" }))} /> : null}
           {data.references.length ? <SimpleInboxGroup title="References" items={data.references.map((item) => ({ id: item.id, label: item.title ?? item.body, href: `/references/${item.id}` }))} /> : null}
@@ -234,6 +236,42 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ProjectInboxGroup({
+  projects,
+  areas,
+}: {
+  projects: GlobalInboxData["projects"];
+  areas: GlobalInboxData["areas"];
+}) {
+  return (
+    <InboxPanel title="Projects" count={projects.length}>
+      {projects.map((project) => (
+        <article key={project.id} className="p-3.5">
+          <Link
+            href={`/projects/${project.id}`}
+            className="flex min-h-11 items-center justify-between gap-3 rounded-[10px] px-1 transition hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          >
+            <span className="min-w-0 break-words text-sm font-medium text-stone-900 [overflow-wrap:anywhere]">{project.name}</span>
+            <span className="shrink-0 rounded-full bg-[#F2F5F0] px-2 py-1 text-[11px] font-medium capitalize text-stone-500">{project.status}</span>
+          </Link>
+          <details className="mt-1">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full text-[13px] font-medium text-teal-700 transition hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
+              Assign area
+            </summary>
+            <form action={updateProjectArea} className="space-y-3 rounded-[12px] bg-[#F7F9F5] p-3">
+              <input type="hidden" name="projectId" value={project.id} />
+              <AreaPicker areas={areas} defaultAreaId={null} label="Move to" />
+              <button type="submit" className="h-11 w-full rounded-full bg-teal-700 px-5 text-sm font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">
+                Save area
+              </button>
+            </form>
+          </details>
+        </article>
+      ))}
+    </InboxPanel>
   );
 }
 
@@ -311,7 +349,7 @@ function Panel({ title, children }: { title: string; children: ReactNode[] }) {
 async function loadGlobalInbox() {
   try {
     const today = dateOnlyFromString(localDateString());
-    const [areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes, entityDocs, documents] = await Promise.all([
+    const [areas, pendingCaptures, reviewProposals, reviews, tasks, projects, ideas, references, notes, entityDocs, documents] = await Promise.all([
       prisma.area.findMany({ where: { status: "active", isSystem: false }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
       prisma.capture.findMany({
         where: {
@@ -339,13 +377,18 @@ async function loadGlobalInbox() {
         take: 30,
       }),
       prisma.task.findMany({ where: { status: "open", areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
+      prisma.project.findMany({
+        where: { areaId: null, status: { in: ["active", "someday", "parked"] } },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      }),
       prisma.idea.findMany({ where: { status: { in: ["seed", "developing"] }, areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
       prisma.reference.findMany({ where: { kind: "reference", areaId: null, projectId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
       prisma.entityNote.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
       prisma.entityDoc.findMany({ where: { parentType: null, parentId: null, status: "active" }, orderBy: { updatedAt: "desc" }, take: 30 }),
       prisma.document.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
     ]);
-    return { ok: true as const, areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes, entityDocs, documents };
+    return { ok: true as const, areas, pendingCaptures, reviewProposals, reviews, tasks, projects, ideas, references, notes, entityDocs, documents };
   } catch {
     return { ok: false as const };
   }

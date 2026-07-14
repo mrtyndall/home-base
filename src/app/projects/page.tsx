@@ -6,7 +6,7 @@ import type {
   Task,
 } from "@prisma/client";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Inbox, Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import {
   dateOnlyFromString,
@@ -32,7 +32,7 @@ export default async function ProjectsPage() {
     return <SetupNotice reason="Database is not migrated or reachable." />;
   }
 
-  const { projects, areas } = result;
+  const { projects, areas, globalInboxCount } = result;
   const recentProjects = getRecentProjects(projects);
 
   return (
@@ -58,13 +58,13 @@ export default async function ProjectsPage() {
           </Link>
         </div>
       </header>
-      <AreaShelves areas={areas} />
+      <AreaShelves areas={areas} globalInboxCount={globalInboxCount} />
       <RecentProjectsRail projects={recentProjects} />
     </div>
   );
 }
 
-function AreaShelves({ areas }: { areas: AreaListItem[] }) {
+function AreaShelves({ areas, globalInboxCount }: { areas: AreaListItem[]; globalInboxCount: number }) {
   const areasById = new Map(areas.map((area) => [area.id, area]));
   const tree = buildAreaTree(areas);
   return (
@@ -72,6 +72,19 @@ function AreaShelves({ areas }: { areas: AreaListItem[] }) {
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
         Areas
       </h2>
+      <Link
+        href="/areas/inbox"
+        className="flex min-h-11 items-center justify-between gap-3 rounded-[18px] border border-[#D8E4DF] bg-[#F2FAF7] p-4 shadow-[0_2px_8px_rgba(28,25,23,0.03)] transition hover:border-teal-700/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:p-5"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-teal-700"><Inbox size={18} /></span>
+          <span className="min-w-0">
+            <span className="block text-[17px] font-medium text-stone-950">Inbox</span>
+            <span className="block text-xs text-stone-500">{globalInboxCount === 0 ? "Inbox is clear" : "Ready to sort when you are"}</span>
+          </span>
+        </span>
+        <span aria-label={`${globalInboxCount} items`} className="shrink-0 rounded-full border border-[#D4E5DE] bg-white px-2.5 py-1 text-xs font-semibold tabular-nums text-teal-800">{globalInboxCount}</span>
+      </Link>
       {areas.length === 0 ? (
         <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/60 p-6 sm:p-8">
           <h3 className="font-serif text-[22px] font-medium text-stone-950">
@@ -424,7 +437,7 @@ function getAreaHeadline(area: AreaListItem) {
 async function loadProjects() {
   try {
     const today = dateOnlyFromString(localDateString());
-    const [projects, areas] = await Promise.all([
+    const [projects, areas, globalInboxCount] = await Promise.all([
       prisma.project.findMany({
         where: { status: { in: ["active", "someday", "parked"] } },
         include: {
@@ -446,6 +459,7 @@ async function loadProjects() {
         where: { status: { in: ["active", "parked"] }, isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
+      loadGlobalInboxCount(today),
     ]);
 
     const projectIds = projects.map((project) => project.id);
@@ -608,8 +622,35 @@ async function loadProjects() {
       ok: true as const,
       projects: projectsWithNotes,
       areas: areasWithFacts,
+      globalInboxCount,
     };
   } catch {
     return { ok: false as const };
   }
+}
+
+async function loadGlobalInboxCount(today: Date) {
+  const counts = await Promise.all([
+    prisma.capture.count({
+      where: {
+        status: "active",
+        OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
+        reviewProposals: { none: { status: { in: ["pending", "snoozed"] } } },
+      },
+    }),
+    prisma.captureReviewProposal.count({
+      where: { OR: [{ status: "pending" }, { status: "snoozed", snoozedUntil: { lte: new Date() } }] },
+    }),
+    prisma.scheduledReview.count({
+      where: { OR: [{ status: "surfaced" }, { status: "pending", reviewAt: { lte: today } }, { status: "pending", reviewAt: null }] },
+    }),
+    prisma.task.count({ where: { status: "open", areaId: null, projectId: null } }),
+    prisma.project.count({ where: { areaId: null, status: { in: ["active", "someday", "parked"] } } }),
+    prisma.idea.count({ where: { status: { in: ["seed", "developing"] }, areaId: null, projectId: null } }),
+    prisma.reference.count({ where: { kind: "reference", areaId: null, projectId: null } }),
+    prisma.entityNote.count({ where: { parentType: null, parentId: null } }),
+    prisma.entityDoc.count({ where: { parentType: null, parentId: null, status: "active" } }),
+    prisma.document.count({ where: { parentType: null, parentId: null } }),
+  ]);
+  return counts.reduce((total, count) => total + count, 0);
 }
