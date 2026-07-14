@@ -60,16 +60,7 @@ async function main() {
     });
 
     if (existingArea) {
-      await prisma.area.update({
-        where: { id: existingArea.id },
-        data: {
-          name: area.name,
-          sortOrder: area.sortOrder,
-          isSystem: area.isSystem ?? false,
-          currentState: area.currentState ?? existingArea.currentState,
-          nextStep: area.nextStep ?? existingArea.nextStep,
-        },
-      });
+      continue;
     } else {
       await createCompatibleArea(prisma, {
         ...area,
@@ -85,11 +76,8 @@ async function main() {
   ] as const;
 
   for (const [key, value] of settings) {
-    await prisma.appSetting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    });
+    const existingSetting = await prisma.appSetting.findUnique({ where: { key } });
+    if (!existingSetting) await prisma.appSetting.create({ data: { key, value } });
   }
 
   await prisma.calendarSyncState.upsert({

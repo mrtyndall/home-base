@@ -6,14 +6,14 @@ Home Base is a single-user personal operations system for tasks, calendar, areas
 
 - Next.js 16 App Router PWA
 - React 19 and Tailwind CSS 4
-- PostgreSQL, currently local through Homebrew
+- PostgreSQL on Railway as the canonical data store
 - Prisma 7 with `@prisma/adapter-pg`
 - Anthropic API for capture parsing
 - Pushover for reminder delivery
 - Google Calendar OAuth, encrypted refresh-token storage, 15-minute scheduled sync, and local calendar event storage
 - REST API plus streamable HTTP MCP server for agent access
-- Local LaunchAgents for the production app server and reminder scheduler, with Tailscale Serve for remote access
-- Railway deployment later, after the local core loop is trusted
+- Railway for the hosted app and canonical Postgres
+- Local LaunchAgents for a Railway-database-backed app server and reminder scheduler, with Tailscale Serve for remote access
 
 ## Shape
 
@@ -21,11 +21,11 @@ This is a single Next.js app, not a split frontend/backend service. Server compo
 
 ## Local Runtime
 
-The current active runtime is local:
+Railway Postgres is canonical. The local runtime is a second application origin over the same real database:
 
-- Database: Homebrew PostgreSQL database `home_base`
-- Local env: `.env.local` with `DATABASE_URL`
-- App server: LaunchAgent `com.mrtyndall.home-base`, using the production standalone server with `.env.local` loaded at start
+- Database: Railway Postgres, resolved by the LaunchAgent at runtime without storing its credential in the repository
+- Local env: `.env.local` for non-database development settings
+- App server: LaunchAgent `com.mrtyndall.home-base`, using the production standalone server against Railway Postgres
 - Reminder scheduler: LaunchAgent `com.mrtyndall.home-base-reminders`
 - Calendar sync scheduler: LaunchAgent `com.mrtyndall.home-base-calendar-sync`
 - App port: `127.0.0.1:3002`
@@ -48,8 +48,10 @@ tailscale serve status
 
 Two origins serve this app and both must be updated on release:
 
-1. **Railway** (`https://home-base-production-e3b7.up.railway.app`, Railway Postgres): deploy with `railway up --detach` from a clean `git worktree` at the release commit (the working tree may hold another agent's edits; `railway up` uploads the directory and records no git metadata). The container CMD runs `npx prisma migrate deploy` before the server starts, so additive migrations apply automatically — check deploy logs for the applied list. Verify by content fingerprint against the production URL, never by deployment status alone.
-2. **Local runtime** (`127.0.0.1:3002` behind `https://mac-studio.tail3baa7a.ts.net`, Homebrew Postgres): the LaunchAgent serves the standalone build its process loaded at start. After a release: `npm run db:migrate` (local DB), `npm run build`, then `launchctl kickstart -k gui/501/com.mrtyndall.home-base` and `launchctl kickstart -k gui/501/com.mrtyndall.home-base-mcp`. A long-lived process here is the usual cause of "production looks stale" reports, since phone shortcuts may point at the tailnet URL.
+1. **Railway** (`https://home-base-production-e3b7.up.railway.app`, canonical Railway Postgres): deploy with `railway up --detach` from a clean `git worktree` at the release commit (the working tree may hold another agent's edits; `railway up` uploads the directory and records no git metadata). The container CMD uses the lockfile-pinned Prisma CLI to run `prisma migrate deploy` before the server starts, then inserts only missing bootstrap defaults. It never reseeds Areas or overwrites settings. Check deploy logs for the applied migration list and verify by content fingerprint against the production URL, never by deployment status alone.
+2. **Local runtime** (`127.0.0.1:3002` behind `https://mac-studio.tail3baa7a.ts.net`, same canonical Railway Postgres): the LaunchAgent serves the standalone build its process loaded at start and resolves the Railway connection at runtime. After a release: `npm run build`, then `launchctl kickstart -k gui/501/com.mrtyndall.home-base` and `launchctl kickstart -k gui/501/com.mrtyndall.home-base-mcp`. Do not run local migration commands against the canonical database as part of this restart; Railway deploy owns migration application. A long-lived process here is the usual cause of "production looks stale" reports, since phone shortcuts may point at the tailnet URL.
+
+The direct Railway URL is intentionally open during the Area-first rollout. Cloudflare Zero Trust Access is the planned access boundary; its rollout is incomplete until the direct Railway origin is disabled or otherwise blocked from bypassing Cloudflare.
 
 ## Integrity Rules
 
@@ -57,8 +59,8 @@ Two origins serve this app and both must be updated on release:
 - Parser failures update the capture status but do not remove or overwrite raw input.
 - No app data uses hard deletes. Completed, killed, and parked are statuses.
 - AI-created rows link back to `capture_id`.
-- The hierarchy is capped at Domains -> Areas -> Projects -> Tasks. Areas and projects have no self-referencing parent columns.
-- Tasks attach to an area or a project; project assignment implies the task area. A database trigger keeps task/project area alignment intact.
+- Areas are flat top-level containers. Projects belong to exactly one Area, and neither Areas nor Projects have self-referencing parent columns.
+- Eligible content may remain unfiled in the global Inbox. Tasks attached to a Project mirror that Project's Area; a database trigger keeps task/project Area alignment intact.
 - Agent writes use `source = api:<key label>` where the table has a source field, and every API write creates a notification feed entry.
 - Search must include raw captures and inactive records.
 - Local database backups are part of the foundation, not a later operational cleanup.
@@ -99,7 +101,7 @@ The Railway app service is deployed with Google OAuth completed (2026-07-03, "Pr
 
 ## Hierarchy And Containers
 
-Domains are organization headers only. Areas are ongoing responsibilities and information canvases with `active`, `parked`, and `retired` statuses. They are the default holder for durable context: notes, references, docs, check-ins, standing tasks, and child projects. Projects are finishable or time-gated containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic.
+Areas are flat ongoing responsibilities and information canvases with `active`, `parked`, and `retired` statuses. They are the default holder for durable context: notes, references, docs, check-ins, standing tasks, and child projects. Projects are finishable or time-gated containers with `someday`, `active`, `parked`, `completed`, and `killed` statuses. Every Project belongs to one Area. A project requires a clear end state, deliverable, deadline, time gate, milestone path, or temporary focused effort. Someday and parked projects stay browsable, carry current state and next step, and are excluded from slipping logic. Areas never participate in slipping logic. Eligible Tasks, Notes, Documents, Ideas, and References may remain unfiled in the global Inbox; Books and Movies remain global, and People remain global with an optional Area link.
 
 Areas and projects share container tables for markdown notes (`entity_notes`), markdown docs (`entity_docs`), and file attachment metadata (`documents`). `entity_notes.starred_at` supports manually starred important notes; nothing auto-stars notes. Check-ins render at the top of both area and project pages as the living timeline, while the generated activity log remains a quieter audit trail. Project-only depth lives in `milestones`. Text-bearing state and docs are plain markdown for portability, full-text search, agent access, and future Obsidian export. Area/project state fields are optional and are shown only when the system already has real data; list cards favor derived task, activity, and note signals.
 
@@ -110,7 +112,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 - `src/app/page.tsx`: Home landing page with derived entry cards for Today, Tasks, Projects, Ideas, and Inbox.
 - `src/app/today/page.tsx`: Today screen with the all-clear state, calendar freshness, due-today/tomorrow horizon, and recently captured strip.
 - `prisma/schema.prisma`: core Section 12 data model.
-- `prisma/seed.ts`: initial domains and app settings.
+- `prisma/seed.ts`: insert-only development bootstrap for canonical starter Areas and missing app-setting defaults.
 - `scripts/backup-database.ts`: `pg_dump` backup with optional S3-compatible upload.
 - `scripts/import-apple-reminders.ts`: one-time CSV importer that writes captures then tasks.
 - `scripts/register-api-key.ts`: hashes an externally supplied API token into `api_keys`.

@@ -2,13 +2,13 @@
 
 Personal operations system for tasks, calendar, projects, ideas, captures, and search.
 
-Home Base is currently running locally while the core trust loop is built and tested. Railway remains the likely later deployment target, but local is the active mode for now.
+Home Base runs on Railway and uses Railway Postgres as its canonical database. The local LaunchAgent serves the same application build against that canonical database for local and Tailnet access.
 
 ## Local Runtime
 
 - App: Next.js 16 App Router
-- Database: Homebrew PostgreSQL database `home_base`
-- Local env: `.env.local`
+- Database: canonical Railway Postgres (the LaunchAgent resolves its connection at runtime; credentials are not stored in this repository)
+- Local env: `.env.local` for non-database development settings
 - App server: user LaunchAgent `com.mrtyndall.home-base`
 - Reminder scheduler: user LaunchAgent `com.mrtyndall.home-base-reminders`
 - Calendar sync scheduler: user LaunchAgent `com.mrtyndall.home-base-calendar-sync`
@@ -42,13 +42,11 @@ tailscale serve status
 
 ## Database
 
-Local database URL:
+Railway Postgres is the source of truth for real Home Base data. The Railway service receives `DATABASE_URL` from Railway, and the local LaunchAgent resolves the same Railway-backed connection at launch. Developers may use a disposable local PostgreSQL database for migrations and tests, but must never treat it as a production replica or run destructive verification against Railway.
 
-```bash
-postgresql://matt@localhost:5432/home_base
-```
+Database credentials stay in Railway/1Password-backed runtime configuration and must never be committed or copied into documentation. Container startup applies committed migrations and only inserts missing bootstrap defaults; it does not reseed Areas or overwrite settings.
 
-The app expects this in `.env.local` as `DATABASE_URL`. Real deployment credentials should stay out of the repo and live in 1Password/environment variables.
+The direct Railway URL is intentionally open during this rollout. Cloudflare Zero Trust Access is the planned access boundary; when it is enabled, the direct Railway origin must also be disabled or blocked so it cannot bypass Cloudflare.
 
 ## Agent Access
 
