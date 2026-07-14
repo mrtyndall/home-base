@@ -131,10 +131,14 @@ function createdTaskId(result: unknown) {
 const SMOKE_TASK_TITLE = "[HERMES-SMOKE] Agent integration verification task";
 const SMOKE_CAPTURE_IDEMPOTENCY_KEY = "5b9f23d4-3e09-4f2f-8946-bdd621b4b5b2";
 
-function matchingOpenSmokeTaskIds(result: unknown) {
+function taskPage(result: unknown) {
   const payload = textPayload(result);
   if (!Array.isArray(payload.tasks)) throw new Error("list_tasks returned no task list");
-  return payload.tasks.flatMap((task) => {
+  return payload.tasks;
+}
+
+function matchingOpenSmokeTaskIds(tasks: unknown[]) {
+  return tasks.flatMap((task) => {
     if (!task || typeof task !== "object") return [];
     const candidate = task as { id?: unknown; title?: unknown; status?: unknown };
     return candidate.title === SMOKE_TASK_TITLE &&
@@ -143,6 +147,37 @@ function matchingOpenSmokeTaskIds(result: unknown) {
       ? [candidate.id]
       : [];
   });
+}
+
+async function discoverOpenSmokeTaskIds(callTool: CallTool) {
+  const taskIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+
+  while (true) {
+    const result = await callTool({
+      name: "list_tasks",
+      arguments: {
+        q: SMOKE_TASK_TITLE,
+        view: "open",
+        limit: 100,
+        ...(cursor ? { cursor } : {}),
+      },
+    });
+    const tasks = taskPage(result);
+    for (const taskId of matchingOpenSmokeTaskIds(tasks)) taskIds.add(taskId);
+    if (tasks.length < 100) return taskIds;
+
+    const lastTask = tasks.at(-1);
+    const nextCursor = lastTask && typeof lastTask === "object" && "id" in lastTask
+      ? lastTask.id
+      : undefined;
+    if (typeof nextCursor !== "string" || !nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error("list_tasks pagination did not return a new cursor");
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
 }
 
 function errorMessage(error: unknown) {
@@ -156,11 +191,8 @@ export async function runWriteSmoke(callTool: CallTool) {
   let primaryError: unknown;
 
   try {
-    const before = await callTool({
-      name: "list_tasks",
-      arguments: { q: SMOKE_TASK_TITLE, view: "open", limit: 100 },
-    });
-    for (const taskId of matchingOpenSmokeTaskIds(before)) discoveredIds.add(taskId);
+    const before = await discoverOpenSmokeTaskIds(callTool);
+    for (const taskId of before) discoveredIds.add(taskId);
 
     textPayload(await callTool({
       name: "capture_input",
@@ -187,11 +219,8 @@ export async function runWriteSmoke(callTool: CallTool) {
 
   const cleanupErrors: string[] = [];
   try {
-    const after = await callTool({
-      name: "list_tasks",
-      arguments: { q: SMOKE_TASK_TITLE, view: "open", limit: 100 },
-    });
-    for (const taskId of matchingOpenSmokeTaskIds(after)) discoveredIds.add(taskId);
+    const after = await discoverOpenSmokeTaskIds(callTool);
+    for (const taskId of after) discoveredIds.add(taskId);
   } catch (error) {
     cleanupErrors.push(`post-write task discovery: ${errorMessage(error)}`);
   }

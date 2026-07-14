@@ -51,6 +51,10 @@ Therefore there is no safe existing credential reference or exact Hermes client 
 - `npm run build`: exit 0; Next.js production build and standalone asset copy completed.
 - `git diff --check`: exit 0.
 
+Pagination follow-up: `list_tasks` now accepts and forwards `cursor` without changing the 74-tool registry. Both smoke discovery passes exhaust all pages, reject cursor non-progress, and de-duplicate exact-title open task IDs before completion. A regression covers 101 pre-existing matches plus the newly created smoke task.
+
+Pagination follow-up verification: `npm test` passed 250/250; the MCP manifest/schema suite passed 11/11; TypeScript, lint, production build, and `git diff --check` exited 0. The health-only verifier again returned HTTP 200 for app and MCP health, then skipped authenticated checks because no dedicated bearer environment reference is available.
+
 ## Commit
 
 Conventional commit subject: `docs: add hermes integration runbook`

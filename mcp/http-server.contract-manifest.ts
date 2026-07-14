@@ -90,7 +90,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
   c("update_calendar_event", { eventId: ID, title: "Updated" }, "PATCH", `/calendar-events/${ENCODED_ID}`, { title: "Updated" }, ["eventId"]),
   c("list_notifications", {}, "GET", "/notifications"),
   c("star_task", { taskId: ID, starred: true }, "POST", `/tasks/${ENCODED_ID}/star`, { starred: true }, ["taskId"]),
-  c("list_tasks", { q: "Needle", starred: true, view: "open", limit: 5 }, "GET", "/tasks?q=Needle&starred=1&view=open&limit=5"),
+  c("list_tasks", { q: "Needle", starred: true, view: "open", limit: 5, cursor: ID }, "GET", "/tasks?q=Needle&starred=1&view=open&limit=5&cursor=seeded+id"),
   c("list_check_ins", { parentType: "area", parentId: ID }, "GET", "/check-ins?parentType=area&parentId=seeded+id"),
   c("create_check_in", { parentType: "project", parentId: ID, bodyMd: "Update" }, "POST", "/check-ins", { parentType: "project", parentId: ID, bodyMd: "Update" }),
   c("draft_check_in_summary", { parentType: "area", parentId: ID }, "POST", "/check-ins/draft", { parentType: "area", parentId: ID }),

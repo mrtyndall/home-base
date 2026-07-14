@@ -220,6 +220,36 @@ test("write smoke de-duplicates matching task discovery during cleanup", async (
   assert.deepEqual(completed.toSorted(), ["existing-task", "new-task"]);
 });
 
+test("write smoke paginates beyond 100 matching open tasks in both discovery passes", async () => {
+  const existingTasks = Array.from({ length: 101 }, (_, index) => ({
+    id: `existing-${index}`,
+    title: "[HERMES-SMOKE] Agent integration verification task",
+    status: "open",
+  }));
+  const cursors: Array<unknown> = [];
+  const completed = new Set<string>();
+  const callTool = async (request: { name: string; arguments: Record<string, unknown> }) => {
+    if (request.name === "list_tasks") {
+      const cursor = request.arguments.cursor;
+      cursors.push(cursor);
+      const start = typeof cursor === "string"
+        ? existingTasks.findIndex((task) => task.id === cursor) + 1
+        : 0;
+      return toolResult({ tasks: existingTasks.slice(start, start + 100) });
+    }
+    if (request.name === "create_task") return toolResult({ task: { id: "new-task" } });
+    if (request.name === "complete_task") completed.add(String(request.arguments.taskId));
+    return toolResult({ status: "ok" });
+  };
+
+  await runWriteSmoke(callTool);
+
+  assert.deepEqual(cursors, [undefined, "existing-99", undefined, "existing-99"]);
+  assert.equal(completed.size, 102);
+  for (const task of existingTasks) assert.equal(completed.has(task.id), true);
+  assert.equal(completed.has("new-task"), true);
+});
+
 test("write smoke reports both the primary failure and cleanup failure", async () => {
   let created = false;
   const callTool = async (request: { name: string; arguments: Record<string, unknown> }) => {

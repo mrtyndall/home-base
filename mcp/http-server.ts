@@ -670,14 +670,16 @@ export function registerTools(server: McpServer, bearerToken: string) {
         starred: z.boolean().optional(),
         view: z.enum(["open", "done"]).optional(),
         limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.string().min(1).optional(),
       }),
     },
-    async ({ q, starred, view, limit }) => {
+    async ({ q, starred, view, limit, cursor }) => {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (starred) params.set("starred", "1");
       if (view) params.set("view", view);
       if (limit) params.set("limit", String(limit));
+      if (cursor) params.set("cursor", cursor);
       const query = params.toString();
       return toToolResult(
         await apiFetch(bearerToken, `/tasks${query ? `?${query}` : ""}`),

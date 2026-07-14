@@ -13,7 +13,7 @@ Evidence labels are deliberately separate:
 | Today / all-clear | `GET /today` | `read` | `all_clear_summary` | — | Discovered | Invoked | Live not run |
 | Search | `GET /search?q=` | `read` | `search` | — | Discovered | Invoked | Live not run |
 | Lossless capture | `GET /captures`; `POST /captures` | `read`; `capture` | `list_captures`; `capture_input` (`preserve_only` accepts a stable idempotency key and skips parser/model actions) | Capture pipeline audit | Discovered | Invoked | Preserve-only + capture suites; live not run |
-| Task list/read | `GET /tasks`; `GET /tasks/:id` | `read` | `list_tasks`; `read_task` | — | Discovered | Invoked | Live not run |
+| Task list/read | `GET /tasks`; `GET /tasks/:id` | `read` | `list_tasks` (cursor-paginated); `read_task` | — | Discovered | Invoked | Live not run |
 | Task create/update | `POST /tasks`; `PATCH /tasks/:id` | `write` | `create_task`; `update_task` | `task_created`; `task_updated` | Discovered | Invoked | Task/API suites; live not run |
 | Task star/complete | `POST /tasks/:id/star`; `POST /tasks/:id/complete` | `write` | `star_task`; `complete_task` | `task_starred` / `task_unstarred`; completion audit | Discovered | Invoked | Task suites; live not run |
 | Area list/read/aggregate | `GET /areas`; `GET /areas/:id`; `GET /areas/:id/aggregate` | `read` | `list_areas`; `read_area`; `read_area_aggregate` | — | Discovered | Invoked | Hierarchy suite; live not run |

@@ -110,6 +110,13 @@ test("capture_input exposes the persistence-only idempotent smoke contract", () 
   }).success, false);
 });
 
+test("list_tasks exposes cursor pagination without adding another tool", () => {
+  const listTasks = collectTools().find((tool) => tool.name === "list_tasks");
+  assert.ok(listTasks?.config.inputSchema);
+  assert.equal(listTasks.config.inputSchema.safeParse({ cursor: "task-100" }).success, true);
+  assert.equal(listTasks.config.inputSchema.safeParse({ cursor: "" }).success, false);
+});
+
 test("every Home Base MCP tool matches its expected REST method, path, query, and body", async () => {
   const calls: Array<{ path: string; method: string; body?: unknown; authorization?: string }> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

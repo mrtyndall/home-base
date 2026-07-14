@@ -103,7 +103,7 @@ The write smoke is off by default. Its only opt-in value is `1`:
 HOME_BASE_ENABLE_WRITE_SMOKE=1 npm run verify:agent-integration
 ```
 
-That smoke submits a fixed, idempotent `[HERMES-SMOKE]` capture with `captureIntent: preserve_only`, which writes the sacred capture ledger and pending audit record without invoking model parsing or parser actions. It then lists matching open smoke tasks, creates the fixed-title smoke task, and completes it. A final task lookup completes every matching open residue, including a task whose create response was lost. It never deletes either record. Run it only with the dedicated `read,write,capture` key.
+That smoke submits a fixed, idempotent `[HERMES-SMOKE]` capture with `captureIntent: preserve_only`, which writes the sacred capture ledger and pending audit record without invoking model parsing or parser actions. It then cursor-paginates through every matching open smoke task, creates the fixed-title smoke task, and completes it. A final fully paginated lookup completes every matching open residue, including a task whose create response was lost. It never deletes either record. Run it only with the dedicated `read,write,capture` key.
 
 `HOME_BASE_UNSAFE_ALLOW_UNVERIFIED_HOST=1` disables the verified-origin check for HTTPS. This is an emergency diagnostic escape hatch: it can send the bearer credential to an attacker-controlled host. Do not set it in Hermes, LaunchAgents, shell profiles, or routine verification. Prefer adding a newly verified Home Base origin to the source allowlist with tests and review.
 
