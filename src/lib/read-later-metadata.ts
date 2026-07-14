@@ -20,7 +20,19 @@ export type MetadataResponse = {
 
 export type MetadataDependencies = {
   resolve(hostname: string): Promise<MetadataAddress[]>;
-  request(url: URL, address: MetadataAddress, timeoutMs?: number): Promise<MetadataResponse>;
+  request(
+    url: URL,
+    address: MetadataAddress,
+    context: { signal: AbortSignal; deadline: number },
+  ): Promise<MetadataResponse>;
+  clock?: MetadataClock;
+  timeoutMs?: number;
+};
+
+export type MetadataClock = {
+  now(): number;
+  setTimeout(callback: () => void, delay: number): unknown;
+  clearTimeout(handle: unknown): void;
 };
 
 const TIMEOUT_MS = 3_000;
@@ -95,7 +107,7 @@ export function isPublicMetadataAddress(address: string) {
   const denied: Array<[string, number]> = [
     ["::", 96], ["100::", 64], ["64:ff9b:1::", 48], ["2001::", 23],
     ["2001:db8::", 32], ["2002::", 16], ["3fff::", 20], ["5f00::", 16],
-    ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
+    ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
   ];
   return !denied.some(([base, bits]) => ipv6InCidr(value, base, bits));
 }
@@ -133,7 +145,37 @@ export function createPinnedLookup(hostname: string, address: MetadataAddress) {
   }) as LookupFunction;
 }
 
-async function defaultRequest(url: URL, address: MetadataAddress, timeoutMs = TIMEOUT_MS): Promise<MetadataResponse> {
+function timeoutError() {
+  return new Error("Metadata request timed out.");
+}
+
+function abortReason(signal: AbortSignal) {
+  return signal.reason instanceof Error ? signal.reason : timeoutError();
+}
+
+function withAbort<T>(operation: PromiseLike<T>, signal: AbortSignal, onAbort?: () => void) {
+  if (signal.aborted) {
+    onAbort?.();
+    return Promise.reject(abortReason(signal));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const aborted = () => {
+      onAbort?.();
+      reject(abortReason(signal));
+    };
+    signal.addEventListener("abort", aborted, { once: true });
+    Promise.resolve(operation).then(
+      (value) => { signal.removeEventListener("abort", aborted); resolve(value); },
+      (error) => { signal.removeEventListener("abort", aborted); reject(error); },
+    );
+  });
+}
+
+async function defaultRequest(
+  url: URL,
+  address: MetadataAddress,
+  context: { signal: AbortSignal },
+): Promise<MetadataResponse> {
   const transport = url.protocol === "https:" ? https : http;
   const hostname = hostnameOf(url);
   return new Promise((resolve, reject) => {
@@ -142,19 +184,36 @@ async function defaultRequest(url: URL, address: MetadataAddress, timeoutMs = TI
       headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "HomeBase-ReadLater/1.0" },
       lookup: createPinnedLookup(hostname, address),
       ...(url.protocol === "https:" && !isIP(hostname) ? { servername: hostname } : {}),
-    }, (response) => resolve({
-      statusCode: response.statusCode ?? 0,
-      headers: response.headers,
-      body: response,
-      cancel: () => response.destroy(),
-    }));
-    request.setTimeout(Math.max(1, timeoutMs), () => request.destroy(new Error("Metadata request timed out.")));
-    request.once("error", reject);
+    }, (response) => {
+      context.signal.removeEventListener("abort", abortRequest);
+      if (context.signal.aborted) {
+        response.destroy(abortReason(context.signal));
+        reject(abortReason(context.signal));
+        return;
+      }
+      resolve({
+        statusCode: response.statusCode ?? 0,
+        headers: response.headers,
+        body: response,
+        cancel: () => response.destroy(),
+      });
+    });
+    const abortRequest = () => request.destroy(abortReason(context.signal));
+    context.signal.addEventListener("abort", abortRequest, { once: true });
+    request.once("error", (error) => {
+      context.signal.removeEventListener("abort", abortRequest);
+      reject(error);
+    });
     request.end();
   });
 }
 
 const DEFAULT_DEPENDENCIES: MetadataDependencies = { resolve: defaultResolve, request: defaultRequest };
+const DEFAULT_CLOCK: MetadataClock = {
+  now: Date.now,
+  setTimeout: (callback, delay) => setTimeout(callback, delay),
+  clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
 
 function header(headers: MetadataResponse["headers"], name: string) {
   const value = headers[name] ?? headers[name.toLowerCase()];
@@ -183,14 +242,18 @@ function parseMetadata(html: string): ReadLaterPageMetadata {
   };
 }
 
-async function readBoundedHtml(response: MetadataResponse) {
+async function readBoundedHtml(response: MetadataResponse, signal: AbortSignal) {
   if (Number(header(response.headers, "content-length") ?? 0) > MAX_HTML_BYTES) {
     response.cancel();
     throw new Error("Metadata response is too large.");
   }
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for await (const chunk of response.body) {
+  const iterator = response.body[Symbol.asyncIterator]();
+  while (true) {
+    const next = await withAbort(iterator.next(), signal, () => response.cancel());
+    if (next.done) break;
+    const chunk = next.value;
     total += chunk.byteLength;
     if (total > MAX_HTML_BYTES) {
       response.cancel();
@@ -205,37 +268,47 @@ async function readBoundedHtml(response: MetadataResponse) {
 }
 
 export async function fetchReadLaterMetadata(rawUrl: string, dependencies: MetadataDependencies = DEFAULT_DEPENDENCIES) {
-  const deadline = Date.now() + TIMEOUT_MS;
+  const clock = dependencies.clock ?? DEFAULT_CLOCK;
+  const timeoutMs = dependencies.timeoutMs ?? TIMEOUT_MS;
+  const deadline = clock.now() + timeoutMs;
+  const controller = new AbortController();
+  const timer = clock.setTimeout(() => controller.abort(timeoutError()), timeoutMs);
   let url = new URL(rawUrl);
-  for (let redirects = 0; ; redirects += 1) {
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
-      throw new Error("Metadata URL is not allowed.");
+  try {
+    for (let redirects = 0; ; redirects += 1) {
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+        throw new Error("Metadata URL is not allowed.");
+      }
+      const hostname = hostnameOf(url);
+      assertAllowedHost(hostname);
+      const addresses = await withAbort(dependencies.resolve(hostname), controller.signal);
+      if (!addresses.length || addresses.some(({ address }) => !isPublicMetadataAddress(address))) {
+        throw new Error("Metadata host is not allowed.");
+      }
+      if (clock.now() >= deadline) throw timeoutError();
+      const response = await withAbort(
+        dependencies.request(url, addresses[0], { signal: controller.signal, deadline }),
+        controller.signal,
+      );
+      if (response.statusCode >= 300 && response.statusCode < 400) {
+        const location = header(response.headers, "location");
+        response.cancel();
+        if (!location) throw new Error("Metadata redirect has no location.");
+        if (redirects >= MAX_REDIRECTS) throw new Error("Metadata redirected too many times.");
+        url = new URL(location, url);
+        continue;
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        response.cancel();
+        throw new Error("Metadata request failed.");
+      }
+      if (!(header(response.headers, "content-type") ?? "").toLowerCase().includes("text/html")) {
+        response.cancel();
+        return {};
+      }
+      return parseMetadata(await readBoundedHtml(response, controller.signal));
     }
-    const hostname = hostnameOf(url);
-    assertAllowedHost(hostname);
-    const addresses = await dependencies.resolve(hostname);
-    if (!addresses.length || addresses.some(({ address }) => !isPublicMetadataAddress(address))) {
-      throw new Error("Metadata host is not allowed.");
-    }
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) throw new Error("Metadata request timed out.");
-    const response = await dependencies.request(url, addresses[0], remaining);
-    if (response.statusCode >= 300 && response.statusCode < 400) {
-      const location = header(response.headers, "location");
-      response.cancel();
-      if (!location) throw new Error("Metadata redirect has no location.");
-      if (redirects >= MAX_REDIRECTS) throw new Error("Metadata redirected too many times.");
-      url = new URL(location, url);
-      continue;
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      response.cancel();
-      throw new Error("Metadata request failed.");
-    }
-    if (!(header(response.headers, "content-type") ?? "").toLowerCase().includes("text/html")) {
-      response.cancel();
-      return {};
-    }
-    return parseMetadata(await readBoundedHtml(response));
+  } finally {
+    clock.clearTimeout(timer);
   }
 }

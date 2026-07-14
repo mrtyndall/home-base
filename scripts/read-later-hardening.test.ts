@@ -11,7 +11,9 @@ type MetadataResponse = {
 };
 type MetadataDependencies = {
   resolve(hostname: string): Promise<MetadataAddress[]>;
-  request(url: URL, address: MetadataAddress): Promise<MetadataResponse>;
+  request(url: URL, address: MetadataAddress, context?: { signal: AbortSignal; deadline: number }): Promise<MetadataResponse>;
+  clock?: FakeClock;
+  timeoutMs?: number;
 };
 type Metadata = { title?: string; description?: string; siteName?: string };
 type ReadLaterApi = typeof readLaterModule & {
@@ -24,6 +26,32 @@ type ReadLaterApi = typeof readLaterModule & {
   fetchReadLaterMetadata(url: string, dependencies: MetadataDependencies): Promise<Metadata>;
 };
 const readLater = readLaterModule as ReadLaterApi;
+
+class FakeClock {
+  private time = 0;
+  private nextId = 1;
+  private timers = new Map<number, { at: number; callback: () => void }>();
+
+  now = () => this.time;
+
+  setTimeout = (callback: () => void, delay: number) => {
+    const id = this.nextId++;
+    this.timers.set(id, { at: this.time + delay, callback });
+    return id;
+  };
+
+  clearTimeout = (id: number) => { this.timers.delete(id); };
+
+  advance(milliseconds: number) {
+    this.time += milliseconds;
+    const due = [...this.timers.entries()]
+      .filter(([, timer]) => timer.at <= this.time)
+      .sort((left, right) => left[1].at - right[1].at);
+    for (const [id, timer] of due) {
+      if (this.timers.delete(id)) timer.callback();
+    }
+  }
+}
 
 function response(
   chunks: Uint8Array[],
@@ -175,6 +203,57 @@ test("metadata address policy rejects private, special, and mapped-private addre
   }
   assert.equal(readLater.isPublicMetadataAddress("93.184.216.34"), true);
   assert.equal(readLater.isPublicMetadataAddress("2606:2800:220:1:248:1893:25c8:1946"), true);
+});
+
+test("metadata address policy rejects both boundaries of deprecated IPv6 site-local space", () => {
+  assert.equal(readLater.isPublicMetadataAddress("fec0::"), false);
+  assert.equal(readLater.isPublicMetadataAddress("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), false);
+});
+
+test("one absolute deadline rejects DNS that never settles", async () => {
+  const clock = new FakeClock();
+  let requested = false;
+  const operation = readLater.fetchReadLaterMetadata("https://example.net/hung-dns", {
+    resolve: async () => new Promise<MetadataAddress[]>(() => undefined),
+    request: async () => { requested = true; return page("").value; },
+    clock,
+    timeoutMs: 10,
+  });
+  await Promise.resolve();
+  clock.advance(10);
+  const outcome = await Promise.race([
+    operation.then(() => "resolved", (error: Error) => error.message),
+    new Promise<string>((resolve) => setTimeout(() => resolve("HARNESS_TIMEOUT"), 50)),
+  ]);
+  assert.equal(outcome, "Metadata request timed out.");
+  assert.equal(requested, false);
+});
+
+test("continuous trickle traffic cannot extend the absolute deadline", async () => {
+  const clock = new FakeClock();
+  let cancelled = false;
+  const trickle: MetadataResponse = {
+    statusCode: 200,
+    headers: { "content-type": "text/html" },
+    body: (async function* () {
+      for (let index = 0; index < 10; index += 1) {
+        clock.advance(4);
+        await Promise.resolve();
+        yield new TextEncoder().encode("x");
+      }
+    })(),
+    cancel() { cancelled = true; },
+  };
+  await assert.rejects(
+    readLater.fetchReadLaterMetadata("https://example.net/trickle", {
+      resolve: async () => [{ address: "93.184.216.34", family: 4 }],
+      request: async () => trickle,
+      clock,
+      timeoutMs: 10,
+    }),
+    /timed out/i,
+  );
+  assert.equal(cancelled, true);
 });
 
 test("metadata rejects special hosts and any hostname resolving partly private", async () => {
