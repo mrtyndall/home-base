@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  updateAreaWithValidatedParent,
   assertValidAreaParent,
   buildAreaTree,
   flattenAreaOptions,
@@ -105,6 +106,47 @@ test("assertValidAreaParent normalizes an empty optional parent to null", async 
     },
   });
   assert.deepEqual(calls, []);
+});
+
+test("updateAreaWithValidatedParent locks the hierarchy before validation and update", async () => {
+  const calls: string[] = [];
+  const rows = new Map([
+    ["child", { id: "child", parentAreaId: null as string | null }],
+    ["parent", { id: "parent", parentAreaId: null as string | null }],
+  ]);
+  const client = {
+    $queryRawUnsafe: async (query: string, namespace: number, key: number) => {
+      calls.push(`lock:${query}:${namespace}:${key}`);
+      return [{ pg_advisory_xact_lock: null }];
+    },
+    area: {
+      findUnique: async ({ where }: { where: { id: string } }) => {
+        calls.push(`find:${where.id}`);
+        return rows.get(where.id) ?? null;
+      },
+      update: async ({ where, data }: {
+        where: { id: string };
+        data: { parentAreaId: string | null; name?: string };
+      }) => {
+        calls.push(`update:${where.id}:${data.parentAreaId}:${data.name}`);
+        return { ...rows.get(where.id)!, ...data };
+      },
+    },
+  };
+
+  const updated = await updateAreaWithValidatedParent(
+    "child",
+    "parent",
+    () => client.area.update({
+      where: { id: "child" },
+      data: { parentAreaId: "parent", name: "Renamed" },
+    }),
+    client as never,
+  );
+
+  assert.equal(updated.parentAreaId, "parent");
+  assert.match(calls[0], /^lock:SELECT .*pg_advisory_xact_lock/);
+  assert.deepEqual(calls.slice(1), ["find:parent", "update:child:parent:Renamed"]);
 });
 
 function parentClient(rows: Array<{ id: string; parentAreaId: string | null }>) {

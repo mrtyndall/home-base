@@ -26,6 +26,13 @@ type AreaParentClient = {
   };
 };
 
+type AreaHierarchyLockClient = AreaParentClient & {
+  $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>;
+};
+
+const AREA_HIERARCHY_LOCK_NAMESPACE = 1_214_809_704;
+const AREA_HIERARCHY_LOCK_KEY = 1;
+
 export type ProjectMutationValidationCode =
   | "area_not_found"
   | "conflicting_area_fields"
@@ -220,4 +227,25 @@ export async function assertValidAreaParent(
     }
     ancestorId = ancestor.parentAreaId;
   }
+}
+
+/**
+ * Serialize every Area reparent operation across all app processes. The caller
+ * must provide a Prisma transaction client so the advisory lock remains held
+ * through the supplied mutation and is released automatically on commit or
+ * rollback.
+ */
+export async function updateAreaWithValidatedParent<T>(
+  areaId: string,
+  parentAreaId: string | null,
+  mutation: () => Promise<T>,
+  client: AreaHierarchyLockClient,
+): Promise<T> {
+  await client.$queryRawUnsafe(
+    "SELECT 1::integer AS locked FROM pg_advisory_xact_lock($1::integer, $2::integer)",
+    AREA_HIERARCHY_LOCK_NAMESPACE,
+    AREA_HIERARCHY_LOCK_KEY,
+  );
+  await assertValidAreaParent(areaId, parentAreaId, client);
+  return mutation();
 }

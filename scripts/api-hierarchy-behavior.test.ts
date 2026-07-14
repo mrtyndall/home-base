@@ -40,6 +40,10 @@ function apiClient(seed?: { areas?: Area[]; failActivity?: boolean }) {
   const notifications: Array<Record<string, unknown>> = [];
 
   const transaction = {
+    $queryRawUnsafe: async () => {
+      calls.push("hierarchy:lock");
+      return [{ pg_advisory_xact_lock: null }];
+    },
     area: {
       findFirst: async ({ where }: { where: Record<string, unknown> }) => {
         const area = typeof where.id === "string"
@@ -64,6 +68,7 @@ function apiClient(seed?: { areas?: Area[]; failActivity?: boolean }) {
       update: async ({ where, data }: { where: { id: string }; data: Partial<Area> }) => {
         const area = areas.get(where.id);
         if (!area) throw new Error("record missing");
+        calls.push("area:update");
         Object.assign(area, data);
         return { ...area };
       },
@@ -227,6 +232,26 @@ test("Area PATCH rejects cycles and returns 404 for a missing Area", async () =>
     missing = error;
   }
   assert.equal(toHierarchyApiError(missing)?.status, 404);
+});
+
+test("Area PATCH holds the hierarchy lock through update and audit", async () => {
+  const fake = apiClient({ areas: [
+    { id: "root", name: "Root", parentAreaId: null, sortOrder: 0, status: "active", isSystem: false },
+    { id: "child", name: "Child", parentAreaId: null, sortOrder: 0, status: "active", isSystem: false },
+  ] });
+
+  await patchAreaForApi(
+    "child",
+    { parentAreaId: "root" },
+    { label: "Hermes" },
+    fake.client as never,
+  );
+
+  const lockIndex = fake.calls.indexOf("hierarchy:lock");
+  const updateIndex = fake.calls.indexOf("area:update");
+  const auditIndex = fake.calls.indexOf("notification");
+  assert.ok(lockIndex >= 0 && lockIndex < updateIndex);
+  assert.ok(updateIndex < auditIndex);
 });
 
 test("Area POST uses a non-empty generated ID and treats an empty parent as root", async () => {

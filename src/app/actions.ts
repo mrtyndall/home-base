@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { createCompatibleArea } from "@/lib/area-compat";
-import { assertValidAreaParent, fileProject } from "@/lib/hierarchy";
+import { fileProject, updateAreaWithValidatedParent } from "@/lib/hierarchy";
 import { resolveVerifiedDestination } from "@/lib/destinations";
 import {
   createReadLater,
@@ -1078,8 +1078,12 @@ export async function updateAreaParent(formData: FormData) {
       });
       if (!parent) throw new Error("Parent Area not found.");
     }
-    await assertValidAreaParent(areaId, parentAreaId, transaction);
-    await transaction.area.update({ where: { id: areaId }, data: { parentAreaId } });
+    await updateAreaWithValidatedParent(
+      areaId,
+      parentAreaId,
+      () => transaction.area.update({ where: { id: areaId }, data: { parentAreaId } }),
+      transaction,
+    );
   });
 
   revalidatePath("/projects");

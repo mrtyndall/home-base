@@ -6,6 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "test": "tsx --test scripts/*.test.ts",
     "test:read-later-postgres": "tsx scripts/read-later-postgres.integration.ts",
+    "test:hierarchy-postgres": "tsx scripts/hierarchy-postgres.integration.ts",
     "build": "prisma generate && next build && npm run build:standalone-assets",
     "build:standalone-assets": "rm -rf .next/standalone/.next/static .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static && cp -R public .next/standalone/public",
     "start": "prisma migrate deploy && DOTENV_CONFIG_PATH=.env.local HOSTNAME=0.0.0.0 PORT=${PORT:-3002} node -r dotenv/config .next/standalone/server.js",

@@ -7,6 +7,7 @@ import {
   mutateProject,
   ProjectMutationValidationError,
   resolveEligibleProjectAreaReference,
+  updateAreaWithValidatedParent,
 } from "@/lib/hierarchy";
 
 export type ApiHierarchyActor = { label: string };
@@ -176,10 +177,7 @@ export async function patchAreaForApi(
     const parentAreaId = input.parentAreaId === undefined
       ? undefined
       : input.parentAreaId?.trim() || null;
-    if (parentAreaId !== undefined) {
-      await assertValidAreaParent(areaId, parentAreaId, transaction);
-    }
-    const area = await transaction.area.update({
+    const update = () => transaction.area.update({
       where: { id: areaId },
       data: {
         name: input.name,
@@ -191,6 +189,9 @@ export async function patchAreaForApi(
         sortOrder: input.sortOrder,
       },
     });
+    const area = parentAreaId === undefined
+      ? await update()
+      : await updateAreaWithValidatedParent(areaId, parentAreaId, update, transaction);
     await transaction.notification.create({
       data: {
         type: "area_updated",
