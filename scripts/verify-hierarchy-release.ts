@@ -29,6 +29,15 @@ type ReleaseQueryClient = {
   query(sql: string): Promise<{ rows: unknown[] }>;
 };
 
+type ReleaseSchemaCapabilities = {
+  hasParentAreaId: boolean;
+  hasReadLaterColumns: boolean;
+  readLaterStatusConstraintDefinition: string | null;
+  readLaterActiveUrlIndexDefinition: string | null;
+  readLaterActiveUrlIndexPredicate: string | null;
+  readLaterActiveUrlIndexIsUnique: boolean;
+};
+
 const baselineFields = [
   ["books", "expected-books"],
   ["movies", "expected-movies"],
@@ -94,6 +103,65 @@ export function evaluateHierarchyRelease(
   return failures;
 }
 
+function sqlLiterals(definition: string) {
+  return Array.from(definition.matchAll(/'((?:''|[^'])*)'/g), (match) =>
+    match[1].replaceAll("''", "'"),
+  );
+}
+
+function normalizedSql(definition: string) {
+  return definition
+    .toLowerCase()
+    .replaceAll('"', "")
+    .replace(/::(?:pg_catalog\.)?text/g, "")
+    .replace(/\s+/g, "");
+}
+
+function hasExactLiterals(definition: string, expected: readonly string[]) {
+  return sqlLiterals(definition).sort().join("\0") === [...expected].sort().join("\0");
+}
+
+function hasValidReadLaterStatusConstraint(definition: string | null) {
+  if (!definition || !hasExactLiterals(definition, ["unread", "read", "archived"])) {
+    return false;
+  }
+  const shape = normalizedSql(definition)
+    .replace(/[()]/g, "")
+    .replace(/'(?:''|[^'])*'/g, "'value'");
+  return shape === "checkread_status=anyarray['value','value','value']";
+}
+
+function hasValidReadLaterActiveUrlIndex(capabilities: ReleaseSchemaCapabilities) {
+  const definition = capabilities.readLaterActiveUrlIndexDefinition;
+  const predicate = capabilities.readLaterActiveUrlIndexPredicate;
+  if (!definition || !predicate || !capabilities.readLaterActiveUrlIndexIsUnique) return false;
+
+  const normalizedDefinition = normalizedSql(definition);
+  const hasExpectedKey = /^createuniqueindexreferences_active_read_later_normalized_url_keyon(?:[a-z0-9_]+\.)?referencesusingbtree\(normalized_url\)where/.test(
+    normalizedDefinition,
+  );
+  if (!hasExpectedKey || /\bOR\b/i.test(predicate)) return false;
+
+  const normalizedPredicate = normalizedSql(predicate).replace(/[()]/g, "");
+  const conjunctions = predicate.match(/\bAND\b/gi)?.length ?? 0;
+  return conjunctions === 2
+    && hasExactLiterals(predicate, ["read_later", "unread", "read"])
+    && normalizedPredicate.includes("kind='read_later'")
+    && normalizedPredicate.includes("normalized_urlisnotnull")
+    && normalizedPredicate.includes("read_status=anyarray[");
+}
+
+function readLaterProtectionFailures(capabilities: ReleaseSchemaCapabilities) {
+  const failures: string[] = [];
+  if (!hasValidReadLaterStatusConstraint(capabilities.readLaterStatusConstraintDefinition)) {
+    failures.push("Read Later status constraint is missing or invalid.");
+  }
+  if (!hasValidReadLaterActiveUrlIndex(capabilities)) {
+    failures.push("Read Later active URL index is missing or invalid.");
+  }
+  return failures;
+}
+
 async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
   const result = await client.query(`
     SELECT
@@ -110,15 +178,64 @@ async function releaseSchemaCapabilities(client: ReleaseQueryClient) {
         WHERE table_schema = current_schema()
           AND table_name = 'references'
           AND column_name IN ('normalized_url', 'read_status', 'saved_at', 'read_at')
-      ) AS "hasReadLaterColumns"
+      ) AS "hasReadLaterColumns",
+      (
+        SELECT pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
+        FROM pg_catalog.pg_constraint constraint_row
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = constraint_row.conrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND constraint_row.conname = 'references_read_status_check'
+          AND constraint_row.contype = 'c'
+        LIMIT 1
+      ) AS "readLaterStatusConstraintDefinition",
+      (
+        SELECT index_row.indexdef
+        FROM pg_catalog.pg_indexes index_row
+        WHERE index_row.schemaname = current_schema()
+          AND index_row.tablename = 'references'
+          AND index_row.indexname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ) AS "readLaterActiveUrlIndexDefinition",
+      (
+        SELECT pg_catalog.pg_get_expr(index_catalog.indpred, index_catalog.indrelid, true)
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ) AS "readLaterActiveUrlIndexPredicate",
+      COALESCE((
+        SELECT index_catalog.indisunique
+        FROM pg_catalog.pg_index index_catalog
+        JOIN pg_catalog.pg_class index_class ON index_class.oid = index_catalog.indexrelid
+        JOIN pg_catalog.pg_class table_row ON table_row.oid = index_catalog.indrelid
+        JOIN pg_catalog.pg_namespace namespace_row ON namespace_row.oid = table_row.relnamespace
+        WHERE namespace_row.nspname = current_schema()
+          AND table_row.relname = 'references'
+          AND index_class.relname = 'references_active_read_later_normalized_url_key'
+        LIMIT 1
+      ), false) AS "readLaterActiveUrlIndexIsUnique"
   `);
   const row = result.rows[0] as {
     hasParentAreaId?: boolean;
     hasReadLaterColumns?: boolean;
+    readLaterStatusConstraintDefinition?: string | null;
+    readLaterActiveUrlIndexDefinition?: string | null;
+    readLaterActiveUrlIndexPredicate?: string | null;
+    readLaterActiveUrlIndexIsUnique?: boolean;
   } | undefined;
   return {
     hasParentAreaId: row?.hasParentAreaId === true,
     hasReadLaterColumns: row?.hasReadLaterColumns === true,
+    readLaterStatusConstraintDefinition: row?.readLaterStatusConstraintDefinition ?? null,
+    readLaterActiveUrlIndexDefinition: row?.readLaterActiveUrlIndexDefinition ?? null,
+    readLaterActiveUrlIndexPredicate: row?.readLaterActiveUrlIndexPredicate ?? null,
+    readLaterActiveUrlIndexIsUnique: row?.readLaterActiveUrlIndexIsUnique === true,
   };
 }
 
@@ -253,7 +370,8 @@ export async function runHierarchyReleaseVerification(
 
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
-    const { hasParentAreaId, hasReadLaterColumns } = await releaseSchemaCapabilities(client);
+    const capabilities = await releaseSchemaCapabilities(client);
+    const { hasParentAreaId, hasReadLaterColumns } = capabilities;
     if (baseline !== null && !hasParentAreaId) {
       throw new Error(
         "Hierarchy release verification failed: areas.parent_area_id is missing; run strict postflight after the hierarchy migration.",
@@ -263,6 +381,14 @@ export async function runHierarchyReleaseVerification(
       throw new Error(
         "Hierarchy release verification failed: Read Later columns are missing; run strict postflight after the Read Later migration.",
       );
+    }
+    if (baseline !== null) {
+      const protectionFailures = readLaterProtectionFailures(capabilities);
+      if (protectionFailures.length > 0) {
+        throw new Error(
+          `Hierarchy release verification failed:\n- ${protectionFailures.join("\n- ")}`,
+        );
+      }
     }
     const counts = await collectHierarchyReleaseCounts(
       client,

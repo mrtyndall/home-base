@@ -23,6 +23,42 @@ const cleanCounts: HierarchyReleaseCounts = {
   referenceCount: "23",
 };
 
+const completeReadLaterProtection = {
+  hasParentAreaId: true,
+  hasReadLaterColumns: true,
+  readLaterStatusConstraintDefinition:
+    "CHECK ((read_status = ANY (ARRAY['unread'::text, 'read'::text, 'archived'::text])))",
+  readLaterActiveUrlIndexDefinition:
+    "CREATE UNIQUE INDEX references_active_read_later_normalized_url_key ON public.references USING btree (normalized_url) WHERE ((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
+  readLaterActiveUrlIndexPredicate:
+    "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
+  readLaterActiveUrlIndexIsUnique: true,
+};
+
+const strictArgs = [
+  "--expected-books=12",
+  "--expected-movies=8",
+  "--expected-areas=5",
+  "--expected-projects=7",
+  "--expected-references=23",
+];
+
+async function runStrictWithProtection(overrides: Record<string, unknown>) {
+  const queries: string[] = [];
+  const client = {
+    async query(sql: string) {
+      queries.push(sql);
+      if (/information_schema\.columns/.test(sql)) {
+        return { rows: [{ ...completeReadLaterProtection, ...overrides }] };
+      }
+      if (/WITH RECURSIVE/.test(sql)) return { rows: [cleanCounts] };
+      return { rows: [] };
+    },
+  };
+  await runHierarchyReleaseVerification(client, strictArgs, () => undefined);
+  return queries;
+}
+
 test("preflight reports all preservation baselines without requiring expected flags", () => {
   assert.equal(parseHierarchyBaseline(["--preflight"]), null);
   assert.deepEqual(evaluateHierarchyRelease(cleanCounts, null), []);
@@ -159,6 +195,91 @@ test("strict postflight requires the additive Read Later columns", async () => {
     ]),
     /Read Later columns are missing/,
   );
+  assert.equal(queries.at(-1), "ROLLBACK");
+});
+
+test("strict postflight rejects all columns with the named status constraint missing", async () => {
+  await assert.rejects(
+    runStrictWithProtection({ readLaterStatusConstraintDefinition: null }),
+    /Read Later status constraint is missing or invalid/,
+  );
+});
+
+test("preflight remains safe on a partial schema with columns but no protections", async () => {
+  const output: string[] = [];
+  const client = {
+    async query(sql: string) {
+      if (/information_schema\.columns/.test(sql)) {
+        return {
+          rows: [{
+            ...completeReadLaterProtection,
+            readLaterStatusConstraintDefinition: null,
+            readLaterActiveUrlIndexDefinition: null,
+            readLaterActiveUrlIndexPredicate: null,
+            readLaterActiveUrlIndexIsUnique: false,
+          }],
+        };
+      }
+      if (/WITH RECURSIVE/.test(sql)) return { rows: [cleanCounts] };
+      return { rows: [] };
+    },
+  };
+
+  await runHierarchyReleaseVerification(client, ["--preflight"], (line) => output.push(line));
+  assert.match(output.join("\n"), /--expected-references=23/);
+});
+
+test("strict postflight rejects a status constraint with the wrong allowed values", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterStatusConstraintDefinition:
+        "CHECK ((read_status = ANY (ARRAY['unread'::text, 'read'::text, 'deleted'::text])))",
+    }),
+    /Read Later status constraint is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects all columns with the named active URL index missing", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexDefinition: null,
+      readLaterActiveUrlIndexPredicate: null,
+      readLaterActiveUrlIndexIsUnique: null,
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects a non-unique active URL index", async () => {
+  await assert.rejects(
+    runStrictWithProtection({ readLaterActiveUrlIndexIsUnique: false }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects a named active URL index on the wrong key", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexDefinition:
+        "CREATE UNIQUE INDEX references_active_read_later_normalized_url_key ON public.references USING btree (url) WHERE ((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight rejects an active URL index with the wrong predicate", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = 'unread'::text))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight accepts the complete named Read Later protection schema", async () => {
+  const queries = await runStrictWithProtection({});
+  assert.equal(queries[0], "BEGIN TRANSACTION READ ONLY");
   assert.equal(queries.at(-1), "ROLLBACK");
 });
 

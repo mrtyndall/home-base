@@ -57,7 +57,7 @@ npm run verify:hierarchy-release -- \
   --expected-references=<count>
 ```
 
-Both modes reject missing Project Area targets and Task/Idea/Reference Area mirrors that disagree with their Project. On the legacy schema, preflight detects absent hierarchy and Read Later columns and substitutes only the checks that are safe against that schema; its count query never names columns that do not exist. Strict postflight requires both additive schemas, rejects Area cycles and missing Area parents, and rejects duplicate active Read Later normalized URLs, invalid Read Later statuses, or drift in any retained Book, Movie, Area, Project, or Reference count. Both modes open a read-only transaction and require a successful rollback; they do not migrate or repair data.
+Both modes reject missing Project Area targets and Task/Idea/Reference Area mirrors that disagree with their Project. On the legacy schema, preflight detects absent hierarchy and Read Later columns and substitutes only the checks that are safe against that schema; its count query never names columns that do not exist. Strict postflight requires the additive columns plus the named three-status check constraint and unique active normalized-URL partial index with their intended definitions. It also rejects Area cycles, missing Area parents, duplicate active Read Later normalized URLs, invalid Read Later statuses, or drift in any retained Book, Movie, Area, Project, or Reference count. Both modes open a read-only transaction and require a successful rollback; they do not migrate or repair data.
 
 ## Read Later
 
