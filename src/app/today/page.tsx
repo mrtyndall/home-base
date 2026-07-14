@@ -48,7 +48,6 @@ export default async function TodayPage() {
                     key={task.id}
                     task={task}
                     today={data.today}
-                    tomorrow={data.tomorrow}
                     grouped
                   />
                 ))}
@@ -122,7 +121,6 @@ export default async function TodayPage() {
                       key={task.id}
                       task={task}
                       today={data.today}
-                      tomorrow={data.tomorrow}
                     />
                   ))}
                 </TaskDropZone>
@@ -165,7 +163,6 @@ export default async function TodayPage() {
                         key={task.id}
                         task={task}
                         today={data.today}
-                        tomorrow={data.tomorrow}
                       />
                     ))}
                   </TaskDropZone>
@@ -193,7 +190,6 @@ export default async function TodayPage() {
                         key={task.id}
                         task={task}
                         today={data.today}
-                        tomorrow={data.tomorrow}
                       />
                     ))}
                   </TaskDropZone>
@@ -212,7 +208,10 @@ type TodayTask = {
   id: string;
   title: string;
   dueDate: Date | null;
+  someday: boolean;
   starred: boolean;
+  areaId: string | null;
+  projectId: string | null;
   area: { name: string } | null;
   project: { name: string } | null;
 };
@@ -220,12 +219,10 @@ type TodayTask = {
 function TodayTaskRow({
   task,
   today,
-  tomorrow,
   grouped = false,
 }: {
   task: TodayTask;
   today: string;
-  tomorrow: string;
   grouped?: boolean;
 }) {
   const detail = `${task.area?.name ?? "Inbox"}${task.project ? ` / ${task.project.name}` : ""}`;
@@ -245,8 +242,13 @@ function TodayTaskRow({
         title={task.title}
         detail={detail}
         currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
+        currentSomeday={task.someday}
+        currentAreaId={task.areaId}
+        currentProjectId={task.projectId}
+        currentLocationLabel={task.project
+          ? `${task.project.name} — ${task.area?.name ?? "No area yet"}`
+          : (task.area?.name ?? "Inbox")}
         today={today}
-        tomorrow={tomorrow}
       />
       <div className="flex shrink-0 items-center gap-1.5">
         <TaskStarButton taskId={task.id} starred={task.starred} />

@@ -32,20 +32,23 @@ assert.equal(
   "An unfiled Project must stay available and explain its filing state.",
 );
 
-const detailSource = fs.readFileSync("src/app/tasks/[taskId]/page.tsx", "utf8");
+const optionsRouteSource = fs.readFileSync(
+  "src/app/api/tasks/[taskId]/assignment-options/route.ts",
+  "utf8",
+);
 const assignmentRouteSource = fs.readFileSync(
   "src/app/api/tasks/[taskId]/assignment/route.ts",
   "utf8",
 );
 assert.match(
-  detailSource,
-  /OR:\s*\[\s*\{\s*areaId:\s*null\s*\},\s*\{\s*area:\s*\{\s*is:\s*\{\s*status:\s*"active",\s*isSystem:\s*false/,
-  "Quick filing must include unfiled Projects alongside Projects in eligible Areas.",
+  optionsRouteSource,
+  /\{\s*areaId:\s*null\s*\}[\s\S]{0,120}\{\s*areaId:\s*\{\s*in:/,
+  "Lazy quick filing must include unfiled Projects alongside Projects in eligible Areas.",
 );
 assert.match(
-  detailSource,
-  /area:\s*\{\s*select:\s*\{\s*name:\s*true\s*\}\s*\}/,
-  "Quick filing must fetch each Project's Area name for disambiguation.",
+  optionsRouteSource,
+  /label:\s*`\$\{project\.name\}\s*—\s*\$\{project\.areaId\s*\?\s*areaPaths\.get\(project\.areaId\)\s*:\s*"No area yet"\}`/,
+  "Lazy quick filing must return path-labelled Projects for disambiguation.",
 );
 assert.match(
   assignmentRouteSource,

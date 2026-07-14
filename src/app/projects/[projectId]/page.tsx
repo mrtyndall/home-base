@@ -112,8 +112,8 @@ export default async function ProjectDetailPage({
       </header>
 
       <details className="rounded-[14px] border border-[#E2E6DF] bg-white">
-        <summary className="flex h-11 cursor-pointer list-none items-center justify-between px-3.5 text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
-          Project area <span className="text-[#9AA096]">{projectPath ?? "No area yet"}</span>
+        <summary className="flex min-h-11 min-w-0 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2 text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
+          <span className="shrink-0">Project area</span> <span className="min-w-0 break-words text-right text-[#9AA096] [overflow-wrap:anywhere]">{projectPath ?? "No area yet"}</span>
         </summary>
         <form action={updateProjectArea} className="space-y-3 border-t border-[#EEF1EC] p-3.5">
           <input type="hidden" name="projectId" value={project.id} />

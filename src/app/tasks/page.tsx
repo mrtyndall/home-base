@@ -897,9 +897,6 @@ function DoneSection({
 function TaskCard({
   task,
   today,
-  tomorrow,
-  areaGroups,
-  projects,
   slipDays,
 }: {
   task: TaskListItem;
@@ -922,12 +919,13 @@ function TaskCard({
           detail={formatTaskDetail(task, slipDays)}
           currentDueDate={task.dueDate?.toISOString().slice(0, 10) ?? null}
           currentParentTaskId={task.parentTaskId}
-          currentAreaId={task.areaId ?? ""}
+          currentSomeday={task.someday}
+          currentAreaId={task.areaId}
           currentProjectId={task.projectId}
-          areaGroups={areaGroups}
-          projects={projects}
+          currentLocationLabel={task.project
+            ? `${task.project.name} — ${task.area?.name ?? "No area yet"}`
+            : (task.area?.name ?? "Inbox")}
           today={today}
-          tomorrow={tomorrow}
         />
         <div className="flex shrink-0 items-center gap-1.5">
           <TaskStarButton taskId={task.id} starred={task.starred} />
@@ -938,9 +936,6 @@ function TaskCard({
         parentTitle={task.title}
         subtasks={task.subtasks}
         today={today}
-        tomorrow={tomorrow}
-        areaGroups={areaGroups}
-        projects={projects}
       />
     </article>
   );
@@ -950,16 +945,10 @@ function SubtaskList({
   parentTitle,
   subtasks,
   today,
-  tomorrow,
-  areaGroups,
-  projects,
 }: {
   parentTitle: string;
   subtasks: TaskListItem["subtasks"];
   today: string;
-  tomorrow: string;
-  areaGroups: TaskAreaGroup[];
-  projects: TaskProjectOption[];
 }) {
   if (subtasks.length === 0) {
     return null;
@@ -993,12 +982,13 @@ function SubtaskList({
                 subtask.dueDate?.toISOString().slice(0, 10) ?? null
               }
               currentParentTaskId={subtask.parentTaskId}
-              currentAreaId={subtask.areaId ?? ""}
+              currentSomeday={subtask.someday}
+              currentAreaId={subtask.areaId}
               currentProjectId={subtask.projectId}
-              areaGroups={areaGroups}
-              projects={projects}
+              currentLocationLabel={subtask.project
+                ? `${subtask.project.name} — ${subtask.area?.name ?? "No area yet"}`
+                : (subtask.area?.name ?? "Inbox")}
               today={today}
-              tomorrow={tomorrow}
             />
             <TaskCompleteButton taskId={subtask.id} />
           </div>

@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { addSubtask, updateTaskDetail } from "@/app/actions";
 import { TaskCompleteButton } from "@/components/task-complete-button";
-import { TaskQuickAssignment } from "@/components/task-quick-assignment";
+import { TaskQuickEdit } from "@/components/task-quick-edit";
 import { TaskStarButton } from "@/components/task-star-button";
 import { SetupNotice } from "@/components/setup-notice";
-import { formatDateOnly } from "@/lib/dates";
+import { formatDateOnly, localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { flattenAreaOptions } from "@/lib/hierarchy";
 import { formatRecurrenceRule } from "@/lib/recurrence";
 import { parseReminderOffsets } from "@/lib/tasks";
 
@@ -33,7 +34,10 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     notFound();
   }
 
-  const { task, domains, projects, assignmentProjects } = result;
+  const { task, domains, projects } = result;
+  const areaPath = task.areaId
+    ? flattenAreaOptions(domains).find((area) => area.id === task.areaId)?.path
+    : null;
   const reminderOffsets = parseReminderOffsets(task.reminderOffsets).join(", ");
   const parsedReminderOffsets = parseReminderOffsets(task.reminderOffsets);
   const labelsText = task.tags.join(", ");
@@ -97,16 +101,22 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
         </div>
       </header>
 
-      {task.status === "open" && !task.areaId && !task.projectId ? (
-        <TaskQuickAssignment
+      {task.status === "open" ? (
+        <TaskQuickEdit
           taskId={task.id}
-          areas={domains.map(({ id, name }) => ({ id, name }))}
-          projects={assignmentProjects.map(({ id, name, areaId, area }) => ({
-            id,
-            name,
-            areaId,
-            areaName: area?.name ?? null,
-          }))}
+          variant="facts"
+          location={{
+            areaId: task.areaId,
+            projectId: task.projectId,
+            label: task.project
+              ? `${task.project.name} — ${areaPath ?? task.area?.name ?? "No area yet"}`
+              : (areaPath ?? task.area?.name ?? "Inbox"),
+          }}
+          schedule={{
+            dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
+            someday: task.someday,
+          }}
+          today={localDateString()}
         />
       ) : null}
 
@@ -395,7 +405,7 @@ async function loadTaskDetail(taskId: string) {
       return { ok: true as const, task: null };
     }
 
-    const [domains, projects, assignmentProjects] = await Promise.all([
+    const [domains, projects] = await Promise.all([
       prisma.area.findMany({
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -407,34 +417,15 @@ async function loadTaskDetail(taskId: string) {
         },
         orderBy: { name: "asc" },
       }) : Promise.resolve([]),
-      !task.areaId && !task.projectId
-        ? prisma.project.findMany({
-            where: {
-              status: { in: ["active", "parked", "someday"] },
-              OR: [
-                { areaId: null },
-                { area: { is: { status: "active", isSystem: false } } },
-              ],
-            },
-            select: {
-              id: true,
-              name: true,
-              areaId: true,
-              area: { select: { name: true } },
-            },
-            orderBy: { name: "asc" },
-          })
-        : Promise.resolve([]),
     ]);
 
-    return { ok: true as const, task, domains, projects, assignmentProjects };
+    return { ok: true as const, task, domains, projects };
   } catch {
     return {
       ok: false as const,
       task: null,
       domains: [],
       projects: [],
-      assignmentProjects: [],
     };
   }
 }

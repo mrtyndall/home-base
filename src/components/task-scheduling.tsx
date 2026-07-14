@@ -10,8 +10,9 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, GripVertical } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { getTaskDragPreviewPosition } from "@/lib/task-drag-preview";
+import { TaskQuickEdit } from "@/components/task-quick-edit";
 
 const dragStartEvent = "home-base-task-drag-start";
 const dragHoverEvent = "home-base-task-drag-hover";
@@ -67,20 +68,11 @@ type DraggableTaskLinkProps = {
   detail: string;
   currentDueDate: string | null;
   currentParentTaskId?: string | null;
-  currentAreaId?: string;
+  currentSomeday?: boolean;
+  currentAreaId?: string | null;
   currentProjectId?: string | null;
-  areaGroups?: Array<{
-    domainName: string;
-    areas: Array<{ id: string; name: string }>;
-  }>;
-  projects?: Array<{
-    id: string;
-    name: string;
-    areaId: string | null;
-    areaName: string | null;
-  }>;
+  currentLocationLabel?: string;
   today: string;
-  tomorrow: string;
 };
 
 export function TaskDropZone({
@@ -179,19 +171,17 @@ export function DraggableTaskLink({
   detail,
   currentDueDate,
   currentParentTaskId = null,
-  currentAreaId = "",
+  currentSomeday = false,
+  currentAreaId = null,
   currentProjectId = null,
-  areaGroups = [],
-  projects = [],
+  currentLocationLabel = "Inbox",
   today,
-  tomorrow,
 }: DraggableTaskLinkProps) {
   const router = useRouter();
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const pointerDragging = useRef(false);
   const dragAnnounced = useRef(false);
   const suppressNextClick = useRef(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [dragPending, setDragPending] = useState(false);
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [dragPreviewPosition, setDragPreviewPosition] =
@@ -256,7 +246,6 @@ export function DraggableTaskLink({
     if (event.pointerType === "touch" && !isTaskDragHandle(event.target)) {
       return;
     }
-    setMenuOpen(false);
     pointerStart.current = { x: event.clientX, y: event.clientY };
     pointerDragging.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -383,17 +372,16 @@ export function DraggableTaskLink({
           <h3 className="text-[15px] font-medium">{title}</h3>
           <p className="mt-0.5 text-[13px] text-stone-500">{detail}</p>
         </Link>
-        <ScheduleMenu
+        <TaskQuickEdit
           taskId={taskId}
-          currentDueDate={currentDueDate}
-          currentAreaId={currentAreaId}
-          currentProjectId={currentProjectId}
-          areaGroups={areaGroups}
-          projects={projects}
+          variant="trigger"
+          location={{
+            areaId: currentAreaId,
+            projectId: currentProjectId,
+            label: currentLocationLabel,
+          }}
+          schedule={{ dueDate: currentDueDate, someday: currentSomeday }}
           today={today}
-          tomorrow={tomorrow}
-          open={menuOpen}
-          setOpen={setMenuOpen}
         />
       </div>
       {dragPreviewPosition ? (
@@ -438,241 +426,6 @@ const TaskFloatingPreview = ({
   </div>
 );
 
-function ScheduleMenu({
-  taskId,
-  currentDueDate,
-  currentAreaId,
-  currentProjectId,
-  areaGroups,
-  projects,
-  today,
-  tomorrow,
-  open,
-  setOpen,
-}: {
-  taskId: string;
-  currentDueDate: string | null;
-  currentAreaId: string;
-  currentProjectId: string | null;
-  areaGroups: NonNullable<DraggableTaskLinkProps["areaGroups"]>;
-  projects: NonNullable<DraggableTaskLinkProps["projects"]>;
-  today: string;
-  tomorrow: string;
-  open: boolean;
-  setOpen: (open: boolean) => void;
-}) {
-  const router = useRouter();
-  const [picking, setPicking] = useState(false);
-  const [assigning, setAssigning] = useState(false);
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedAreaId, setSelectedAreaId] = useState(currentAreaId);
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    currentProjectId ?? "",
-  );
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [, startTransition] = useTransition();
-  const filteredProjects = selectedAreaId
-    ? projects.filter((project) => project.areaId === selectedAreaId)
-    : projects;
-
-  async function schedule(dueDate: string | null) {
-    if (dueDate === currentDueDate) {
-      setOpen(false);
-      return;
-    }
-
-    setPending(true);
-    setError("");
-    try {
-      await updateTaskSchedule(taskId, { dueDate });
-      setOpen(false);
-      setPicking(false);
-      setAssigning(false);
-      startTransition(() => router.refresh());
-    } catch {
-      setError("Date was not updated.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function assign() {
-    setPending(true);
-    setError("");
-    try {
-      await updateTaskAssignment(taskId, {
-        areaId: selectedAreaId,
-        projectId: selectedProjectId || null,
-      });
-      setOpen(false);
-      setPicking(false);
-      setAssigning(false);
-      startTransition(() => router.refresh());
-    } catch {
-      setError("Assignment was not updated.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div className="relative shrink-0" data-task-control>
-      <button
-        type="button"
-        title="Schedule or assign task"
-        onClick={() => setOpen(!open)}
-        aria-label="Schedule or assign task"
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[13px] font-medium transition ${
-          open
-            ? "border-teal-700/40 text-teal-800"
-            : "border-[#E2E6DF] text-stone-600 hover:border-teal-700/50 hover:text-teal-700"
-        }`}
-      >
-        <CalendarDays size={15} />
-      </button>
-      {open ? (
-        <div className="absolute right-0 top-10 z-30 w-56 rounded-[20px] border border-white/65 bg-[#FAFBF9]/80 p-2 text-sm shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150">
-          <MenuButton disabled={pending} onClick={() => schedule(today)}>
-            Today
-          </MenuButton>
-          <MenuButton disabled={pending} onClick={() => schedule(tomorrow)}>
-            Tomorrow
-          </MenuButton>
-          <MenuButton
-            disabled={pending}
-            onClick={() => {
-              setPicking(true);
-              window.setTimeout(() => {
-                const input = dateInputRef.current;
-                input?.focus();
-                if (input && "showPicker" in input) {
-                  (
-                    input as HTMLInputElement & { showPicker: () => void }
-                  ).showPicker();
-                }
-              }, 0);
-            }}
-          >
-            Pick date
-          </MenuButton>
-          {picking ? (
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
-              onChange={(event) => {
-                if (event.target.value) {
-                  void schedule(event.target.value);
-                }
-              }}
-            />
-          ) : null}
-          <MenuButton disabled={pending} onClick={() => schedule(null)}>
-            Clear date
-          </MenuButton>
-          <MenuButton
-            disabled={pending}
-            onClick={async () => {
-              setPending(true);
-              setError("");
-              try {
-                await updateTaskSchedule(taskId, { someday: true });
-                setOpen(false);
-                setPicking(false);
-                setAssigning(false);
-                startTransition(() => router.refresh());
-              } catch {
-                setError("Task was not updated.");
-              } finally {
-                setPending(false);
-              }
-            }}
-          >
-            Someday
-          </MenuButton>
-          {areaGroups.length > 0 ? (
-            <MenuButton
-              disabled={pending}
-              onClick={() => setAssigning(!assigning)}
-            >
-              Assign
-            </MenuButton>
-          ) : null}
-          {assigning ? (
-            <div className="space-y-2 border-t border-[#EEF1EC] px-2 pt-2">
-              <select
-                value={selectedAreaId}
-                onChange={(event) => {
-                  setSelectedAreaId(event.target.value);
-                  setSelectedProjectId("");
-                }}
-                className="h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
-              >
-                {areaGroups.map((group) => (
-                  <optgroup key={group.domainName} label={group.domainName}>
-                    {group.areas.map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {area.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              {projects.length > 0 ? (
-                <select
-                  value={selectedProjectId}
-                  onChange={(event) => setSelectedProjectId(event.target.value)}
-                  className="h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3 text-sm outline-none focus:border-teal-700"
-                >
-                  <option value="">No project</option>
-                  {filteredProjects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name} / {project.areaName ?? "No area yet"}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={assign}
-                className="h-10 w-full rounded-full bg-teal-700 px-3 text-center text-sm font-medium text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-[#D6DBD3]"
-              >
-                Save assignment
-              </button>
-            </div>
-          ) : null}
-          {error ? (
-            <p className="px-3 py-1 text-xs text-amber-800">{error}</p>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function MenuButton({
-  disabled,
-  onClick,
-  children,
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="block h-10 w-full rounded-[10px] px-3 text-left text-stone-700 transition hover:bg-white/85 disabled:cursor-not-allowed disabled:text-stone-400"
-    >
-      {children}
-    </button>
-  );
-}
-
 async function updateTaskSchedule(
   taskId: string,
   body: { dueDate?: string | null; someday?: boolean },
@@ -695,21 +448,6 @@ async function updateTaskOrder(taskId: string, body: { targetTaskId: string }) {
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error("Task order update failed.");
-}
-
-async function updateTaskAssignment(
-  taskId: string,
-  body: { areaId: string; projectId?: string | null },
-) {
-  const response = await fetch(`/api/tasks/${taskId}/assignment`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error("Task assignment update failed.");
-  }
 }
 
 function findTaskCard(taskId: string) {
