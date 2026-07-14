@@ -4,12 +4,14 @@ const httpUrl = z.string().url().refine((value) => {
   const protocol = new URL(value).protocol;
   return protocol === "http:" || protocol === "https:";
 }, "URL must use HTTP(S).");
-const nullableId = z.string().min(1).nullable().optional();
+const id = z.string().uuid();
+const nullableId = id.nullable().optional();
 
 export const readLaterMcpSchemas = {
   list: z.object({
     status: z.enum(["unread", "read", "archived"]).optional(),
     limit: z.number().int().min(1).max(100).optional(),
+    cursor: id.optional(),
   }),
   save: z.object({
     url: httpUrl,
@@ -20,12 +22,12 @@ export const readLaterMcpSchemas = {
     projectId: nullableId,
   }),
   file: z.object({
-    referenceId: z.string().min(1),
+    referenceId: id,
     areaId: nullableId,
     projectId: nullableId,
   }),
   status: z.object({
-    referenceId: z.string().min(1),
+    referenceId: id,
     status: z.enum(["unread", "read", "archived"]),
   }),
 };
@@ -38,6 +40,7 @@ export function readLaterProxyRequest(name: ToolName, rawInput: unknown) {
     const params = new URLSearchParams();
     if (input.status) params.set("status", input.status);
     if (input.limit) params.set("limit", String(input.limit));
+    if (input.cursor) params.set("cursor", input.cursor);
     const query = params.toString();
     return { path: `/read-later${query ? `?${query}` : ""}`, method: "GET" as const };
   }
@@ -47,8 +50,8 @@ export function readLaterProxyRequest(name: ToolName, rawInput: unknown) {
   }
   if (name === "file_reference") {
     const { referenceId, ...body } = readLaterMcpSchemas.file.parse(rawInput);
-    return { path: `/references/${referenceId}/file`, method: "POST" as const, body };
+    return { path: `/references/${encodeURIComponent(referenceId)}/file`, method: "POST" as const, body };
   }
   const { referenceId, ...body } = readLaterMcpSchemas.status.parse(rawInput);
-  return { path: `/read-later/${referenceId}/status`, method: "POST" as const, body };
+  return { path: `/read-later/${encodeURIComponent(referenceId)}/status`, method: "POST" as const, body };
 }

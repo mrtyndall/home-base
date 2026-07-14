@@ -98,6 +98,9 @@ export async function parseCaptureWithContext(
   rawText: string,
   context: ParserContext,
 ): Promise<ParserAction[]> {
+  const deterministic = classifyDeterministicUrlCapture(rawText);
+  if (deterministic) return deterministic;
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.ANTHROPIC_PARSE_MODEL;
   const routerModel = process.env.ANTHROPIC_INBOX_ROUTER_MODEL;
@@ -144,6 +147,16 @@ export async function parseCaptureWithContext(
   }
 
   return actions;
+}
+
+export function classifyDeterministicUrlCapture(rawText: string): ParserAction[] | null {
+  const trimmed = rawText.trim();
+  const readLater = trimmed.match(/^read\s+later\s*[:,-]?\s*(https?:\/\/\S+)$/i);
+  if (readLater?.[1]) return [{ type: "save_read_later", url: readLater[1] }];
+  if (/^https?:\/\/\S+$/i.test(trimmed)) {
+    return [{ type: "create_reference", body: trimmed, url: trimmed }];
+  }
+  return null;
 }
 
 async function parseWithAnthropic(
@@ -371,11 +384,6 @@ function fallbackParse(rawText: string): ParserAction[] {
   );
   if (referenceMatch?.[2]) {
     return [{ type: "create_reference", body: referenceMatch[2].trim() }];
-  }
-
-  const readLaterMatch = trimmed.match(/^read\s+later\s*[:,-]?\s*(https?:\/\/\S+)$/i);
-  if (readLaterMatch?.[1]) {
-    return [{ type: "save_read_later", url: readLaterMatch[1] }];
   }
 
   // Require "the/my" or a "... task" suffix so prose like "star gazing

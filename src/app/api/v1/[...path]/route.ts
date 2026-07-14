@@ -34,14 +34,9 @@ import { completeRoutineById, getRoutinesWithState } from "@/lib/routines";
 import { getTodayDashboard } from "@/lib/today";
 import { completeTaskById, createTaskWithAudit } from "@/lib/tasks";
 import {
-  createReadLaterForApi,
-  fileReferenceForApi,
-  listReadLaterForApi,
-  readReadLaterForApi,
-  setReadLaterStatusForApi,
-  toReadLaterApiError,
-} from "@/lib/api/read-later";
-import type { ReadLaterFilingIntent } from "@/lib/read-later";
+  dispatchReadLaterRoute,
+  readLaterRouteScope,
+} from "@/lib/api/read-later-router";
 import { toReferenceSearchResult, type SearchableReference } from "@/lib/reference-search-result";
 
 type RouteCtx = {
@@ -55,7 +50,13 @@ const listQuerySchema = z.object({
 });
 
 export async function GET(request: Request, context: RouteCtx) {
-  return handleApi(request, context, "read", async ({ path, url }) => {
+  const path = (await context.params).path ?? [];
+  const scope = readLaterRouteScope("GET", path) ?? "read";
+  return handleApi(request, context, scope, async ({ apiKey, path, url }) => {
+    const readLater = await dispatchReadLaterRoute({
+      method: "GET", path, url, body: undefined, actor: apiKey,
+    });
+    if (readLater) return readLater;
     const [resource, id, action] = path;
 
     if (resource === "today") {
@@ -243,12 +244,6 @@ export async function GET(request: Request, context: RouteCtx) {
       };
     }
 
-    if (resource === "read-later") {
-      if (id) return { reference: await readReadLaterForApi(id) };
-      const query = readLaterListSchema.parse(Object.fromEntries(url.searchParams));
-      return { references: await listReadLaterForApi(query) };
-    }
-
     if (resource === "calendar-events") {
       if (id) {
         return {
@@ -396,7 +391,8 @@ export async function GET(request: Request, context: RouteCtx) {
 
 export async function POST(request: Request, context: RouteCtx) {
   const path = (await context.params).path ?? [];
-  const requiredScope = path[0] === "captures" ? "capture" : "write";
+  const requiredScope = readLaterRouteScope("POST", path) ??
+    (path[0] === "captures" ? "capture" : "write");
   return handleApi(
     request,
     context,
@@ -404,6 +400,10 @@ export async function POST(request: Request, context: RouteCtx) {
     async ({ apiKey, path }) => {
       const [resource, id, action] = path;
       const body = await readJson(request);
+      const readLater = await dispatchReadLaterRoute({
+        method: "POST", path, url: new URL(request.url), body, actor: apiKey,
+      });
+      if (readLater) return readLater;
 
       if (resource === "captures") {
         const parsed = apiCaptureSchema.parse(body);
@@ -630,36 +630,6 @@ export async function POST(request: Request, context: RouteCtx) {
           id: reference.id,
         });
         return { reference };
-      }
-
-      if (resource === "read-later" && id && action === "status") {
-        const parsed = readLaterStatusSchema.parse(body);
-        return {
-          reference: await setReadLaterStatusForApi(id, parsed.status, apiKey),
-        };
-      }
-
-      if ((resource === "read-later" || resource === "references") && id && action === "file") {
-        const parsed = readLaterFileSchema.parse(body);
-        return {
-          reference: await fileReferenceForApi(id, filingFromApiInput(parsed, true), apiKey),
-        };
-      }
-
-      if (resource === "read-later") {
-        const parsed = createReadLaterApiSchema.parse(body);
-        return {
-          reference: await createReadLaterForApi(
-            {
-              url: parsed.url,
-              title: parsed.title,
-              body: parsed.body,
-              tags: parsed.tags,
-              filing: filingFromApiInput(parsed, false),
-            },
-            apiKey,
-          ),
-        };
       }
 
       if (resource === "entity-notes") {
@@ -1023,10 +993,16 @@ export async function POST(request: Request, context: RouteCtx) {
 }
 
 export async function PATCH(request: Request, context: RouteCtx) {
-  return handleApi(request, context, "write", async ({ apiKey, path }) => {
+  const path = (await context.params).path ?? [];
+  const scope = readLaterRouteScope("PATCH", path) ?? "write";
+  return handleApi(request, context, scope, async ({ apiKey, path }) => {
+    const body = await readJson(request);
+    const readLater = await dispatchReadLaterRoute({
+      method: "PATCH", path, url: new URL(request.url), body, actor: apiKey,
+    });
+    if (readLater) return readLater;
     const [resource, id] = path;
     if (!id) return notFound();
-    const body = await readJson(request);
 
     if (resource === "tasks") {
       const parsed = patchTaskSchema.parse(body);
@@ -1231,22 +1207,8 @@ async function handleApi(
       return Response.json({ error: error.message }, { status: error.status });
     }
 
-    if (
-      error instanceof z.ZodError &&
-      (path[0] === "read-later" || (path[0] === "references" && path[2] === "file"))
-    ) {
-      return Response.json(
-        { error: { code: "invalid_read_later_request", message: "Invalid Read Later request." } },
-        { status: 400 },
-      );
-    }
-
     if (error instanceof z.ZodError) {
       return Response.json({ error: z.treeifyError(error) }, { status: 400 });
-    }
-
-    if (path[0] === "read-later" || (path[0] === "references" && path[2] === "file")) {
-      return toReadLaterApiError(error);
     }
 
     return toApiErrorResponse(error);
@@ -1542,49 +1504,6 @@ const createReferenceSchema = z.object({
   relatedType: z.string().optional(),
   relatedId: z.string().optional(),
 });
-
-const nullableDestinationId = z.string().trim().min(1).nullable().optional();
-const destinationFields = {
-  areaId: nullableDestinationId,
-  projectId: nullableDestinationId,
-};
-const createReadLaterApiSchema = z.object({
-  url: z.string().trim().min(1),
-  title: z.string().trim().min(1).optional(),
-  body: z.string().trim().min(1).optional(),
-  tags: z.array(z.string()).optional(),
-  ...destinationFields,
-}).refine((value) => !(value.areaId && value.projectId), {
-  message: "Choose either an Area or a Project.",
-});
-const readLaterFileSchema = z.object(destinationFields).refine(
-  (value) => !(value.areaId && value.projectId),
-  { message: "Choose either an Area or a Project." },
-);
-const readLaterStatusSchema = z.object({
-  status: z.enum(["unread", "read", "archived"]),
-});
-const readLaterListSchema = listQuerySchema.pick({ limit: true, cursor: true }).extend({
-  status: z.enum(["unread", "read", "archived"]).optional(),
-});
-
-function filingFromApiInput(
-  input: { areaId?: string | null; projectId?: string | null },
-  explicit: true,
-): Exclude<ReadLaterFilingIntent, { mode: "unchanged" }>;
-function filingFromApiInput(
-  input: { areaId?: string | null; projectId?: string | null },
-  explicit: false,
-): ReadLaterFilingIntent;
-function filingFromApiInput(
-  input: { areaId?: string | null; projectId?: string | null },
-  explicit: boolean,
-): ReadLaterFilingIntent {
-  if (input.projectId) return { mode: "project", projectId: input.projectId };
-  if (input.areaId) return { mode: "area", areaId: input.areaId };
-  if (explicit || input.areaId === null || input.projectId === null) return { mode: "unfiled" };
-  return { mode: "unchanged" };
-}
 
 const patchReferenceSchema = createReferenceSchema.partial();
 

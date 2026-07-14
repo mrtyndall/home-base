@@ -8,6 +8,15 @@ import type { ExecutableAction } from "@/lib/capture/types";
 
 type Action = Extract<ExecutableAction, { type: "save_read_later" }>;
 
+export function readLaterCaptureFiling(
+  projectId: string | null,
+  areaId: string | null | undefined,
+): ReadLaterFilingIntent {
+  if (projectId) return { mode: "project", projectId };
+  if (areaId) return { mode: "area", areaId };
+  return { mode: "unchanged" };
+}
+
 export async function executeReadLaterCaptureAction(
   action: Action,
   context: {

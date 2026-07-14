@@ -33,10 +33,18 @@ export async function listReadLaterForApi(
   input: { status?: ReadLaterStatus; limit?: number; cursor?: string },
   client: ApiClient = prisma,
 ) {
+  const status = input.status ?? "unread";
+  if (input.cursor) {
+    const cursor = await client.reference.findFirst({
+      where: { id: input.cursor, kind: "read_later", readStatus: status },
+      select: { id: true },
+    });
+    if (!cursor) throw new Error("Read Later cursor not found.");
+  }
   return client.reference.findMany({
-    where: { kind: "read_later", readStatus: input.status ?? "unread" },
+    where: { kind: "read_later", readStatus: status },
     include: { area: true, project: true },
-    orderBy: { savedAt: "desc" },
+    orderBy: [{ savedAt: "desc" }, { id: "desc" }],
     take: input.limit ?? 50,
     ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
   });
@@ -84,10 +92,31 @@ export async function fileReferenceForApi(
   actor: ApiActor,
   client: ApiClient = prisma,
 ) {
+  return fileReferenceWithKindForApi(id, filing, actor, client);
+}
+
+export async function fileReadLaterForApi(
+  id: string,
+  filing: Exclude<ReadLaterFilingIntent, { mode: "unchanged" }>,
+  actor: ApiActor,
+  client: ApiClient = prisma,
+) {
+  return fileReferenceWithKindForApi(id, filing, actor, client, "read_later");
+}
+
+async function fileReferenceWithKindForApi(
+  id: string,
+  filing: Exclude<ReadLaterFilingIntent, { mode: "unchanged" }>,
+  actor: ApiActor,
+  client: ApiClient,
+  kind?: "read_later",
+) {
   return client.$transaction(async (transaction) => {
     const tx = transaction as ApiClient;
-    const existing = await tx.reference.findUnique({ where: { id } });
-    if (!existing) throw new Error("Reference not found.");
+    const existing = kind
+      ? await tx.reference.findFirst({ where: { id, kind } })
+      : await tx.reference.findUnique({ where: { id } });
+    if (!existing) throw new Error(kind ? "Read Later item not found." : "Reference not found.");
     const destination = await resolveVerifiedDestination(
       readLaterFilingDestination(filing),
       tx,
@@ -130,6 +159,12 @@ export function toReadLaterApiError(error: unknown) {
     return Response.json(
       { error: { code: "reference_not_found", message } },
       { status: 404 },
+    );
+  }
+  if (message === "Read Later cursor not found.") {
+    return Response.json(
+      { error: { code: "invalid_read_later_cursor", message } },
+      { status: 400 },
     );
   }
   if (/^(Area|Project) not found\.$/.test(message) || message.includes("selected Area")) {

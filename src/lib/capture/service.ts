@@ -4,7 +4,10 @@ import { addHours, parseISO } from "date-fns";
 import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
-import { executeReadLaterCaptureAction } from "@/lib/capture/read-later";
+import {
+  executeReadLaterCaptureAction,
+  readLaterCaptureFiling,
+} from "@/lib/capture/read-later";
 import { createCheckInRecord } from "@/lib/checkins";
 import { boostResurfaceByMatch } from "@/lib/resurfacing";
 import { createPersonRecord, findPersonByMatch } from "@/lib/people";
@@ -921,11 +924,7 @@ async function saveReadLater(
 ) {
   const project = await resolveProject(action.project_id, action.project_match, context);
   const areaId = await resolveAreaId(action.area_id, action.area_match, context);
-  const filing = project
-    ? { mode: "project" as const, projectId: project.id }
-    : areaId
-      ? { mode: "area" as const, areaId }
-      : { mode: "unfiled" as const };
+  const filing = readLaterCaptureFiling(project?.id ?? null, areaId);
   return executeReadLaterCaptureAction(action, {
     client: context.client as never,
     enrichmentClient: prisma as never,
