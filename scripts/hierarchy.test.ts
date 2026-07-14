@@ -87,6 +87,26 @@ test("assertValidAreaParent rejects an unknown proposed parent", async () => {
   );
 });
 
+test("assertValidAreaParent requires a non-empty Area ID", async () => {
+  await assert.rejects(
+    assertValidAreaParent("", null, parentClient([])),
+    (error: unknown) => (error as { code?: string }).code === "invalid_area_id",
+  );
+});
+
+test("assertValidAreaParent normalizes an empty optional parent to null", async () => {
+  const calls: string[] = [];
+  await assertValidAreaParent("area-1", "  ", {
+    area: {
+      findUnique: async () => {
+        calls.push("query");
+        return null;
+      },
+    },
+  });
+  assert.deepEqual(calls, []);
+});
+
 function parentClient(rows: Array<{ id: string; parentAreaId: string | null }>) {
   const byId = new Map(rows.map((row) => [row.id, row]));
   let count = 0;

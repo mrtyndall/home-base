@@ -16,11 +16,16 @@ import {
 } from "@/lib/destinations";
 import { createPersonRecord } from "@/lib/people";
 import {
-  assertValidAreaParent,
-  fileProject,
   flattenAreaOptions,
-  HierarchyValidationError,
 } from "@/lib/hierarchy";
+import {
+  createAreaForApi,
+  createProjectForApi,
+  listAreasForApi,
+  patchAreaForApi,
+  patchProjectForApi,
+  toApiErrorResponse,
+} from "@/lib/api/hierarchy";
 import {
   boostResurfaceWeight,
   getDailyResurfacedItem,
@@ -88,19 +93,7 @@ export async function GET(request: Request, context: RouteCtx) {
         };
       }
 
-      const areas = await prisma.area.findMany({
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        take: 100,
-      });
-      const paths = new Map(
-        flattenAreaOptions(areas).map((area) => [area.id, area.path]),
-      );
-      return {
-        areas: areas.map((area) => ({
-          ...area,
-          path: paths.get(area.id) ?? area.name,
-        })),
-      };
+      return { areas: await listAreasForApi() };
     }
 
     if (resource === "captures") {
@@ -468,24 +461,7 @@ export async function POST(request: Request, context: RouteCtx) {
 
       if (resource === "areas") {
         const parsed = createAreaSchema.parse(body);
-        const area = await prisma.$transaction(async (transaction) => {
-          await assertValidAreaParent("", parsed.parentAreaId ?? null, transaction);
-          return transaction.area.create({
-            data: {
-              name: parsed.name,
-              status: parsed.status ?? "active",
-              currentState: parsed.currentState,
-              nextStep: parsed.nextStep,
-              tendingCadence: parsed.tendingCadence,
-              sortOrder: parsed.sortOrder,
-              parentAreaId: parsed.parentAreaId,
-            },
-          });
-        });
-        await auditApiWrite(apiKey, "area_created", "Area created", {
-          type: "area",
-          id: area.id,
-        });
+        const area = await createAreaForApi(parsed, apiKey);
         return { area };
       }
 
@@ -513,38 +489,7 @@ export async function POST(request: Request, context: RouteCtx) {
 
       if (resource === "projects") {
         const parsed = createProjectSchema.parse(body);
-        const areaId = await resolveAreaReference(parsed.areaId, parsed.areaName);
-        if (areaId) await resolveVerifiedDestination({ areaId });
-        const now = new Date();
-        const status = parsed.status ?? "active";
-        const project = await prisma.project.create({
-          data: {
-            name: parsed.name,
-            areaId,
-            status,
-            targetDate: parseDateOnly(parsed.targetDate),
-            parkedAt: status === "parked" ? now : undefined,
-            completedAt: status === "completed" ? now : undefined,
-            killedAt: status === "killed" ? now : undefined,
-            currentState: parsed.currentState,
-            nextStep: parsed.nextStep,
-            activity: {
-              create: {
-                entry: "Project created through API.",
-                source: `api:${apiKey.label}`,
-                stateSnapshot: {
-                  current_state: parsed.currentState ?? null,
-                  next_step: parsed.nextStep ?? null,
-                  status,
-                },
-              },
-            },
-          },
-        });
-        await auditApiWrite(apiKey, "project_created", "Project created", {
-          type: "project",
-          id: project.id,
-        });
+        const project = await createProjectForApi(parsed, apiKey);
         return { project };
       }
 
@@ -1085,76 +1030,13 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (resource === "projects") {
       const parsed = patchProjectSchema.parse(body);
-      const now = new Date();
-      const existing = await prisma.project.findUnique({ where: { id }, select: { areaId: true } });
-      if (!existing) return notFound();
-      const areaId = parsed.areaName
-        ? await resolveAreaReference(parsed.areaId, parsed.areaName)
-        : parsed.areaId;
-      const nextAreaId = areaId === undefined ? existing.areaId : areaId;
-      if (areaId !== undefined) await fileProject(id, nextAreaId);
-      const project = await prisma.project.update({
-        where: { id },
-        data: {
-          name: parsed.name,
-          status: parsed.status,
-          currentState: parsed.currentState,
-          nextStep: parsed.nextStep,
-          targetDate: parseDateOnly(parsed.targetDate),
-          parkedAt:
-            parsed.status === "parked"
-              ? now
-              : parsed.status === "active" || parsed.status === "someday"
-                ? null
-                : undefined,
-          completedAt: parsed.status === "completed" ? now : undefined,
-          killedAt: parsed.status === "killed" ? now : undefined,
-        },
-      });
-      await prisma.projectActivity.create({
-        data: {
-          projectId: id,
-          entry:
-            parsed.logEntry ??
-            `Project updated through API by ${apiKey.label}.`,
-          source: `api:${apiKey.label}`,
-          stateSnapshot: {
-            status: project.status,
-            current_state: project.currentState,
-            next_step: project.nextStep,
-          },
-        },
-      });
-      await auditApiWrite(apiKey, "project_updated", "Project updated", {
-        type: "project",
-        id,
-      });
+      const project = await patchProjectForApi(id, parsed, apiKey);
       return { project };
     }
 
     if (resource === "areas") {
       const parsed = patchAreaSchema.parse(body);
-      const area = await prisma.$transaction(async (transaction) => {
-        if (parsed.parentAreaId !== undefined) {
-          await assertValidAreaParent(id, parsed.parentAreaId, transaction);
-        }
-        return transaction.area.update({
-          where: { id },
-          data: {
-            name: parsed.name,
-            status: parsed.status,
-            currentState: parsed.currentState,
-            nextStep: parsed.nextStep,
-            tendingCadence: parsed.tendingCadence,
-            sortOrder: parsed.sortOrder,
-            parentAreaId: parsed.parentAreaId,
-          },
-        });
-      });
-      await auditApiWrite(apiKey, "area_updated", "Area updated", {
-        type: "area",
-        id,
-      });
+      const area = await patchAreaForApi(id, parsed, apiKey);
       return { area };
     }
 
@@ -1306,29 +1188,7 @@ async function handleApi(
       return Response.json({ error: z.treeifyError(error) }, { status: 400 });
     }
 
-    if (error instanceof HierarchyValidationError) {
-      return Response.json(
-        {
-          error: {
-            code: error.code,
-            message: hierarchyValidationMessage(error.code),
-          },
-        },
-        { status: 400 },
-      );
-    }
-
-    if (error instanceof Error && error.message === "Area not found.") {
-      return Response.json(
-        { error: { code: "area_not_found", message: error.message } },
-        { status: 400 },
-      );
-    }
-
-    return Response.json(
-      { error: error instanceof Error ? error.message : "API request failed." },
-      { status: 500 },
-    );
+    return toApiErrorResponse(error);
   }
 }
 
@@ -1354,17 +1214,6 @@ async function getAreaPathMap() {
     },
   });
   return new Map(flattenAreaOptions(areas).map((area) => [area.id, area.path]));
-}
-
-function hierarchyValidationMessage(code: HierarchyValidationError["code"]) {
-  switch (code) {
-    case "self_parent":
-      return "An Area cannot be its own parent.";
-    case "cycle":
-      return "That parent would create an Area cycle.";
-    case "parent_not_found":
-      return "Parent Area not found.";
-  }
 }
 
 async function resolveAreaReference(
@@ -1582,8 +1431,8 @@ const patchTaskSchema = createTaskSchema.partial().extend({
 
 const createProjectSchema = z.object({
   name: z.string().min(1),
-  areaId: z.string().nullable().optional(),
-  areaName: z.string().optional(),
+  areaId: z.string().trim().min(1).nullable().optional(),
+  areaName: z.string().trim().min(1).optional(),
   status: z
     .enum(["someday", "active", "parked", "completed", "killed"])
     .optional(),
@@ -1598,7 +1447,10 @@ const patchProjectSchema = createProjectSchema.partial().extend({
 
 const createAreaSchema = z.object({
   name: z.string().min(1),
-  parentAreaId: z.string().nullable().optional(),
+  parentAreaId: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().trim().min(1).nullable().optional(),
+  ),
   status: z.enum(["active", "parked", "retired"]).optional(),
   currentState: z.string().optional(),
   nextStep: z.string().optional(),

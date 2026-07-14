@@ -21,6 +21,8 @@ type AreaRow = {
 
 function filingClient(initialAreaId: string | null = null) {
   const calls: string[] = [];
+  const activities: Array<Record<string, unknown>> = [];
+  const notifications: Array<Record<string, unknown>> = [];
   const project: ProjectRow = {
     id: "project-1",
     name: "Project One",
@@ -54,6 +56,8 @@ function filingClient(initialAreaId: string | null = null) {
       },
     },
     project: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        where.id === project.id ? { ...project } : null,
       update: async ({ data }: { data: { areaId: string | null } }) => {
         calls.push(`project:${data.areaId}`);
         project.areaId = data.areaId;
@@ -100,14 +104,16 @@ function filingClient(initialAreaId: string | null = null) {
       },
     },
     projectActivity: {
-      create: async () => {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
         calls.push("activity");
+        activities.push(data);
         return { id: "activity-1" };
       },
     },
     notification: {
-      create: async () => {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
         calls.push("notification");
+        notifications.push(data);
         return { id: "notification-1" };
       },
     },
@@ -115,6 +121,8 @@ function filingClient(initialAreaId: string | null = null) {
 
   return {
     calls,
+    activities,
+    notifications,
     project,
     client: {
       $transaction: async <T>(operation: (tx: typeof transaction) => Promise<T>) => {
@@ -141,6 +149,10 @@ test("fileProject assigns a Project and mirrors its Area to children", async () 
     "activity",
     "notification",
   ]);
+  assert.equal(fake.activities[0]?.source, "manual");
+  assert.deepEqual(fake.notifications[0]?.sourceRef, {
+    type: "project", id: "project-1", source: "manual",
+  });
 });
 
 test("fileProject moves a Project between Areas", async () => {

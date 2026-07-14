@@ -1,18 +1,31 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { HierarchyValidationError } from "../src/lib/hierarchy";
+import { toHierarchyApiError } from "../src/lib/api/hierarchy";
+import {
+  hierarchyMcpSchemas,
+  hierarchyProxyRequest,
+} from "../mcp/hierarchy-tools";
 
-const api = readFileSync("src/app/api/v1/[...path]/route.ts", "utf8");
-const mcp = readFileSync("mcp/http-server.ts", "utf8");
+async function main() {
+  const cycle = toHierarchyApiError(new HierarchyValidationError("cycle"));
+  assert.equal(cycle?.status, 400);
+  assert.deepEqual(await cycle?.json(), {
+    error: { code: "cycle", message: "That parent would create an Area cycle." },
+  });
 
-assert.match(api, /assertValidAreaParent/);
-assert.match(api, /fileProject/);
-assert.match(api, /parentAreaId/);
-assert.match(api, /path:/);
-assert.match(mcp, /"list_areas"/);
-assert.match(mcp, /"create_area"/);
-assert.match(mcp, /"create_project"/);
-assert.match(mcp, /"reparent_area"/);
-assert.match(mcp, /"file_project"/);
-assert.doesNotMatch(mcp, /parent domains|named domain|read_domain_page|domainId|domainName/i);
+  assert.deepEqual(
+    hierarchyMcpSchemas.createArea.parse({ name: "Radio", parentAreaId: "" }),
+    { name: "Radio", parentAreaId: null },
+  );
+  assert.deepEqual(
+    hierarchyProxyRequest("file_project", { projectId: "project-1", areaId: null }),
+    { path: "/projects/project-1", method: "PATCH", body: { areaId: null } },
+  );
 
-console.log("API hierarchy contract verified.");
+  console.log("API hierarchy behavior contract verified.");
+}
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : "API contract verification failed.");
+  process.exitCode = 1;
+});

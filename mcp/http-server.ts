@@ -3,6 +3,10 @@ import type { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
+import {
+  hierarchyMcpSchemas,
+  hierarchyProxyRequest,
+} from "./hierarchy-tools";
 
 const PORT = Number(process.env.MCP_PORT || 8081);
 const API_BASE = process.env.HOME_BASE_API_URL || "http://127.0.0.1:3002/api/v1";
@@ -96,13 +100,7 @@ function registerTools(server: McpServer, bearerToken: string) {
     "create_area",
     {
       description: "Create an Area, optionally nested under another Area.",
-      inputSchema: z.object({
-        name: z.string().min(1),
-        parentAreaId: z.string().nullable().optional(),
-        currentState: z.string().optional(),
-        nextStep: z.string().optional(),
-        tendingCadence: z.string().optional(),
-      }),
+      inputSchema: hierarchyMcpSchemas.createArea,
     },
     async (input) => toToolResult(await apiFetch(bearerToken, "/areas", "POST", input)),
   );
@@ -111,17 +109,14 @@ function registerTools(server: McpServer, bearerToken: string) {
     "reparent_area",
     {
       description: "Move an Area under another Area, or null to make it a root.",
-      inputSchema: z.object({
-        areaId: z.string().min(1),
-        parentAreaId: z.string().nullable(),
-      }),
+      inputSchema: hierarchyMcpSchemas.reparentArea,
     },
-    async ({ areaId, parentAreaId }) =>
-      toToolResult(
-        await apiFetch(bearerToken, `/areas/${areaId}`, "PATCH", {
-          parentAreaId,
-        }),
-      ),
+    async (input) => {
+      const request = hierarchyProxyRequest("reparent_area", input);
+      return toToolResult(
+        await apiFetch(bearerToken, request.path, request.method, request.body),
+      );
+    },
   );
 
   server.registerTool(
@@ -144,15 +139,7 @@ function registerTools(server: McpServer, bearerToken: string) {
     "create_project",
     {
       description: "Create a Project, optionally filed in an Area. Projects can start active or someday.",
-      inputSchema: z.object({
-        name: z.string().min(1),
-        areaId: z.string().nullable().optional(),
-        areaName: z.string().optional(),
-        status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
-        currentState: z.string().optional(),
-        nextStep: z.string().optional(),
-        targetDate: z.string().optional(),
-      }),
+      inputSchema: hierarchyMcpSchemas.createProject,
     },
     async (input) => toToolResult(await apiFetch(bearerToken, "/projects", "POST", input)),
   );
@@ -161,15 +148,7 @@ function registerTools(server: McpServer, bearerToken: string) {
     "update_project_state",
     {
       description: "Update project current state, next step, status, and activity log.",
-      inputSchema: z.object({
-        projectId: z.string().min(1),
-        areaId: z.string().nullable().optional(),
-        areaName: z.string().optional(),
-        currentState: z.string().optional(),
-        nextStep: z.string().optional(),
-        status: z.enum(["someday", "active", "parked", "completed", "killed"]).optional(),
-        logEntry: z.string().optional(),
-      }),
+      inputSchema: hierarchyMcpSchemas.updateProject,
     },
     async ({ projectId, ...body }) =>
       toToolResult(await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", body)),
@@ -179,17 +158,14 @@ function registerTools(server: McpServer, bearerToken: string) {
     "file_project",
     {
       description: "File a Project in an Area, or null to leave it unfiled.",
-      inputSchema: z.object({
-        projectId: z.string().min(1),
-        areaId: z.string().nullable(),
-      }),
+      inputSchema: hierarchyMcpSchemas.fileProject,
     },
-    async ({ projectId, areaId }) =>
-      toToolResult(
-        await apiFetch(bearerToken, `/projects/${projectId}`, "PATCH", {
-          areaId,
-        }),
-      ),
+    async (input) => {
+      const request = hierarchyProxyRequest("file_project", input);
+      return toToolResult(
+        await apiFetch(bearerToken, request.path, request.method, request.body),
+      );
+    },
   );
 
   server.registerTool(

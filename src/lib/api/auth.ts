@@ -29,13 +29,14 @@ export function parseBearerToken(authHeader: string | null) {
 export async function authenticateApiRequest(
   request: Request,
   requiredScope: ApiScope,
+  client: Pick<typeof prisma, "apiKey"> = prisma,
 ) {
   const token = parseBearerToken(request.headers.get("authorization"));
   if (!token) {
     throw new ApiAuthError("Missing bearer token.", 401);
   }
 
-  const key = await prisma.apiKey.findUnique({
+  const key = await client.apiKey.findUnique({
     where: { tokenHash: hashToken(token) },
   });
 
@@ -52,7 +53,7 @@ export async function authenticateApiRequest(
     enforceRateLimit(key.id, key.rateLimit);
   }
 
-  await prisma.apiKey.update({
+  await client.apiKey.update({
     where: { id: key.id },
     data: { lastUsedAt: new Date() },
   });
