@@ -10,7 +10,7 @@ import { getRecentCaptureHref } from "@/lib/today-capture-actions";
 import { ResurfacedMemory } from "@/components/resurfaced-memory";
 import { TodayRoutinesLine } from "@/components/today-routines";
 import { CaptureFileActions } from "@/components/capture-file-actions";
-import { isActionableCapture } from "@/lib/actionable-captures";
+import { selectActionableCaptures } from "@/lib/actionable-captures";
 
 export const dynamic = "force-dynamic";
 
@@ -265,7 +265,7 @@ function RecentCapturesStrip({
   captures: RecentCapture[];
   areas: Area[];
 }) {
-  const actionableCaptures = captures.filter(isActionableCapture);
+  const actionableCaptures = selectActionableCaptures(captures);
 
   if (actionableCaptures.length === 0) {
     return null;
@@ -279,7 +279,7 @@ function RecentCapturesStrip({
         </h2>
       </div>
       <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
-        {actionableCaptures.slice(0, 5).map((capture) => {
+        {actionableCaptures.map((capture) => {
           const outcome =
             formatCaptureOutcome(capture.createdItems) ??
             capture.parseStatus ??

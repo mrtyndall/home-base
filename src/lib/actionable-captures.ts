@@ -4,6 +4,13 @@ type CaptureReviewState = {
   createdItems: unknown;
 };
 
+export function selectActionableCaptures<T extends CaptureReviewState>(
+  captures: T[],
+  limit = 5,
+) {
+  return captures.filter(isActionableCapture).slice(0, limit);
+}
+
 export function isActionableCapture(capture: CaptureReviewState) {
   if (capture.status !== "active") return false;
 

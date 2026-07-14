@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { isActionableCapture } from "../src/lib/actionable-captures";
+import {
+  isActionableCapture,
+  selectActionableCaptures,
+} from "../src/lib/actionable-captures";
 
 const processedTaskCapture = {
   status: "active",
@@ -42,4 +45,24 @@ assert.equal(
   isActionableCapture({ status: "dismissed", parseStatus: "failed", createdItems: [] }),
   false,
   "Dismissed captures never return to the review queue.",
+);
+
+const olderActionableCapture = {
+  id: "needs-review",
+  status: "active",
+  parseStatus: "failed",
+  createdItems: [],
+};
+const newerProcessedCaptures = Array.from({ length: 7 }, (_, index) => ({
+  id: `processed-${index}`,
+  ...processedTaskCapture,
+}));
+
+assert.deepEqual(
+  selectActionableCaptures(
+    [...newerProcessedCaptures, olderActionableCapture],
+    5,
+  ).map((capture) => capture.id),
+  ["needs-review"],
+  "Filtering must happen before the display limit so newer receipts cannot hide review work.",
 );

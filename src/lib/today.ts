@@ -135,8 +135,11 @@ export async function getTodayDashboard() {
         take: getTodayTaskInboxLimit(),
       }),
       prisma.capture.findMany({
+        // Today renders at most five review items. Inspect a larger bounded
+        // active window so processed receipts cannot crowd review work out.
+        where: { status: "active" },
         orderBy: { createdAt: "desc" },
-        take: 6,
+        take: 50,
       }),
       prisma.task.findFirst({
         where: {
