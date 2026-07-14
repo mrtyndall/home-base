@@ -364,21 +364,25 @@ model IdeaNote {
 }
 
 model Reference {
-  id          String   @id @default(uuid())
-  title       String?
-  kind        String   @default("reference")
-  body        String
-  url         String?
-  tags        String[] @default([])
-  metadata    Json?
-  sourcePath  String?  @unique @map("source_path")
-  areaId      String?  @map("area_id")
-  projectId   String?  @map("project_id")
-  relatedType String?  @map("related_type")
-  relatedId   String?  @map("related_id")
-  source      String?
-  captureId   String?  @map("capture_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id            String    @id @default(uuid())
+  title         String?
+  kind          String    @default("reference")
+  body          String
+  url           String?
+  normalizedUrl String?   @map("normalized_url")
+  tags          String[]  @default([])
+  metadata      Json?
+  sourcePath    String?   @unique @map("source_path")
+  areaId        String?   @map("area_id")
+  projectId     String?   @map("project_id")
+  relatedType   String?   @map("related_type")
+  relatedId     String?   @map("related_id")
+  source        String?
+  captureId     String?   @map("capture_id")
+  readStatus    String    @default("unread") @map("read_status")
+  savedAt       DateTime  @default(now()) @map("saved_at")
+  readAt        DateTime? @map("read_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
   capture  Capture?           @relation(fields: [captureId], references: [id])
   area     Area?              @relation(fields: [areaId], references: [id])
@@ -388,6 +392,7 @@ model Reference {
   @@index([areaId])
   @@index([projectId])
   @@index([kind])
+  @@index([kind, readStatus, savedAt])
   @@index([captureId])
   @@map("references")
 }
