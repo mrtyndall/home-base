@@ -15,7 +15,10 @@ type TaskRecord = {
   someday: boolean;
 };
 
-function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
+function quickEditClient(
+  taskOverrides: Partial<TaskRecord> = {},
+  failures: { areaLookup?: boolean; notification?: boolean } = {},
+) {
   const task: TaskRecord = {
     id: "task-1",
     title: "Call the radio club",
@@ -31,11 +34,14 @@ function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
     { id: "hobbies", name: "Hobbies", parentAreaId: null, sortOrder: 2, status: "active", isSystem: false },
     { id: "radio", name: "Ham Radio", parentAreaId: "hobbies", sortOrder: 1, status: "active", isSystem: false },
     { id: "retired", name: "Old", parentAreaId: null, sortOrder: 3, status: "retired", isSystem: false },
+    { id: "legacy", name: "Still active", parentAreaId: "retired", sortOrder: 1, status: "active", isSystem: false },
     { id: "system", name: "System", parentAreaId: null, sortOrder: 4, status: "active", isSystem: true },
   ];
   const projects = [
     { id: "antenna", name: "Antenna", areaId: "radio", status: "active" },
     { id: "loose", name: "Loose plan", areaId: null, status: "parked" },
+    { id: "later", name: "Later project", areaId: "home", status: "someday" },
+    { id: "legacy-project", name: "Legacy project", areaId: "legacy", status: "active" },
     { id: "old-project", name: "Old project", areaId: "retired", status: "active" },
     { id: "done-project", name: "Done project", areaId: "home", status: "completed" },
   ];
@@ -43,7 +49,7 @@ function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
   const notifications: Array<Record<string, unknown>> = [];
   const calls: string[] = [];
 
-  const client = {
+  const transaction = {
     task: {
       findUnique: async ({ where }: { where: { id: string } }) => {
         calls.push("task:findUnique");
@@ -60,15 +66,21 @@ function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
     area: {
       findMany: async ({ where }: { where?: { status?: string; isSystem?: boolean } }) => {
         calls.push("area:findMany");
+        if (failures.areaLookup) throw new Error("area lookup failed");
         return areas.filter((area) =>
           (!where?.status || area.status === where.status) &&
           (where?.isSystem === undefined || area.isSystem === where.isSystem))
           .map((area) => ({ ...area }));
       },
-      findFirst: async ({ where }: { where: { id: string } }) => {
+      findFirst: async ({ where }: {
+        where: { id: string; status?: string; isSystem?: boolean };
+      }) => {
         calls.push("area:findFirst");
         const area = areas.find((candidate) => candidate.id === where.id);
-        return area?.status === "active" && !area.isSystem ? { id: area.id } : null;
+        if (!area) return null;
+        if (where.status !== undefined && area.status !== where.status) return null;
+        if (where.isSystem !== undefined && area.isSystem !== where.isSystem) return null;
+        return { id: area.id };
       },
     },
     project: {
@@ -85,6 +97,7 @@ function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
             condition.areaId === null
               ? project.areaId === null
               : project.areaId !== null && condition.areaId.in.includes(project.areaId))))
+          .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
           .map((project) => ({ ...project }));
       },
       findFirst: async ({ where }: { where: { id: string } }) => {
@@ -99,9 +112,28 @@ function quickEditClient(taskOverrides: Partial<TaskRecord> = {}) {
     notification: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         calls.push("notification:create");
+        if (failures.notification) throw new Error("notification failed");
         notifications.push(data);
         return { id: `notification-${notifications.length}` };
       },
+    },
+  };
+
+  const client = {
+    ...transaction,
+    $transaction: async <T>(operation: (tx: typeof transaction) => Promise<T>) => {
+      calls.push("transaction");
+      const beforeTask = { ...task };
+      const beforeUpdates = updates.length;
+      const beforeNotifications = notifications.length;
+      try {
+        return await operation(transaction);
+      } catch (error) {
+        Object.assign(task, beforeTask);
+        updates.length = beforeUpdates;
+        notifications.length = beforeNotifications;
+        throw error;
+      }
     },
   };
 
@@ -129,7 +161,10 @@ test("assignment options load eligible hierarchy on demand with Inbox and path l
       { id: "home", type: "area", label: "Home", areaId: "home", projectId: null },
       { id: "hobbies", type: "area", label: "Hobbies", areaId: "hobbies", projectId: null },
       { id: "radio", type: "area", label: "Hobbies / Ham Radio", areaId: "radio", projectId: null },
+      { id: "legacy", type: "area", label: "Old / Still active", areaId: "legacy", projectId: null },
       { id: "antenna", type: "project", label: "Antenna — Hobbies / Ham Radio", areaId: "radio", projectId: "antenna" },
+      { id: "later", type: "project", label: "Later project — Home", areaId: "home", projectId: "later" },
+      { id: "legacy-project", type: "project", label: "Legacy project — Old / Still active", areaId: "legacy", projectId: "legacy-project" },
       { id: "loose", type: "project", label: "Loose plan — No area yet", areaId: null, projectId: "loose" },
     ],
   });
@@ -165,6 +200,64 @@ test("assignment PATCH returns Inbox after clearing both destination fields", as
   assert.equal(fake.notifications.length, 1);
 });
 
+test("assignment PATCH rejects a direct system Area using the shared eligibility query", async () => {
+  const fake = quickEditClient();
+  const response = await taskAssignmentResponse("task-1", request({ areaId: "system" }), fake.client as never);
+
+  assert.equal(response.status, 404);
+  assert.equal(fake.updates.length, 0);
+  assert.equal(fake.notifications.length, 0);
+});
+
+test("assignment no-op returns the authoritative path label without update or audit", async () => {
+  const fake = quickEditClient({ areaId: "radio", projectId: "antenna" });
+  const response = await taskAssignmentResponse(
+    "task-1",
+    request({ areaId: "home", projectId: "antenna" }),
+    fake.client as never,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    task: { id: "task-1", areaId: "radio", projectId: "antenna" },
+    displayLabel: "Antenna — Hobbies / Ham Radio",
+  });
+  assert.equal(fake.updates.length, 0);
+  assert.equal(fake.notifications.length, 0);
+});
+
+test("assignment resolves its display label before any write", async () => {
+  const fake = quickEditClient({}, { areaLookup: true });
+
+  await assert.rejects(
+    taskAssignmentResponse("task-1", request({ areaId: "home" }), fake.client as never),
+    /area lookup failed/,
+  );
+  assert.equal(fake.updates.length, 0);
+  assert.equal(fake.notifications.length, 0);
+  assert.equal(fake.calls.includes("transaction"), false);
+});
+
+test("assignment and schedule roll back their task update when notification creation fails", async () => {
+  const assignment = quickEditClient({}, { notification: true });
+  await assert.rejects(
+    taskAssignmentResponse("task-1", request({ areaId: "home" }), assignment.client as never),
+    /notification failed/,
+  );
+  assert.equal(assignment.task.areaId, null);
+  assert.equal(assignment.updates.length, 0);
+  assert.equal(assignment.notifications.length, 0);
+
+  const schedule = quickEditClient({}, { notification: true });
+  await assert.rejects(
+    taskScheduleResponse("task-1", request({ dueDate: "2026-07-18" }), schedule.client as never),
+    /notification failed/,
+  );
+  assert.equal(schedule.task.dueDate, null);
+  assert.equal(schedule.updates.length, 0);
+  assert.equal(schedule.notifications.length, 0);
+});
+
 test("schedule PATCH returns authoritative date, Someday, and No date labels with one audit per write", async () => {
   const cases = [
     { payload: { dueDate: "2026-07-18", someday: false }, label: "Jul 18" },
@@ -182,11 +275,41 @@ test("schedule PATCH returns authoritative date, Someday, and No date labels wit
   }
 });
 
+test("schedule date, Someday, and No date no-ops return authoritative labels without audit", async () => {
+  const cases = [
+    {
+      current: { dueDate: new Date("2026-07-18T00:00:00.000Z"), someday: false },
+      payload: { dueDate: "2026-07-18", someday: false },
+      label: "Jul 18",
+    },
+    {
+      current: { dueDate: null, someday: true },
+      payload: { dueDate: null, someday: true },
+      label: "Someday",
+    },
+    {
+      current: { dueDate: null, someday: false },
+      payload: { dueDate: null, someday: false },
+      label: "No date",
+    },
+  ];
+
+  for (const { current, payload, label } of cases) {
+    const fake = quickEditClient(current);
+    const response = await taskScheduleResponse("task-1", request(payload), fake.client as never);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).displayLabel, label);
+    assert.equal(fake.updates.length, 0);
+    assert.equal(fake.notifications.length, 0);
+  }
+});
+
 test("missing, closed, and invalid requests do not mutate or audit", async () => {
   const missing = quickEditClient();
   assert.equal((await taskAssignmentOptionsResponse("missing", missing.client as never)).status, 404);
 
   const closed = quickEditClient({ status: "completed" });
+  assert.equal((await taskAssignmentOptionsResponse("task-1", closed.client as never)).status, 409);
   assert.equal((await taskAssignmentResponse("task-1", request({ areaId: "home" }), closed.client as never)).status, 409);
 
   const invalid = quickEditClient();

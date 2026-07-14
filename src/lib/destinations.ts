@@ -57,7 +57,7 @@ export async function resolveVerifiedDestination(
   if (!destination.projectId) {
     if (!destination.areaId) return destination;
     const area = await client.area.findFirst({
-      where: { id: destination.areaId, status: "active" },
+      where: { id: destination.areaId, status: "active", isSystem: false },
       select: { id: true },
     });
     if (!area) throw new Error("Area not found.");

@@ -8,9 +8,15 @@ type RouteContext = {
   params: Promise<{ taskId: string }>;
 };
 
-type AssignmentClient = {
+type AssignmentDataClient = {
   task: {
-    findUnique(args: unknown): PromiseLike<{ id: string; title: string; status: string } | null>;
+    findUnique(args: unknown): PromiseLike<{
+      id: string;
+      title: string;
+      status: string;
+      areaId: string | null;
+      projectId: string | null;
+    } | null>;
     update(args: unknown): PromiseLike<{
       id: string;
       title: string;
@@ -25,8 +31,6 @@ type AssignmentClient = {
       name: string;
       parentAreaId: string | null;
       sortOrder: number;
-      status: "active";
-      isSystem: false;
     }>>;
   };
   project: {
@@ -39,6 +43,10 @@ type AssignmentClient = {
   notification: {
     create(args: unknown): PromiseLike<unknown>;
   };
+};
+
+type AssignmentClient = AssignmentDataClient & {
+  $transaction<T>(operation: (client: AssignmentDataClient) => Promise<T>): Promise<T>;
 };
 
 export async function taskAssignmentResponse(
@@ -56,7 +64,7 @@ export async function taskAssignmentResponse(
 
   const task = await client.task.findUnique({
     where: { id: taskId },
-    select: { id: true, title: true, status: true },
+    select: { id: true, title: true, status: true, areaId: true, projectId: true },
   });
   if (!task) {
     return NextResponse.json({ error: "Task not found." }, { status: 404 });
@@ -98,40 +106,15 @@ export async function taskAssignmentResponse(
     );
   }
 
-  const updated = await client.task.update({
-    where: { id: task.id },
-    data: {
-      areaId: destination.areaId,
-      projectId: destination.projectId,
-    },
-  });
-
-  await client.notification.create({
-    data: {
-      type: "task_assigned",
-      title: "Task assigned",
-      body: updated.title,
-      sourceRef: {
-        type: "task",
-        id: updated.id,
-        source: "manual",
-        areaId: updated.areaId,
-        projectId: updated.projectId,
-      },
-    },
-  });
-
   let displayLabel = "Inbox";
   if (destination.areaId) {
     const areas = await client.area.findMany({
-      where: { status: "active", isSystem: false },
+      where: { isSystem: false },
       select: {
         id: true,
         name: true,
         parentAreaId: true,
         sortOrder: true,
-        status: true,
-        isSystem: true,
       },
     });
     const areaPath = flattenAreaOptions(areas).find((area) => area.id === destination.areaId)?.path;
@@ -141,6 +124,43 @@ export async function taskAssignmentResponse(
   } else if (project) {
     displayLabel = `${project.name} — No area yet`;
   }
+
+  if (task.areaId === destination.areaId && task.projectId === destination.projectId) {
+    return NextResponse.json({
+      task: {
+        id: task.id,
+        areaId: task.areaId,
+        projectId: task.projectId,
+      },
+      displayLabel,
+    });
+  }
+
+  const updated = await client.$transaction(async (transaction) => {
+    const nextTask = await transaction.task.update({
+      where: { id: task.id },
+      data: {
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+      },
+    });
+
+    await transaction.notification.create({
+      data: {
+        type: "task_assigned",
+        title: "Task assigned",
+        body: nextTask.title,
+        sourceRef: {
+          type: "task",
+          id: nextTask.id,
+          source: "manual",
+          areaId: nextTask.areaId,
+          projectId: nextTask.projectId,
+        },
+      },
+    });
+    return nextTask;
+  });
 
   return NextResponse.json({
     task: {

@@ -16,8 +16,7 @@ type AssignmentOptionsClient = {
       name: string;
       parentAreaId: string | null;
       sortOrder: number;
-      status: "active";
-      isSystem: false;
+      status: "active" | "retired";
     }>>;
   };
   project: {
@@ -48,18 +47,21 @@ export async function taskAssignmentOptionsResponse(
   }
 
   const areas = await client.area.findMany({
-    where: { status: "active", isSystem: false },
+    where: { isSystem: false },
     select: {
       id: true,
       name: true,
       parentAreaId: true,
       sortOrder: true,
       status: true,
-      isSystem: true,
     },
   });
-  const areaOptions = flattenAreaOptions(areas);
-  const areaPaths = new Map(areaOptions.map((area) => [area.id, area.path]));
+  const allAreaOptions = flattenAreaOptions(areas);
+  const activeAreaIds = new Set(
+    areas.filter((area) => area.status === "active").map((area) => area.id),
+  );
+  const areaOptions = allAreaOptions.filter((area) => activeAreaIds.has(area.id));
+  const areaPaths = new Map(allAreaOptions.map((area) => [area.id, area.path]));
   const projects = await client.project.findMany({
     where: {
       status: { in: ["active", "parked", "someday"] },

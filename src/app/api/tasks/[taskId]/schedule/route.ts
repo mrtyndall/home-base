@@ -8,7 +8,7 @@ type RouteContext = {
   params: Promise<{ taskId: string }>;
 };
 
-type ScheduleClient = {
+type ScheduleDataClient = {
   task: {
     findUnique(args: unknown): PromiseLike<{
       id: string;
@@ -27,6 +27,10 @@ type ScheduleClient = {
   notification: {
     create(args: unknown): PromiseLike<unknown>;
   };
+};
+
+type ScheduleClient = ScheduleDataClient & {
+  $transaction<T>(operation: (client: ScheduleDataClient) => Promise<T>): Promise<T>;
 };
 
 export async function taskScheduleResponse(
@@ -76,27 +80,30 @@ export async function taskScheduleResponse(
     });
   }
 
-  const updated = await client.task.update({
-    where: { id: task.id },
-    data: {
-      dueDate: nextDueDate,
-      someday: somedayValue ? true : false,
-    },
-  });
-
-  await client.notification.create({
-    data: {
-      type: "task_rescheduled",
-      title: "Task rescheduled",
-      body: updated.title,
-      sourceRef: {
-        type: "task",
-        id: updated.id,
-        source: "manual",
-        dueDate: somedayValue ? null : dueDateValue,
-        someday: somedayValue,
+  const updated = await client.$transaction(async (transaction) => {
+    const nextTask = await transaction.task.update({
+      where: { id: task.id },
+      data: {
+        dueDate: nextDueDate,
+        someday: somedayValue ? true : false,
       },
-    },
+    });
+
+    await transaction.notification.create({
+      data: {
+        type: "task_rescheduled",
+        title: "Task rescheduled",
+        body: nextTask.title,
+        sourceRef: {
+          type: "task",
+          id: nextTask.id,
+          source: "manual",
+          dueDate: somedayValue ? null : dueDateValue,
+          someday: somedayValue,
+        },
+      },
+    });
+    return nextTask;
   });
 
   const updatedDueDate = updated.dueDate?.toISOString().slice(0, 10) ?? null;

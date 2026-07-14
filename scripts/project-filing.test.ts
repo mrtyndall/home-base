@@ -238,6 +238,28 @@ test("resolveVerifiedDestination accepts an unfiled Project as authoritative", a
   );
 });
 
+test("resolveVerifiedDestination rejects a system Area through its real query contract", async () => {
+  const systemArea = { id: "system", status: "active", isSystem: true };
+  const client = {
+    area: {
+      findFirst: async ({ where }: {
+        where: { id: string; status?: string; isSystem?: boolean };
+      }) => {
+        if (where.id !== systemArea.id) return null;
+        if (where.status !== undefined && where.status !== systemArea.status) return null;
+        if (where.isSystem !== undefined && where.isSystem !== systemArea.isSystem) return null;
+        return { id: systemArea.id };
+      },
+    },
+    project: { findFirst: async () => null },
+  };
+
+  await assert.rejects(
+    resolveVerifiedDestination({ areaId: "system" }, client),
+    /Area not found/,
+  );
+});
+
 test("resolveVerifiedDestination distinguishes a missing Project", async () => {
   const client = {
     area: { findFirst: async () => ({ id: "area-1" }) },
