@@ -21,6 +21,7 @@ Each action is an object whose "type" field names the action, plus that action's
 { "type": "create_task", "title": "...", "area_match": "...", "due_date": "..." }
 { "type": "create_entity_note", "parent_type": "area", "area_match": "...", "body_md": "..." }
 { "type": "check_in", "project_match": "...", "body_md": "..." }
+{ "type": "save_read_later", "url": "https://..." }
 create_entity_note and create_entity_doc may omit parent_type to create unfiled content.
 Use these action types:
 - create_task
@@ -44,6 +45,7 @@ Use these action types:
 - append_to_idea
 - convert_idea
 - create_reference
+- save_read_later
 - create_entity_note
 - create_entity_doc
 
@@ -63,6 +65,7 @@ Rules:
 - Clear action intent ("do", "buy", "call", "fix", "schedule", "renew") creates a task.
 - A thought, opinion, or possibility ("what if", "I wonder", "idea:") creates an idea.
 - A fact, link, detail, or recommendation someone mentioned creates a reference, or an area entity note when a known area is named. Prefer area notes over project notes unless the text clearly ties the detail to a finite project.
+- Explicit reading intent such as "read later https://..." uses save_read_later. A bare or generic URL remains create_reference.
 - Status narration on a known project or area ("check in on X: ...", "quick update on X: ...", progress reports) uses check_in with body_md and area_match or project_match. Check-ins are the living timeline and heartbeat of the container.
 - "journal: ..." and reflective first-person narration about the day or Matt's state of mind ("today was...", "feeling like...", "grateful that...") use journal with body_md. entry_date defaults to today; set it only when the text names a different day.
 - Requests to see a memory or idea more often ("boost the podcast intro idea", "keep that one coming back") use boost_resurface with item_match.
@@ -370,6 +373,11 @@ function fallbackParse(rawText: string): ParserAction[] {
     return [{ type: "create_reference", body: referenceMatch[2].trim() }];
   }
 
+  const readLaterMatch = trimmed.match(/^read\s+later\s*[:,-]?\s*(https?:\/\/\S+)$/i);
+  if (readLaterMatch?.[1]) {
+    return [{ type: "save_read_later", url: readLaterMatch[1] }];
+  }
+
   // Require "the/my" or a "... task" suffix so prose like "star gazing
   // would be lovely" is not coerced into a star_task action.
   const starMatch =
@@ -406,7 +414,11 @@ function fallbackParse(rawText: string): ParserAction[] {
     /^(the|a|an)\b.+\b(is|are|was|were)\b/i.test(trimmed) ||
     /^https?:\/\//i.test(trimmed)
   ) {
-    return [{ type: "create_reference", body: trimmed }];
+    return [{
+      type: "create_reference",
+      body: trimmed,
+      ...( /^https?:\/\//i.test(trimmed) ? { url: trimmed } : {}),
+    }];
   }
 
   return [

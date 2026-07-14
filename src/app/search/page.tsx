@@ -3,6 +3,7 @@ import { SearchIcon } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatShortDate } from "@/lib/dates";
 import { SetupNotice } from "@/components/setup-notice";
+import { toReferenceSearchResult } from "@/lib/reference-search-result";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,7 @@ async function runSearch(query: string) {
       prisma.reference.findMany({
         where: {
           OR: [
+            { title: { contains: query, mode: "insensitive" } },
             { body: { contains: query, mode: "insensitive" } },
             { url: { contains: query, mode: "insensitive" } },
           ],
@@ -241,13 +243,7 @@ async function runSearch(query: string) {
         title: idea.title,
         detail: idea.status,
       })),
-      ...references.map((reference) => ({
-        type: "Reference",
-        id: reference.id,
-        title: reference.body,
-        detail: reference.url ?? undefined,
-        href: `/references/${reference.id}`,
-      })),
+      ...references.map(toReferenceSearchResult),
       ...referenceSnippets.map((snippet) => ({
         type: "Highlight",
         id: snippet.id,

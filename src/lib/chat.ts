@@ -8,6 +8,7 @@ import {
 } from "@/lib/dates";
 import { getTaskSlipDays, projectLastActivityFact, taskOpenSinceFact } from "@/lib/slippage";
 import { flattenAreaOptions } from "@/lib/hierarchy";
+import { toReferenceSearchResult } from "@/lib/reference-search-result";
 
 const DEFAULT_CHAT_MODEL = "claude-sonnet-4-6";
 const MAX_TOOL_ROUNDS = 6;
@@ -151,7 +152,7 @@ async function toolAreas() {
 async function toolSearch(query: string) {
   if (!query.trim()) return { results: [] };
   const like = { contains: query, mode: "insensitive" as const };
-  const [tasks, projects, ideas, journal, checkIns, people, captures] =
+  const [tasks, projects, ideas, references, journal, checkIns, people, captures] =
     await Promise.all([
       prisma.task.findMany({
         where: { OR: [{ title: like }, { notes: like }] },
@@ -166,6 +167,13 @@ async function toolSearch(query: string) {
       prisma.idea.findMany({
         where: { OR: [{ title: like }, { body: like }] },
         select: { id: true, title: true, status: true },
+        take: 8,
+      }),
+      prisma.reference.findMany({
+        where: { OR: [{ title: like }, { body: like }, { url: like }] },
+        select: {
+          id: true, kind: true, title: true, body: true, url: true, readStatus: true,
+        },
         take: 8,
       }),
       prisma.journalEntry.findMany({
@@ -210,6 +218,7 @@ async function toolSearch(query: string) {
         status: idea.status,
         href: "/ideas",
       })),
+      ...references.map(toReferenceSearchResult),
       ...journal.map((entry) => ({
         type: "journal",
         date: entry.entryDate.toISOString().slice(0, 10),

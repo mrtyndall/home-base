@@ -4,6 +4,7 @@ import { addHours, parseISO } from "date-fns";
 import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
+import { executeReadLaterCaptureAction } from "@/lib/capture/read-later";
 import { createCheckInRecord } from "@/lib/checkins";
 import { boostResurfaceByMatch } from "@/lib/resurfacing";
 import { createPersonRecord, findPersonByMatch } from "@/lib/people";
@@ -35,6 +36,7 @@ type ExecutionContext = {
   actor: { source: "capture" | "api"; label?: string };
   writeSource: string;
   calendarSource: "capture" | "api";
+  deferredEnrichment: Array<() => Promise<void>>;
 };
 
 export async function submitCapture(
@@ -108,7 +110,8 @@ async function persistCaptureAtomically(input: {
   status: CaptureParseStatus;
   areas: AreaContext[];
 }) {
-  return prisma.$transaction(async (client) => {
+  const deferredEnrichment: Array<() => Promise<void>> = [];
+  const result = await prisma.$transaction(async (client) => {
     await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.captureId}, 0))`;
     const existing = await client.capture.findUnique({ where: { id: input.captureId } });
     if (existing) {
@@ -142,6 +145,7 @@ async function persistCaptureAtomically(input: {
       captureSource: input.input.source,
       areas: input.areas,
       ...input.actorContext,
+      deferredEnrichment,
     };
     const executableActions = input.actions.filter(isExecutableAction);
     const createdItems =
@@ -164,6 +168,10 @@ async function persistCaptureAtomically(input: {
       createdItems,
     };
   });
+  for (const job of deferredEnrichment) {
+    queueMicrotask(() => { void job().catch(() => undefined); });
+  }
+  return result;
 }
 
 async function buildParserContext(source: string) {
@@ -341,6 +349,9 @@ async function executeActions(
         break;
       case "create_reference":
         createdItems.push(await createReference(action, context));
+        break;
+      case "save_read_later":
+        createdItems.push(await saveReadLater(action, context));
         break;
       case "check_in":
         createdItems.push(await executeCheckIn(action, context));
@@ -902,6 +913,27 @@ async function createReference(
     id: reference.id,
     label: `Reference saved to ${reference.project?.name ?? reference.area?.name ?? "Inbox"}`,
   };
+}
+
+async function saveReadLater(
+  action: Extract<ExecutableAction, { type: "save_read_later" }>,
+  context: ExecutionContext,
+) {
+  const project = await resolveProject(action.project_id, action.project_match, context);
+  const areaId = await resolveAreaId(action.area_id, action.area_match, context);
+  const filing = project
+    ? { mode: "project" as const, projectId: project.id }
+    : areaId
+      ? { mode: "area" as const, areaId }
+      : { mode: "unfiled" as const };
+  return executeReadLaterCaptureAction(action, {
+    client: context.client as never,
+    enrichmentClient: prisma as never,
+    captureId: context.captureId,
+    source: context.writeSource,
+    filing,
+    deferEnrichment(job) { context.deferredEnrichment.push(job); },
+  });
 }
 
 async function createEntityNote(

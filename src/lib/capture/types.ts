@@ -125,6 +125,17 @@ const createReferenceAction = z.object({
   related_match: z.string().optional(),
 });
 
+const saveReadLaterAction = z.object({
+  type: z.literal("save_read_later"),
+  url: z.string().url(),
+  title: z.string().optional(),
+  area_id: z.string().optional(),
+  area_match: z.string().optional(),
+  project_id: z.string().optional(),
+  project_match: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
 const createPersonAction = z.object({
   type: z.literal("create_person"),
   name: z.string().min(1),
@@ -235,6 +246,7 @@ export const executableActionSchema = z.discriminatedUnion("type", [
   appendToIdeaAction,
   convertIdeaAction,
   createReferenceAction,
+  saveReadLaterAction,
   journalAction,
   boostResurfaceAction,
   scheduleReviewAction,

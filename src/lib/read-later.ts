@@ -59,7 +59,7 @@ type ReferenceClient = {
   }): PromiseLike<{ count: number }>;
 };
 
-type ReadLaterClient = {
+export type ReadLaterClient = {
   area: {
     findFirst(args: unknown): PromiseLike<{ id: string } | null>;
   };
@@ -67,12 +67,13 @@ type ReadLaterClient = {
     findFirst(args: unknown): PromiseLike<{ id: string; areaId: string | null } | null>;
   };
   reference: ReferenceClient;
-  $transaction<T>(operation: (client: { reference: ReferenceClient }) => Promise<T>): Promise<T>;
+  $transaction?<T>(operation: (client: { reference: ReferenceClient }) => Promise<T>): Promise<T>;
 };
 
 export type ReadLaterOptions = {
   scheduleEnrichment?: (job: () => Promise<void>) => void;
   fetchMetadata?: (url: string) => Promise<ReadLaterPageMetadata>;
+  enrichmentClient?: ReadLaterClient;
 };
 
 const ACTIVE_READ_LATER_STATUSES: ReadLaterStatus[] = ["unread", "read"];
@@ -163,7 +164,7 @@ function scheduleMetadataEnrichment(
         ...(json ? { metadata: json } : {}),
       };
       if (Object.keys(data).length) {
-        await client.reference.update({ where: { id: item.id }, data });
+        await (options.enrichmentClient ?? client).reference.update({ where: { id: item.id }, data });
       }
     } catch {
       return;
@@ -235,7 +236,7 @@ export async function setReadLaterStatus(
   if (!(["unread", "read", "archived"] as string[]).includes(status)) {
     throw new Error("Invalid Read Later status.");
   }
-  return client.$transaction(async (transaction) => {
+  const operation = async (transaction: { reference: ReferenceClient }) => {
     if (status === "read") {
       await transaction.reference.updateMany({
         where: { id, kind: "read_later", readAt: null },
@@ -258,5 +259,6 @@ export async function setReadLaterStatus(
     });
     if (!item) throw new Error("Read Later item not found.");
     return item;
-  });
+  };
+  return client.$transaction ? client.$transaction(operation) : operation(client);
 }
