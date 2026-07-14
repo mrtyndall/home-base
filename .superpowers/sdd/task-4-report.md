@@ -1,128 +1,54 @@
-# Task 4 report — Area-first web experience
+# Task 4 Report — REST, capture, MCP, and compatibility cleanup
 
 ## Status
 
-Implemented the Area-first web rollout in the assigned worktree. The compatibility index remains `/projects`, the primary label is now Areas, Area creation is name-only, Project creation can be locked to a validated query-supplied Area, and the existing Inbox surface is now global at `/areas/inbox` without a synthetic Inbox Area.
+Implemented and committed as `f158d86` (`feat: expose area hierarchy to agents`).
 
-## RED / GREEN evidence
+## RED evidence
 
-- RED command: `npx tsx --test scripts/area-creation-ui.test.ts scripts/project-area-creation-ui.test.ts scripts/global-inbox-ui.test.ts`
-- RED result: 0 passed, 3 failed for the expected missing behaviors: no Area creation route, no query-scoped Project form, and no global unfiled Inbox.
-- GREEN command: same focused command.
-- GREEN result: 3 passed, 0 failed.
-- Regression result after moving the Inbox off Home and onto the existing Inbox surface: `npm test` passed 50/50.
+The contract tests were added/updated before production code. The exact brief-prescribed discovery command selected `scripts/verify-api-contract.ts` and `scripts/api-hierarchy-contract.test.ts`.
 
-## Verification
+```text
+files=$(rg -l 'create_area|create_project|list_areas' src mcp scripts | rg 'test|verify')
+for file in ${(f)files}; do npx tsx --test "$file"; done
+```
 
-- `npx tsc --noEmit` — exit 0.
-- `npm test` — 50 passed, 0 failed.
-- `npm run lint` — exit 0.
-- `npm run build` — exit 0; Next compiled, TypeScript completed, 19 static pages generated, standalone assets copied.
-- `git diff --check` — clean.
+Both files failed for the intended absent behavior. The first assertion in each reported that the REST route did not use `assertValidAreaParent`; no setup or syntax error obscured the failure.
 
-## Disposable runtime QA
+The existing `scripts/area-first-runtime.test.ts` contract was also inverted before implementation so capture-created Projects were required to allow an omitted Area and label that result `Unfiled`.
 
-A local Postgres 17 disposable database was created in a throwaway Docker container, all migrations were applied, the repaired seed was executed, and synthetic pending/unfiled fixtures were added. No production or Railway state was used.
+## GREEN implementation
 
-HTTP smoke checks all returned 200:
+- REST Project create accepts omitted/null `areaId`; Project patch files to an Area or null through `fileProject`.
+- REST Area create/patch accepts `parentAreaId`, validates through `assertValidAreaParent`, and returns stable `{ error: { code, message } }` bodies with HTTP 400 for self-parent, cycle, and missing-parent failures.
+- Area list/detail reads add slash-separated hierarchy `path` values while retaining `parentAreaId`.
+- Capture parser explicitly permits unfiled Projects and forbids inventing an Area; capture execution only rejects a named Area that cannot be matched.
+- MCP adds `reparent_area` and `file_project`, makes Project Area inputs nullable, proxies REST only, and removes `read_domain_page` plus all active Domain-era schemas/descriptions.
+- Chat adds a hierarchy-ordered, path-labelled `list_areas` read tool.
+- Added `scripts/api-hierarchy-contract.test.ts` and `scripts/verify-api-contract.ts`; updated the prior capture runtime contract.
 
-- `/projects` rendered Areas, New area, and New project.
-- `/areas/new` rendered the name-focused Area form.
-- `/projects/new?areaId=area_seed_home` rendered fixed `Create in Home` context.
-- `/areas/inbox` rendered Pending captures and unfiled Tasks, Ideas, References, and Notes.
+## GREEN evidence
 
-Cleanup was verified: the disposable container was removed and the local dev server was stopped.
+Focused API/capture/MCP/hierarchy verification:
 
-## Screenshots / remaining QA need
+```text
+npx tsx --test scripts/api-hierarchy-contract.test.ts scripts/area-first-runtime.test.ts scripts/hierarchy.test.ts scripts/project-filing.test.ts scripts/capture-options-runtime.test.ts scripts/capture-file-confirmation.test.ts
+```
 
-No screenshots were captured. The in-app browser runtime reported zero available browser targets, so desktop/narrow visual inspection, keyboard focus traversal, and interactive form submission could not be performed in this task. These remain manual QA needs despite clean source-contract, runtime HTTP, TypeScript, lint, and production-build evidence.
+Result: 18 passed, 0 failed.
 
-## Exact files
+Final verification immediately before commit:
 
-Created:
+```text
+npm test
+npx tsc --noEmit
+npx eslint src/app/api/v1/'[...path]'/route.ts src/lib/capture/parser.ts src/lib/capture/service.ts src/lib/chat.ts mcp/http-server.ts scripts/api-hierarchy-contract.test.ts scripts/area-first-runtime.test.ts scripts/verify-api-contract.ts
+npx tsx scripts/verify-api-contract.ts
+git diff --check
+```
 
-- `src/app/areas/new/page.tsx`
-- `scripts/area-creation-ui.test.ts`
-- `scripts/project-area-creation-ui.test.ts`
-- `scripts/global-inbox-ui.test.ts`
-
-Deleted:
-
-- `src/app/domains/[domainId]/page.tsx`
-
-Modified:
-
-- `prisma/seed.ts`
-- `scripts/home-attention.test.ts`
-- `scripts/import-apple-reminders.ts`
-- `scripts/seed-runtime.mjs`
-- `src/app/actions.ts`
-- `src/app/api/v1/[...path]/route.ts`
-- `src/app/areas/[areaId]/page.tsx`
-- `src/app/captures/[captureId]/page.tsx`
-- `src/app/ideas/page.tsx`
-- `src/app/notes/[noteId]/page.tsx`
-- `src/app/page.tsx`
-- `src/app/people/[personId]/page.tsx`
-- `src/app/projects/[projectId]/page.tsx`
-- `src/app/projects/new/page.tsx`
-- `src/app/projects/page.tsx`
-- `src/app/tasks/[taskId]/page.tsx`
-- `src/app/tasks/page.tsx`
-- `src/app/today/page.tsx`
-- `src/components/capture-file-actions.tsx`
-- `src/components/check-in-feed.tsx`
-- `src/components/nav-tabs.tsx`
-- `src/components/task-scheduling.tsx`
-- `src/lib/home-attention.ts`
-- `src/lib/today.ts`
+Result: all commands exited 0; full suite 75 passed, 0 failed; API hierarchy contract verified; TypeScript, scoped lint, and diff check were clean.
 
 ## Concerns
 
-- The expand migration intentionally retains a required physical `areas.domain_id` column until the later contract release, while the generated Prisma model no longer exposes it. Fresh-database QA revealed that ordinary `prisma.area.create()` in seed code therefore violates the physical null constraint. The seed paths now use parameterized raw inserts solely for new Areas, assigning the hidden compatibility group; web/runtime UI and DTOs do not expose Domains. The later contract migration should remove this compatibility code with the physical column.
-- Interactive screenshot, narrow-layout, keyboard-focus, and click-through creation QA still needs a browser-enabled task.
-
-## Review remediation
-
-The seven review findings were addressed in a follow-up pass:
-
-- Added the isolated expand-schema shim `src/lib/area-compat.ts`. It upserts and returns the actual hidden System Domain ID with parameterized SQL, then creates an Area with the still-required physical `domain_id`. `createArea` and the Prisma seed share this helper. The module is explicitly marked for deletion with the contract migration.
-- Updated the runtime JavaScript seed to use the System ID returned by `ON CONFLICT ... DO UPDATE ... RETURNING id`; neither seed assumes `domain_system` owns the unique System name.
-- Reworked capture options around the flat `{ areas, projects }` response and added runtime normalization. System Areas are excluded from the API response.
-- Rejected system Areas in `createProject`, including forged form posts.
-- Limited Inbox References to `kind: "reference"` before the result cap, added unfiled Entity Docs and uploaded Documents, and replaced all remaining `/#inbox` backlinks with `/areas/inbox`.
-
-Follow-up TDD evidence:
-
-- RED: the five focused review tests failed for the intended missing behaviors.
-- GREEN: `npx tsx --test scripts/area-creation-ui.test.ts scripts/capture-options-runtime.test.ts scripts/project-area-creation-ui.test.ts scripts/global-inbox-ui.test.ts scripts/seed-area-compat.test.ts` passed 5/5.
-- Full suite: `npm test` passed 52/52.
-- `npm run lint`, `npx tsc --noEmit`, and `npm run build` exited successfully.
-
-Disposable PostgreSQL 17 integration QA migrated a fresh loopback database, changed the existing System row to a non-default ID, created an Area through `createCompatibleArea`, and verified its name, next sort order, physical foreign key, non-system visibility, and Domain-free return shape. It also ran both seed implementations against that row. The throwaway database was dropped and absence was verified afterward.
-
-## Final seed-parity cleanup
-
-- Added a source-contract parity assertion that extracts each seed's flat Area dataset and compares both against the canonical order: Home 10, Family 20, Health 30, Creative 40, Ham Radio 50, Homelab 60, Magic/Pokemon 70.
-- Corrected the Prisma seed's duplicated 10/20/30 sort orders for its final three Areas.
-- Added the explicit `CONTRACT_RELEASE_DELETE` marker beside the runtime seed's Domain compatibility SQL so the Release B contract work can find and remove it.
-- TDD RED evidence: the focused test first failed on the Prisma seed's 10/20/30 mismatch; after that correction, it failed on the absent deletion marker.
-- TDD GREEN evidence: `npx tsx --test scripts/seed-area-compat.test.ts` passed 1/1.
-
-## Browser-QA taxonomy follow-up
-
-Browser review found two remaining Area-first wording leaks. Project detail now labels its `/projects` back-link as `Areas`. The capture assignment control now reads `Destination`, presents Inbox under `Global`, and keeps the API-supplied flat Areas under `Areas`; it no longer exposes a `System` group or implies that global Inbox is itself an Area. The separate Project picker and its filtering/selection behavior were left unchanged.
-
-TDD evidence:
-
-- RED: `npx tsx --test scripts/project-area-creation-ui.test.ts scripts/capture-bar-picker-ui.test.ts` failed 2/2 on the old `Projects`, `Area`, and `System` labels.
-- GREEN: the same focused command passed 2/2 after the minimal copy/grouping correction.
-
-## Capture destination interaction follow-up
-
-Browser interaction QA exposed a state bug after the taxonomy copy fix: choosing Global → Inbox retained the current Project because the Area handler treated an empty `nextAreaId` as a valid match. The stale Project then repopulated both Area and Project submission fields.
-
-The destination transition now uses a tested retention rule: an empty Inbox destination always clears Project; a different Area clears a Project outside that Area; and only the selected Project's own nonempty Area retains it. Project-picker selection behavior remains unchanged.
-
-- RED: `npx tsx --test scripts/capture-options-runtime.test.ts` failed because the explicit Project-retention behavior did not exist.
-- GREEN: `npx tsx --test scripts/capture-options-runtime.test.ts scripts/capture-bar-picker-ui.test.ts` passed 2/2, covering all three transitions plus the picker taxonomy contract.
+- API/MCP contract coverage is source-contract based because the repository has no isolated authenticated REST/MCP integration harness. Shared hierarchy and filing behavior is exercised directly by the focused runtime tests, but a deployed authenticated smoke test remains worthwhile.
