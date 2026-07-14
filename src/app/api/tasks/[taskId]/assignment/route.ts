@@ -41,6 +41,12 @@ export async function PATCH(request: Request, context: RouteContext) {
         select: { id: true, areaId: true },
       })
     : null;
+  if (projectId && !project) {
+    return NextResponse.json(
+      { error: "Project not found or unavailable." },
+      { status: 404 },
+    );
+  }
   if (project) areaId = project.areaId;
   let destination;
   try {
