@@ -28,4 +28,6 @@ Note: this app has TWO origins — Railway (`home-base-production-e3b7.up.railwa
 
 Container startup may run committed migrations and insert missing bootstrap defaults only. It must not recreate Areas or overwrite user-managed taxonomy, Area state, or settings.
 
+Before an Area-first production deploy, record the current Book and Movie row counts and create a fresh database backup. Run `npm run verify:area-release -- --expected-books=<count> --expected-movies=<count>` against the canonical Railway database before deployment, then run the same read-only command with the same recorded counts after migrations complete. Do not treat deployment status or page smoke checks as a substitute for this preservation gate.
+
 The direct Railway domain is intentionally open for the Area-first rollout. Cloudflare Zero Trust Access is the planned access boundary; when enabled, the Railway origin must be disabled or blocked from direct access so it cannot bypass Cloudflare.
