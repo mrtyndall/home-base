@@ -212,6 +212,7 @@ type TodayTask = {
   starred: boolean;
   areaId: string | null;
   projectId: string | null;
+  areaPath: string | null;
   area: { name: string } | null;
   project: { name: string } | null;
 };
@@ -225,7 +226,8 @@ function TodayTaskRow({
   today: string;
   grouped?: boolean;
 }) {
-  const detail = `${task.area?.name ?? "Inbox"}${task.project ? ` / ${task.project.name}` : ""}`;
+  const areaLabel = task.areaPath ?? task.area?.name ?? "Inbox";
+  const detail = `${areaLabel}${task.project ? ` / ${task.project.name}` : ""}`;
 
   return (
     <div
@@ -246,8 +248,8 @@ function TodayTaskRow({
         currentAreaId={task.areaId}
         currentProjectId={task.projectId}
         currentLocationLabel={task.project
-          ? `${task.project.name} — ${task.area?.name ?? "No area yet"}`
-          : (task.area?.name ?? "Inbox")}
+          ? `${task.project.name} — ${task.areaPath ?? task.area?.name ?? "No area yet"}`
+          : areaLabel}
         today={today}
       />
       <div className="flex shrink-0 items-center gap-1.5">

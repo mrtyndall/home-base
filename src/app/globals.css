@@ -3,6 +3,8 @@
 :root {
   --background: #eff2ee;
   --foreground: #1c1917;
+  /* 60px collapsed capture + 8px gap + 62px nav + device/baseline inset. */
+  --app-dock-clearance: calc(8.125rem + max(0.75rem, env(safe-area-inset-bottom)));
 }
 
 @theme inline {

@@ -10,6 +10,7 @@ import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getRoutinesWithState } from "@/lib/routines";
 import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
 import { mergeUpcomingCommitments } from "@/lib/upcoming-commitments";
+import { flattenAreaOptions } from "@/lib/hierarchy";
 
 type UpcomingTaskCandidate = Pick<
   Task,
@@ -239,17 +240,22 @@ export async function getTodayDashboard() {
     const calendarSyncIsStale =
       !calendarSync?.lastSyncedAt ||
       Date.now() - calendarSync.lastSyncedAt.getTime() > staleMinutes * 60_000;
+    const areaPaths = new Map(flattenAreaOptions(areas).map((area) => [area.id, area.path]));
+    const withAreaPath = <T extends { areaId: string | null }>(task: T) => ({
+      ...task,
+      areaPath: task.areaId ? areaPaths.get(task.areaId) ?? null : null,
+    });
 
     return {
       ready: true as const,
       generatedAt: new Date(),
       today,
       tomorrow,
-      topTasks,
+      topTasks: topTasks.map(withAreaPath),
       starredCount,
-      dueToday,
-      dueTomorrow,
-      taskInbox,
+      dueToday: dueToday.map(withAreaPath),
+      dueTomorrow: dueTomorrow.map(withAreaPath),
+      taskInbox: taskInbox.map(withAreaPath),
       todayEvents,
       tomorrowEvents,
       upcomingCommitments: mergeUpcomingCommitments(

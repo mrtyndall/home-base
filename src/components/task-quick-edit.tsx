@@ -28,6 +28,14 @@ import {
   taskDatePresets,
   type TaskScheduleValue,
 } from "@/lib/task-quick-edit";
+import {
+  LatestRequestCoordinator,
+  MutationChannel,
+  type ChannelSnapshot,
+  readRecentDestinationIds,
+  runLatestRequest,
+  writeRecentDestinationId,
+} from "@/lib/task-quick-edit-coordinator";
 
 type Destination = {
   id: string;
@@ -42,12 +50,6 @@ type LocationValue = {
   projectId: string | null;
   label: string;
 };
-
-type RetryAction =
-  | { kind: "schedule"; next: TaskScheduleValue; previous: TaskScheduleValue }
-  | { kind: "location"; next: LocationValue; previous: LocationValue };
-
-const recentStorageKey = "home-base:task-quick-edit:recent-destinations";
 
 export function TaskQuickEdit({
   taskId,
@@ -65,9 +67,18 @@ export function TaskQuickEdit({
   const router = useRouter();
   const dialogTitleId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const locationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const scheduleTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const operationToken = useRef(0);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locationUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestCoordinator = useRef(new LatestRequestCoordinator());
+  const destinationTaskId = useRef<string | null>(null);
+  const scheduleChannel = useRef(new MutationChannel(schedule, sameSchedule)).current;
+  const locationChannel = useRef(new MutationChannel(location, sameLocation)).current;
+  const scheduleState = useSyncExternalStore(scheduleChannel.subscribe, scheduleChannel.snapshot, scheduleChannel.snapshot);
+  const locationState = useSyncExternalStore(locationChannel.subscribe, locationChannel.snapshot, locationChannel.snapshot);
   const mounted = useSyncExternalStore(
     useCallback(() => () => {}, []),
     useCallback(() => true, []),
@@ -75,34 +86,38 @@ export function TaskQuickEdit({
   );
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"quick" | "move">("quick");
-  const [locationValue, setLocationValue] = useState(location);
-  const [scheduleValue, setScheduleValue] = useState(schedule);
   const [destinations, setDestinations] = useState<Destination[] | null>(null);
   const [destinationsError, setDestinationsError] = useState(false);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [pickingDate, setPickingDate] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryAction, setRetryAction] = useState<RetryAction | null>(null);
-  const [undoAction, setUndoAction] = useState<RetryAction | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => () => {
-    if (undoTimer.current) clearTimeout(undoTimer.current);
+    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
+    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
+    requestCoordinator.current.cancel();
   }, []);
 
   useEffect(() => {
+    scheduleChannel.reconcile(schedule);
+  }, [schedule, scheduleChannel]);
+  useEffect(() => {
+    locationChannel.reconcile(location);
+  }, [location, locationChannel]);
+  useEffect(() => () => requestCoordinator.current.cancel(), [taskId]);
+
+  useEffect(() => {
     if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const trigger = triggerRef.current;
-    window.setTimeout(() => dialogRef.current?.focus(), 0);
+    const opener = openerRef.current;
+    window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>("[data-dialog-initial]")?.focus(), 0);
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") closeDialog();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("keydown", closeOnEscape);
-      (trigger ?? previous)?.focus?.();
+      opener?.focus();
     };
   }, [open]);
 
@@ -127,9 +142,10 @@ export function TaskQuickEdit({
       : ranked;
   }, [destinations, query, recentIds]);
 
-  function showDialog(nextView: "quick" | "move" = "quick") {
+  function showDialog(nextView: "quick" | "move" = "quick", opener = triggerRef.current) {
+    openerRef.current = opener;
     setView(nextView);
-    if (nextView === "move" && destinations === null) void loadDestinations();
+    if (nextView === "move" && (destinations === null || destinationTaskId.current !== taskId)) void loadDestinations();
     setQuery("");
     setPickingDate(false);
     setOpen(true);
@@ -137,124 +153,116 @@ export function TaskQuickEdit({
 
   function openMoveView() {
     setView("move");
-    if (destinations === null) void loadDestinations();
+    if (destinations === null || destinationTaskId.current !== taskId) void loadDestinations();
+    window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>("[data-dialog-initial]")?.focus(), 0);
+  }
+
+  function openQuickView() {
+    setView("quick");
+    window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>("[data-dialog-initial]")?.focus(), 0);
   }
 
   function closeDialog() {
+    requestCoordinator.current.cancel();
+    setDestinations(null);
     setOpen(false);
     setView("quick");
   }
 
   const loadDestinations = useCallback(async () => {
+    destinationTaskId.current = taskId;
+    setDestinations(null);
     setDestinationsError(false);
     try {
-      const response = await fetch(`/api/tasks/${taskId}/assignment-options`);
-      if (!response.ok) throw new Error("Destination load failed");
-      const data = await response.json() as { options?: Destination[] };
+      const data = await runLatestRequest(requestCoordinator.current, async (signal) => {
+        const response = await fetch(`/api/tasks/${taskId}/assignment-options`, { signal });
+        if (!response.ok) throw new Error("Destination load failed");
+        return response.json() as Promise<{ options?: Destination[] }>;
+      });
+      if (!data) return;
       setDestinations(data.options ?? []);
-      setRecentIds(readRecentIds());
+      setRecentIds(readRecentDestinationIds(safeStorage()));
     } catch {
       setDestinationsError(true);
     }
   }, [taskId]);
 
-  function armUndo(action: RetryAction) {
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    setUndoAction(action);
-    undoTimer.current = setTimeout(() => setUndoAction(null), 6000);
+  async function writeSchedule(next: TaskScheduleValue) {
+    const response = await fetch(`/api/tasks/${taskId}/schedule`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next),
+    });
+    if (!response.ok) throw new Error("Schedule update failed");
+    const result = await response.json() as { task?: TaskScheduleValue };
+    return result.task ?? next;
   }
 
-  async function changeSchedule(next: TaskScheduleValue, previous = scheduleValue) {
-    if (next.dueDate === scheduleValue.dueDate && next.someday === scheduleValue.someday) {
+  async function writeLocation(next: LocationValue) {
+    const response = await fetch(`/api/tasks/${taskId}/assignment`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ areaId: next.areaId, projectId: next.projectId }),
+    });
+    if (!response.ok) throw new Error("Location update failed");
+    const result = await response.json() as { task?: { areaId: string | null; projectId: string | null }; displayLabel?: string };
+    return { areaId: result.task?.areaId ?? next.areaId, projectId: result.task?.projectId ?? next.projectId, label: result.displayLabel ?? next.label };
+  }
+
+  async function changeSchedule(next: TaskScheduleValue) {
+    if (sameSchedule(next, scheduleState.value)) {
       closeDialog();
       return;
     }
-    const action: RetryAction = { kind: "schedule", next, previous };
-    const token = ++operationToken.current;
-    setScheduleValue(next);
-    setError(null);
-    setRetryAction(null);
+    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
     closeDialog();
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/schedule`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
-      if (!response.ok) throw new Error("Schedule update failed");
-      const result = await response.json() as { task?: TaskScheduleValue };
-      if (operationToken.current !== token) return;
-      setScheduleValue(result.task ?? next);
-      armUndo(action);
+    await scheduleChannel.mutate(next, writeSchedule);
+    if (scheduleChannel.snapshot().undo) {
+      scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
       startTransition(() => router.refresh());
-    } catch {
-      if (operationToken.current !== token) return;
-      setScheduleValue(previous);
-      setError("Couldn’t update task");
-      setRetryAction(action);
     }
   }
 
-  async function changeLocation(next: LocationValue, previous = locationValue) {
-    if (next.areaId === locationValue.areaId && next.projectId === locationValue.projectId) {
+  async function changeLocation(next: LocationValue) {
+    if (sameLocation(next, locationState.value)) {
       closeDialog();
       return;
     }
-    const action: RetryAction = { kind: "location", next, previous };
-    const token = ++operationToken.current;
-    setLocationValue(next);
-    setError(null);
-    setRetryAction(null);
+    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
     closeDialog();
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/assignment`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ areaId: next.areaId, projectId: next.projectId }),
-      });
-      if (!response.ok) throw new Error("Location update failed");
-      const result = await response.json() as {
-        task?: { areaId: string | null; projectId: string | null };
-        displayLabel?: string;
-      };
-      if (operationToken.current !== token) return;
-      const authoritative = {
-        areaId: result.task?.areaId ?? next.areaId,
-        projectId: result.task?.projectId ?? next.projectId,
-        label: result.displayLabel ?? next.label,
-      };
-      setLocationValue(authoritative);
-      rememberDestination(next.projectId ?? next.areaId ?? "inbox");
-      setRecentIds(readRecentIds());
-      armUndo({ ...action, next: authoritative });
+    await locationChannel.mutate(next, writeLocation);
+    if (locationChannel.snapshot().undo) {
+      setRecentIds(writeRecentDestinationId(safeStorage(), next.projectId ?? next.areaId ?? "inbox"));
+      locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
       startTransition(() => router.refresh());
-    } catch {
-      if (operationToken.current !== token) return;
-      setLocationValue(previous);
-      setError("Couldn’t update task");
-      setRetryAction(action);
     }
   }
 
-  function retry() {
-    if (!retryAction) return;
-    if (retryAction.kind === "schedule") {
-      void changeSchedule(retryAction.next, retryAction.previous);
-    } else {
-      void changeLocation(retryAction.next, retryAction.previous);
+  async function retrySchedule() {
+    await scheduleChannel.retry(writeSchedule);
+    if (scheduleChannel.snapshot().undo) {
+      scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
+      startTransition(() => router.refresh());
     }
   }
 
-  function undo() {
-    const action = undoAction;
-    if (!action) return;
-    setUndoAction(null);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    if (action.kind === "schedule") {
-      void changeSchedule(action.previous, action.next);
-    } else {
-      void changeLocation(action.previous, action.next);
+  async function retryLocation() {
+    await locationChannel.retry(writeLocation);
+    if (locationChannel.snapshot().undo) {
+      locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
+      startTransition(() => router.refresh());
     }
+  }
+
+  async function undoSchedule() {
+    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
+    await scheduleChannel.undo(writeSchedule);
+    if (scheduleChannel.snapshot().undo) scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
+    startTransition(() => router.refresh());
+  }
+
+  async function undoLocation() {
+    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
+    await locationChannel.undo(writeLocation);
+    if (locationChannel.snapshot().undo) locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
+    startTransition(() => router.refresh());
   }
 
   function keepFocusInside(event: KeyboardEvent<HTMLDivElement>) {
@@ -265,10 +273,11 @@ export function TaskQuickEdit({
     if (!focusable?.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
       event.preventDefault();
       first.focus();
     }
@@ -278,8 +287,8 @@ export function TaskQuickEdit({
     <div className={variant === "facts" ? "min-w-0" : "relative shrink-0"} data-task-control>
       {variant === "facts" ? (
         <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-          <FactButton ref={triggerRef} label="Location" value={locationValue.label} icon={<FolderInput size={15} />} onClick={() => showDialog("move")} />
-          <FactButton label="Schedule" value={displayTaskSchedule(scheduleValue)} icon={<CalendarDays size={15} />} onClick={() => showDialog("quick")} />
+          <FactButton ref={locationTriggerRef} label="Location" value={locationState.value.label} icon={<FolderInput size={15} />} onClick={() => showDialog("move", locationTriggerRef.current)} />
+          <FactButton ref={scheduleTriggerRef} label="Schedule" value={displayTaskSchedule(scheduleState.value)} icon={<CalendarDays size={15} />} onClick={() => showDialog("quick", scheduleTriggerRef.current)} />
         </div>
       ) : (
         <button
@@ -296,13 +305,6 @@ export function TaskQuickEdit({
         </button>
       )}
 
-      {error ? (
-        <div role="alert" className="mt-2 flex min-h-11 items-center gap-2 rounded-[12px] border border-[#DDE5DD] bg-[#F7FAF5] px-3 text-[13px] text-stone-700">
-          <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={retry} className="min-h-11 shrink-0 font-semibold text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700">Retry</button>
-        </div>
-      ) : null}
-
       {mounted && open ? createPortal(
         <div className="fixed inset-0 z-[70] bg-stone-950/20 sm:grid sm:place-items-center sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
           <div
@@ -313,12 +315,12 @@ export function TaskQuickEdit({
             aria-labelledby={dialogTitleId}
             tabIndex={-1}
             onKeyDown={keepFocusInside}
-            className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-4rem)] min-w-0 overflow-y-auto overflow-x-hidden rounded-t-[24px] border border-[#E2E6DF] bg-[#FAFBF9] px-3 pt-2 shadow-[0_-18px_48px_rgba(28,25,23,0.18)] transition motion-reduce:transition-none sm:static sm:w-[min(28rem,calc(100vw-3rem))] sm:max-h-[min(42rem,calc(100dvh-3rem))] sm:rounded-[20px] sm:p-3 sm:shadow-[0_18px_54px_rgba(28,25,23,0.20)] [padding-bottom:calc(var(--app-bottom-clearance,5.5rem)+env(safe-area-inset-bottom))] sm:[padding-bottom:0.75rem]"
+            className="fixed inset-x-0 bottom-[var(--app-dock-clearance)] max-h-[calc(100dvh_-_var(--app-dock-clearance)_-_1rem)] min-w-0 overflow-y-auto overflow-x-hidden rounded-t-[24px] border border-[#E2E6DF] bg-[#FAFBF9] px-3 pb-3 pt-2 shadow-[0_-18px_48px_rgba(28,25,23,0.18)] transition motion-reduce:transition-none sm:static sm:w-[min(28rem,calc(100vw-3rem))] sm:max-h-[min(42rem,calc(100dvh-3rem))] sm:rounded-[20px] sm:p-3 sm:shadow-[0_18px_54px_rgba(28,25,23,0.20)]"
           >
             <div aria-hidden="true" className="mx-auto mb-1 h-1 w-10 rounded-full bg-stone-300 sm:hidden" />
             <div className="flex min-h-11 items-center gap-2 px-1">
               {view === "move" ? (
-                <button type="button" aria-label="Back to quick edit" onClick={() => setView("quick")} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-stone-600 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"><ArrowLeft size={17} /></button>
+                <button type="button" aria-label="Back to quick edit" onClick={openQuickView} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-stone-600 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"><ArrowLeft size={17} /></button>
               ) : null}
               <h2 id={dialogTitleId} className="min-w-0 flex-1 font-serif text-lg font-medium text-stone-950">
                 {view === "move" ? "Move task" : "Quick edit"}
@@ -328,8 +330,8 @@ export function TaskQuickEdit({
 
             {view === "quick" ? (
               <div className="divide-y divide-[#E6EAE3] border-t border-[#E6EAE3]">
-                {presets.slice(0, 4).map((preset) => (
-                  <Choice key={preset.key} selected={sameSchedule(preset.value, scheduleValue)} onClick={() => void changeSchedule(preset.value)}>{preset.label}</Choice>
+                {presets.slice(0, 4).map((preset, index) => (
+                  <Choice initial={index === 0} key={preset.key} selected={sameSchedule(preset.value, scheduleState.value)} onClick={() => void changeSchedule(preset.value)}>{preset.label}</Choice>
                 ))}
                 <Choice selected={false} onClick={() => setPickingDate((value) => !value)}>Pick date</Choice>
                 {pickingDate ? (
@@ -339,22 +341,22 @@ export function TaskQuickEdit({
                   </label>
                 ) : null}
                 {presets.slice(4).map((preset) => (
-                  <Choice key={preset.key} selected={sameSchedule(preset.value, scheduleValue)} onClick={() => void changeSchedule(preset.value)}>{preset.label}</Choice>
+                  <Choice key={preset.key} selected={sameSchedule(preset.value, scheduleState.value)} onClick={() => void changeSchedule(preset.value)}>{preset.label}</Choice>
                 ))}
-                <Choice selected={false} onClick={openMoveView}><span className="flex items-center gap-2"><FolderInput size={15} />Move task<span className="ml-auto max-w-[65%] break-words text-right text-xs text-stone-500 [overflow-wrap:anywhere]">{locationValue.label}</span></span></Choice>
+                <Choice selected={false} onClick={openMoveView}><span className="flex items-center gap-2"><FolderInput size={15} />Move task<span className="ml-auto max-w-[65%] break-words text-right text-xs text-stone-500 [overflow-wrap:anywhere]">{locationState.value.label}</span></span></Choice>
               </div>
             ) : (
               <div className="min-w-0 border-t border-[#E6EAE3] pt-2">
                 <label className="flex min-h-11 items-center gap-2 rounded-[12px] border border-[#DDE5DD] bg-white px-3 text-stone-500 focus-within:border-teal-700 focus-within:ring-2 focus-within:ring-teal-700/15">
                   <Search size={15} />
                   <span className="sr-only">Search destinations</span>
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Areas and Projects" className="h-11 min-w-0 flex-1 bg-transparent text-base text-stone-950 outline-none placeholder:text-stone-400" />
+                  <input data-dialog-initial value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Areas and Projects" className="h-11 min-w-0 flex-1 bg-transparent text-base text-stone-950 outline-none placeholder:text-stone-400" />
                 </label>
                 {destinations === null && !destinationsError ? <p role="status" className="px-3 py-4 text-sm text-stone-500">Loading destinations…</p> : null}
                 {destinationsError ? <div role="alert" className="flex min-h-11 items-center justify-between gap-3 px-3 text-sm text-stone-700"><span>Couldn’t load destinations</span><button type="button" onClick={() => void loadDestinations()} className="min-h-11 font-semibold text-teal-800">Retry</button></div> : null}
                 <div className="divide-y divide-[#E6EAE3]">
                   {visibleDestinations.map((destination) => (
-                    <Choice key={`${destination.type}:${destination.id}`} selected={destination.areaId === locationValue.areaId && destination.projectId === locationValue.projectId} onClick={() => void changeLocation({ areaId: destination.areaId, projectId: destination.projectId, label: destination.label })}>
+                    <Choice key={`${destination.type}:${destination.id}`} selected={destination.areaId === locationState.value.areaId && destination.projectId === locationState.value.projectId} onClick={() => void changeLocation({ areaId: destination.areaId, projectId: destination.projectId, label: destination.label })}>
                       <span className="block break-words py-1 [overflow-wrap:anywhere]">{destination.label}</span>
                     </Choice>
                   ))}
@@ -366,13 +368,14 @@ export function TaskQuickEdit({
         document.body,
       ) : null}
 
-      {mounted && undoAction ? createPortal(
-        <div role="status" aria-live="polite" className="fixed bottom-[calc(var(--app-bottom-clearance,5.5rem)+env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[80] flex min-h-11 -translate-x-1/2 items-center gap-4 rounded-full bg-stone-900 px-4 text-sm text-white shadow-lg sm:bottom-6">
-          <span>Task updated</span>
-          <button type="button" onClick={undo} className="min-h-11 font-semibold text-teal-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Undo</button>
-        </div>,
-        document.body,
-      ) : null}
+      {mounted ? <TaskQuickEditStatus
+        schedule={scheduleState}
+        location={locationState}
+        onRetrySchedule={() => void retrySchedule()}
+        onRetryLocation={() => void retryLocation()}
+        onUndoSchedule={() => void undoSchedule()}
+        onUndoLocation={() => void undoLocation()}
+      /> : null}
     </div>
   );
 }
@@ -381,26 +384,43 @@ function FactButton({ label, value, icon, onClick, ref }: { label: string; value
   return <button ref={ref} type="button" onClick={onClick} className="flex min-h-11 min-w-0 items-center gap-2 rounded-[12px] border border-[#DDE5DD] bg-[#F7FAF5] px-3 text-left transition hover:border-teal-700/40 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 motion-reduce:transition-none"><span className="shrink-0 text-teal-700">{icon}</span><span className="min-w-0"><span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">{label}</span><span className="block break-words text-[13px] font-medium text-stone-800 [overflow-wrap:anywhere]">{value}</span></span></button>;
 }
 
-function Choice({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" onClick={onClick} className="flex min-h-11 w-full min-w-0 items-center gap-3 px-3 py-1.5 text-left text-sm text-stone-800 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-700 motion-reduce:transition-none"><span className="min-w-0 flex-1">{children}</span>{selected ? <Check aria-label="Selected" className="shrink-0 text-teal-700" size={17} /> : null}</button>;
+function Choice({ selected, onClick, children, initial = false }: { selected: boolean; onClick: () => void; children: ReactNode; initial?: boolean }) {
+  return <button data-dialog-initial={initial ? "" : undefined} type="button" onClick={onClick} className="flex min-h-11 w-full min-w-0 items-center gap-3 px-3 py-1.5 text-left text-sm text-stone-800 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-700 motion-reduce:transition-none"><span className="min-w-0 flex-1">{children}</span>{selected ? <Check aria-label="Selected" className="shrink-0 text-teal-700" size={17} /> : null}</button>;
 }
 
 function sameSchedule(a: TaskScheduleValue, b: TaskScheduleValue) {
   return a.dueDate === b.dueDate && a.someday === b.someday;
 }
 
-function readRecentIds() {
-  if (typeof window === "undefined") return [] as string[];
-  try {
-    const value = JSON.parse(localStorage.getItem(recentStorageKey) ?? "[]");
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string").slice(0, 5) : [];
-  } catch {
-    return [];
-  }
+function sameLocation(a: LocationValue, b: LocationValue) {
+  return a.areaId === b.areaId && a.projectId === b.projectId && a.label === b.label;
 }
 
-function rememberDestination(id: string) {
-  if (typeof window === "undefined") return;
-  const ids = [id, ...readRecentIds().filter((candidate) => candidate !== id)].slice(0, 5);
-  localStorage.setItem(recentStorageKey, JSON.stringify(ids));
+function safeStorage() {
+  try { return typeof window === "undefined" ? null : window.localStorage; } catch { return null; }
+}
+
+function TaskQuickEditStatus({ schedule, location, onRetrySchedule, onRetryLocation, onUndoSchedule, onUndoLocation }: {
+  schedule: ChannelSnapshot<TaskScheduleValue>;
+  location: ChannelSnapshot<LocationValue>;
+  onRetrySchedule: () => void;
+  onRetryLocation: () => void;
+  onUndoSchedule: () => void;
+  onUndoLocation: () => void;
+}) {
+  const errors = [
+    schedule.error ? { key: "schedule", retry: onRetrySchedule } : null,
+    location.error ? { key: "location", retry: onRetryLocation } : null,
+  ].filter((item): item is { key: string; retry: () => void } => item !== null);
+  const undos = [
+    schedule.undo ? { key: "schedule", undo: onUndoSchedule } : null,
+    location.undo ? { key: "location", undo: onUndoLocation } : null,
+  ].filter((item): item is { key: string; undo: () => void } => item !== null);
+  if (errors.length === 0 && undos.length === 0) return null;
+  return createPortal(
+    <div className="fixed inset-x-3 bottom-[calc(var(--app-dock-clearance)+0.75rem)] z-[80] mx-auto flex max-w-md flex-col gap-2 sm:bottom-6">
+      {errors.map((item) => <div key={item.key} role="alert" className="flex min-h-11 items-center gap-3 rounded-[14px] border border-[#DDE5DD] bg-[#F7FAF5] px-4 text-sm text-stone-800 shadow-lg"><span className="min-w-0 flex-1">Couldn’t update task</span><button type="button" onClick={item.retry} className="min-h-11 shrink-0 font-semibold text-teal-800">Retry</button></div>)}
+      {undos.map((item) => <div key={item.key} role="status" aria-live="polite" className="flex min-h-11 items-center gap-4 rounded-[14px] bg-stone-900 px-4 text-sm text-white shadow-lg"><span className="min-w-0 flex-1">Task updated</span><button type="button" onClick={item.undo} className="min-h-11 font-semibold text-teal-200">Undo</button></div>)}
+    </div>, document.body,
+  );
 }

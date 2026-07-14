@@ -14,6 +14,7 @@ import { SetupNotice } from "@/components/setup-notice";
 import { getRoutinesWithState } from "@/lib/routines";
 import { getTaskSlipDays, taskOpenSinceFact } from "@/lib/slippage";
 import { buildTaskSectionJumps } from "@/lib/task-section-jumps";
+import { flattenAreaOptions } from "@/lib/hierarchy";
 import {
   buildTasksFilterHref,
   normalizeFilterValues,
@@ -923,8 +924,8 @@ function TaskCard({
           currentAreaId={task.areaId}
           currentProjectId={task.projectId}
           currentLocationLabel={task.project
-            ? `${task.project.name} — ${task.area?.name ?? "No area yet"}`
-            : (task.area?.name ?? "Inbox")}
+            ? `${task.project.name} — ${task.areaPath ?? task.area?.name ?? "No area yet"}`
+            : (task.areaPath ?? task.area?.name ?? "Inbox")}
           today={today}
         />
         <div className="flex shrink-0 items-center gap-1.5">
@@ -986,8 +987,8 @@ function SubtaskList({
               currentAreaId={subtask.areaId}
               currentProjectId={subtask.projectId}
               currentLocationLabel={subtask.project
-                ? `${subtask.project.name} — ${subtask.area?.name ?? "No area yet"}`
-                : (subtask.area?.name ?? "Inbox")}
+                ? `${subtask.project.name} — ${subtask.areaPath ?? subtask.area?.name ?? "No area yet"}`
+                : (subtask.areaPath ?? subtask.area?.name ?? "Inbox")}
               today={today}
             />
             <TaskCompleteButton taskId={subtask.id} />
@@ -999,9 +1000,10 @@ function SubtaskList({
 }
 
 type TaskListItem = Task & {
+  areaPath?: string | null;
   area: Area | null;
   project: Project | null;
-  subtasks: Array<Task & { area: Area | null; project: Project | null }>;
+  subtasks: Array<Task & { area: Area | null; project: Project | null; areaPath?: string | null }>;
 };
 
 type DoneTaskItem = Task & {
@@ -1148,9 +1150,20 @@ async function loadTasks(view: TaskViewFilter) {
         }),
       ]);
 
+    const areaPaths = new Map(flattenAreaOptions(domains).map((area) => [area.id, area.path]));
+    function addAreaPath<T extends { areaId: string | null }>(task: T): T & { areaPath: string | null } {
+      return { ...task, areaPath: task.areaId ? areaPaths.get(task.areaId) ?? null : null };
+    }
+    const tasksWithPaths = tasks.map((task) => ({
+      ...addAreaPath(task),
+      subtasks: task.subtasks.map((subtask) => ({
+        ...subtask,
+        areaPath: subtask.areaId ? areaPaths.get(subtask.areaId) ?? null : null,
+      })),
+    }));
     return {
       ok: true as const,
-      tasks,
+      tasks: tasksWithPaths,
       doneTasks,
       openCount,
       doneCount,

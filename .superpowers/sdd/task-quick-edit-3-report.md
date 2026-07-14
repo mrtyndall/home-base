@@ -30,4 +30,23 @@ Complete. Task detail, Tasks, and Today now share one adaptive `TaskQuickEdit` s
 ## Concerns
 
 - No live DB-backed browser fixture was available in this task run, so 440×956, 390×844, and 1440×1000 behavior is protected by responsive source contracts and production compilation rather than screenshot-based interaction testing.
-- Initial list-card labels use the already-loaded Area name; the lazily loaded Move hierarchy and all authoritative mutation responses use full hierarchy paths. Task detail derives its initial full path from the already-required full Edit Area data.
+
+## Review remediation
+
+- Replaced the shared operation token with independent schedule and location `MutationChannel` instances. Each channel serializes server writes, keeps unrelated channel state independent, clears superseded Undo state, queues Undo/Retry through the same writer, and reconciles changed props only while idle.
+- Added behavioral tests against the exact coordinator, latest-request runner, and storage helpers imported by `TaskQuickEdit`, covering ordering, stale UI protection, channel independence, exact Undo history, rollback/Retry, prop reconciliation, request cancellation/generation, and storage exceptions.
+- Added one `--app-dock-clearance` layout token shared by `AppDock`, the mobile sheet, and portal status surfaces. The sheet now sits above the collapsed capture bar, inter-control gap, nav, and safe-area boundary with its max height calculated from the same token.
+- Added distinct Location, Schedule, and list trigger refs; exact-opener restoration; first-action focus on each view; and complete forward/backward Tab wrapping.
+- Destination fetches now use `AbortController` plus request generations. Close, unmount, task changes, and replacement requests invalidate older success and failure results.
+- Isolated all local-storage access behind exception-safe helpers.
+- Tasks and Today loaders now decorate tasks and subtasks with hierarchy-derived full Area paths before rendering initial labels.
+- Moved error/Retry and Undo UI into card-width portals above the shared dock boundary.
+
+### Review verification
+
+- `npx tsx --test scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts` — PASS (9/9).
+- `npm test` — PASS (125/125, 0 failures).
+- `npx tsc --noEmit` — PASS.
+- `npx eslint src/components/task-quick-edit.tsx src/lib/task-quick-edit-coordinator.ts scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts src/components/app-dock.tsx src/lib/today.ts src/app/today/page.tsx src/app/tasks/page.tsx` — PASS (0 errors, 0 warnings).
+- `npm run build` — PASS; optimized compilation, TypeScript, 19 static pages, route generation, and standalone asset copy completed.
+- `git diff --check` — PASS.
