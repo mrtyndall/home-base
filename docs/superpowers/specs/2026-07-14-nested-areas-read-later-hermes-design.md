@@ -227,6 +227,7 @@ Only fixes required for this release's new behavior or for serious correctness/s
 8. Existing Books, Movies, Areas, Projects, and References survive migration unchanged except for additive defaults.
 9. Automated tests cover hierarchy cycles, optional Project Area, mirrored filing, URL normalization/deduplication, status transitions, auth/scopes, and MCP proxy contracts.
 10. Production build, lint, typecheck, Prisma validation, migration pre/post checks, responsive browser QA, Railway deployment, and local LaunchAgent health all pass.
+11. iPhone 16 Pro Max is the primary mobile design target at a 440×956 CSS-pixel viewport: safe-area insets, bottom capture/navigation clearance, 44px touch targets, long path/title wrapping, thumb reach, and horizontal overflow are verified. Smaller supported mobile widths must remain usable.
 
 ## Out of scope for this release
 

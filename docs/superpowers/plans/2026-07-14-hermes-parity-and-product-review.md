@@ -16,6 +16,7 @@
 - Every write is scoped, validated, rate-limited, and audited.
 - Runtime documentation is based on live checks, not stale host assumptions.
 - Product review findings are prioritized; unrelated wholesale redesign is not bundled into this release.
+- iPhone 16 Pro Max at 440×956 CSS pixels is the primary mobile UI/UX and release-QA target; smaller mobile widths remain regression checks.
 
 ---
 
@@ -107,7 +108,7 @@ Map every primary route, its purpose, main action, empty/loading/error state, da
 
 - [ ] **Step 2: Review mobile and desktop surfaces**
 
-At minimum inspect Home, Today, Inbox, Tasks/list/detail/create, Areas/index/detail/create, Projects/detail/create, Library and each database, Reference detail, People, Search, Chat, Calendar event, Settings, and Notifications at 390x844 and 1440x1000.
+At minimum inspect Home, Today, Inbox, Tasks/list/detail/create, Areas/index/detail/create, Projects/detail/create, Library and each database, Reference detail, People, Search, Chat, Calendar event, Settings, and Notifications at iPhone 16 Pro Max (440×956 CSS pixels), a smaller-phone regression width (390×844), and desktop (1440×1000). Verify Safari safe-area behavior, bottom capture/navigation clearance, 44px touch targets, long path/title wrapping, thumb reach, and zero horizontal overflow.
 
 - [ ] **Step 3: Review cross-cutting quality**
 
