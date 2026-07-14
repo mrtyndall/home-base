@@ -25,6 +25,7 @@ npm run build
 npm run db:deploy
 npm run db:seed
 npm run verify:hierarchy-release -- --preflight
+npm run verify:agent-integration
 npm run calendar:sync
 npm run reminders:send
 ```
@@ -72,6 +73,8 @@ The direct Railway URL is intentionally open during this rollout. Cloudflare Zer
 The REST API is under `/api/v1` and uses bearer API keys registered with `npm run api:key:register`. Current hierarchy routes are `GET/POST /api/v1/areas`, `GET/PATCH /api/v1/areas/:id`, `GET/POST /api/v1/projects`, and `GET/PATCH /api/v1/projects/:id`. Area reads include hierarchy paths; Area writes accept `parentAreaId`; Project writes accept an optional or null `areaId`. Read Later uses `GET/POST /api/v1/read-later`, `GET /api/v1/read-later/:id`, `POST /api/v1/read-later/:id/status`, and `POST /api/v1/read-later/:id/file`; ordinary References can use `POST /api/v1/references/:id/file`. These authenticated, non-destructive contracts are also the future integration point for browser extensions and native share extensions; those clients are not part of this release.
 
 The MCP server runs from `npm run mcp:http`, wraps the REST API, and serves streamable HTTP at `/api/mcp` (Tailnet: `https://mac-studio.tail3baa7a.ts.net:8443/api/mcp`). Its hierarchy tools are `list_areas`, `read_area`, `create_area`, `reparent_area`, `create_project`, `update_project_state`, and `file_project`; its Read Later tools are `list_read_later`, `save_read_later`, `file_reference`, and `set_read_later_status`. The in-app data chat has read-only `list_areas` and returns path-labelled hierarchy entries.
+
+Hermes and other MCP clients must receive `HOME_BASE_API_URL`, `HOME_BASE_MCP_URL`, and `HOME_BASE_API_TOKEN` through approved environment references. `npm run verify:agent-integration` checks local health and, when a bearer reference exists, MCP initialization, discovery, and representative read capabilities. Its non-destructive capture/task write smoke requires the explicit `HOME_BASE_ENABLE_WRITE_SMOKE=1` opt-in. See [the Hermes integration runbook](./docs/hermes-home-base-integration.md) for verified host identity, routes, 1Password-backed registration, secret-free configuration, and troubleshooting.
 
 ## Google Calendar
 

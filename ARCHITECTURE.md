@@ -34,6 +34,8 @@ Railway Postgres is canonical. The local runtime is a second application origin 
 - Tailnet MCP URL: `https://mac-studio.tail3baa7a.ts.net:8443/api/mcp`
 - Railway URL: `https://home-base-production-e3b7.up.railway.app/`
 
+Host identity is layered: on the verified 2026-07-14 runtime, `hostname` returned `Mac-Studio.local`, `LocalHostName` was `Mac-Studio`, the explicit macOS `HostName` was unset, and Tailscale advertised `mac-studio.tail3baa7a.ts.net` (`100.98.48.102`). Routing configuration must use `tailscale serve status`, not a hostname inferred from the other identity fields.
+
 Useful commands:
 
 ```bash
@@ -84,6 +86,8 @@ The REST API lives under `/api/v1` and uses bearer API keys stored as hashes in 
 
 The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streamable HTTP at `/api/mcp`. Its current hierarchy tools are `list_areas`, `read_area`, `create_area`, `reparent_area`, `update_area_state`, `create_project`, `update_project_state`, and `file_project`; Read Later uses `list_read_later`, `save_read_later`, `file_reference`, and `set_read_later_status`. The remaining tools cover all-clear/search, task actions, project park/unpark, ideas, shared markdown notes/docs, milestones, calendar, check-ins, journal/resurfacing/reviews, routines, and people. The in-app data chat is a separate read-only agent surface and exposes path-labelled `list_areas` alongside search, summaries, tasks, people, journals, and Project reads.
 
+`scripts/verify-agent-integration.ts` is the live client boundary check. It accepts only exact, credential-free HTTP(S) API/MCP URLs, limits plaintext HTTP to loopback, redacts bearer material from errors, verifies app/MCP health, initializes MCP, checks discovery, and calls a representative read from every documented read capability group. Writes are impossible unless `HOME_BASE_ENABLE_WRITE_SMOKE=1` and a dedicated environment-backed token are both present; the smoke retains a prefixed capture and completes a prefixed task rather than deleting data. The complete current-host and 1Password-backed operator procedure is in `docs/hermes-home-base-integration.md`.
+
 ## Calendar Sync
 
 `calendar_sync_states` stores sync freshness and powers the Today screen stale-warning line. Sync is intentionally never triggered on page load. The local scheduler runs `scripts/sync-google-calendar.ts` every 15 minutes.
@@ -124,6 +128,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 - `scripts/backup-database.ts`: `pg_dump` backup with optional S3-compatible upload.
 - `scripts/import-apple-reminders.ts`: one-time CSV importer that writes captures then tasks.
 - `scripts/register-api-key.ts`: hashes an externally supplied API token into `api_keys`.
+- `scripts/verify-agent-integration.ts`: secret-safe live app/MCP health, discovery, read, and opt-in non-destructive write verification.
 - `scripts/send-reminders.ts`: minute scheduler target for Pushover reminder delivery.
 - `scripts/sync-google-calendar.ts`: 15-minute scheduler target for Google Calendar two-way sync.
 - `src/app/api/v1/[...path]/route.ts`: REST API for agent access.
