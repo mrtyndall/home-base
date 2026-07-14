@@ -38,6 +38,7 @@ import {
   readLaterRouteScope,
 } from "@/lib/api/read-later-router";
 import { toReferenceSearchResult, type SearchableReference } from "@/lib/reference-search-result";
+import { updateEntityNoteForApi } from "@/lib/api/entity-note";
 
 type RouteCtx = {
   params: Promise<{ path?: string[] }>;
@@ -269,6 +270,9 @@ export async function GET(request: Request, context: RouteCtx) {
     }
 
     if (resource === "entity-notes") {
+      if (id) {
+        return { note: await prisma.entityNote.findUnique({ where: { id } }) };
+      }
       return {
         notes: await prisma.entityNote.findMany({
           orderBy: { createdAt: "desc" },
@@ -278,6 +282,9 @@ export async function GET(request: Request, context: RouteCtx) {
     }
 
     if (resource === "entity-docs") {
+      if (id) {
+        return { doc: await prisma.entityDoc.findUnique({ where: { id } }) };
+      }
       return {
         docs: await prisma.entityDoc.findMany({
           orderBy: { updatedAt: "desc" },
@@ -1117,6 +1124,11 @@ export async function PATCH(request: Request, context: RouteCtx) {
       return { reference };
     }
 
+    if (resource === "entity-notes") {
+      const parsed = patchEntityNoteSchema.parse(body);
+      return { note: await updateEntityNoteForApi(id, parsed, apiKey) };
+    }
+
     if (resource === "entity-docs") {
       const parsed = patchEntityDocSchema.parse(body);
       const doc = await prisma.entityDoc.update({
@@ -1514,6 +1526,8 @@ const createEntityNoteSchema = z.object({
   projectId: z.string().nullable().optional(),
   bodyMd: z.string().min(1),
 });
+
+const patchEntityNoteSchema = z.object({ bodyMd: z.string().min(1) });
 
 const createEntityDocSchema = z.object({
   parentType: z.enum(["area", "project"]).nullable().optional(),

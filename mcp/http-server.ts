@@ -1,4 +1,5 @@
 import express from "express";
+import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -8,6 +9,7 @@ import {
   hierarchyProxyRequest,
 } from "./hierarchy-tools";
 import { registerReadLaterTools } from "./read-later-registration";
+import { mcpApiError, toToolResult } from "./proxy-result";
 
 const PORT = Number(process.env.MCP_PORT || 8081);
 const API_BASE = process.env.HOME_BASE_API_URL || "http://127.0.0.1:3002/api/v1";
@@ -28,7 +30,7 @@ function createServer(bearerToken: string) {
   return server;
 }
 
-function registerTools(server: McpServer, bearerToken: string) {
+export function registerTools(server: McpServer, bearerToken: string) {
   registerReadLaterTools(server, bearerToken, apiFetch);
   server.registerTool(
     "all_clear_summary",
@@ -51,6 +53,37 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_captures",
+    {
+      description: "List recent lossless captures.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.string().optional(),
+      }),
+    },
+    async ({ limit, cursor }) => {
+      const params = new URLSearchParams();
+      if (limit) params.set("limit", String(limit));
+      if (cursor) params.set("cursor", cursor);
+      const query = params.toString();
+      return toToolResult(await apiFetch(bearerToken, `/captures${query ? `?${query}` : ""}`));
+    },
+  );
+
+  server.registerTool(
+    "capture_input",
+    {
+      description: "Submit ambiguous natural-language input to the lossless capture pipeline.",
+      inputSchema: z.object({
+        rawText: z.string().min(1),
+        idempotencyKey: z.string().uuid().optional(),
+        deviceContext: z.record(z.string(), z.unknown()).optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/captures", "POST", input)),
+  );
+
+  server.registerTool(
     "create_task",
     {
       description: "Create a task. No work items are deleted by this API.",
@@ -68,6 +101,39 @@ function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async (input) => toToolResult(await apiFetch(bearerToken, "/tasks", "POST", input)),
+  );
+
+  server.registerTool(
+    "read_task",
+    {
+      description: "Read a task with its filing and subtasks.",
+      inputSchema: z.object({ taskId: z.string().min(1) }),
+    },
+    async ({ taskId }) => toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}`)),
+  );
+
+  server.registerTool(
+    "update_task",
+    {
+      description: "Update, schedule, or refile a task without deleting it.",
+      inputSchema: z.object({
+        taskId: z.string().min(1),
+        title: z.string().min(1).optional(),
+        notes: z.string().optional(),
+        status: z.enum(["open", "completed", "killed"]).optional(),
+        dueDate: z.string().optional(),
+        dueTime: z.string().optional(),
+        priority: z.string().optional(),
+        areaId: z.string().nullable().optional(),
+        projectId: z.string().nullable().optional(),
+        parentTaskId: z.string().optional(),
+        someday: z.boolean().optional(),
+        recurrenceRule: z.string().optional(),
+        reminderOffsets: z.array(z.union([z.string(), z.number()])).optional(),
+      }),
+    },
+    async ({ taskId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/tasks/${taskId}`, "PATCH", body)),
   );
 
   server.registerTool(
@@ -147,6 +213,34 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_projects",
+    {
+      description: "List Projects with their optional Area filing.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/projects")),
+  );
+
+  server.registerTool(
+    "read_project",
+    {
+      description: "Read a Project with activity and milestones.",
+      inputSchema: z.object({ projectId: z.string().min(1) }),
+    },
+    async ({ projectId }) => toToolResult(await apiFetch(bearerToken, `/projects/${projectId}`)),
+  );
+
+  server.registerTool(
+    "log_project_activity",
+    {
+      description: "Append an audited activity entry to a Project.",
+      inputSchema: z.object({ projectId: z.string().min(1), entry: z.string().min(1) }),
+    },
+    async ({ projectId, entry }) =>
+      toToolResult(await apiFetch(bearerToken, `/projects/${projectId}/activity`, "POST", { entry })),
+  );
+
+  server.registerTool(
     "update_project_state",
     {
       description: "Update project current state, next step, status, and activity log.",
@@ -220,6 +314,106 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_ideas",
+    {
+      description: "List Ideas with Area and Project filing.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/ideas")),
+  );
+
+  server.registerTool(
+    "read_idea",
+    {
+      description: "Read an Idea and its notes.",
+      inputSchema: z.object({ ideaId: z.string().min(1) }),
+    },
+    async ({ ideaId }) => toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}`)),
+  );
+
+  server.registerTool(
+    "update_idea",
+    {
+      description: "Update or refile an Idea without deleting it.",
+      inputSchema: z.object({
+        ideaId: z.string().min(1),
+        title: z.string().min(1).optional(),
+        body: z.string().optional(),
+        areaId: z.string().nullable().optional(),
+        projectId: z.string().nullable().optional(),
+        tags: z.array(z.string()).optional(),
+        status: z.enum(["seed", "developing", "converted", "killed"]).optional(),
+      }),
+    },
+    async ({ ideaId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
+    "add_idea_note",
+    {
+      description: "Append an audited note to an Idea.",
+      inputSchema: z.object({ ideaId: z.string().min(1), body: z.string().min(1) }),
+    },
+    async ({ ideaId, body }) =>
+      toToolResult(await apiFetch(bearerToken, `/ideas/${ideaId}/notes`, "POST", { body })),
+  );
+
+  server.registerTool(
+    "list_references",
+    {
+      description: "List Library References, including books, movies, and saved links.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/references")),
+  );
+
+  server.registerTool(
+    "read_reference",
+    {
+      description: "Read a Library Reference with its filing.",
+      inputSchema: z.object({ referenceId: z.string().min(1) }),
+    },
+    async ({ referenceId }) => toToolResult(await apiFetch(bearerToken, `/references/${referenceId}`)),
+  );
+
+  server.registerTool(
+    "create_reference",
+    {
+      description: "Create an audited Library Reference.",
+      inputSchema: z.object({
+        body: z.string().min(1),
+        url: z.string().url().optional(),
+        tags: z.array(z.string()).optional(),
+        areaId: z.string().nullable().optional(),
+        projectId: z.string().nullable().optional(),
+        relatedType: z.string().optional(),
+        relatedId: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/references", "POST", input)),
+  );
+
+  server.registerTool(
+    "update_reference",
+    {
+      description: "Update or refile a Library Reference without deleting it.",
+      inputSchema: z.object({
+        referenceId: z.string().min(1),
+        body: z.string().min(1).optional(),
+        url: z.string().url().optional(),
+        tags: z.array(z.string()).optional(),
+        areaId: z.string().nullable().optional(),
+        projectId: z.string().nullable().optional(),
+        relatedType: z.string().optional(),
+        relatedId: z.string().optional(),
+      }),
+    },
+    async ({ referenceId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/references/${referenceId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
     "convert_idea",
     {
       description: "Convert an idea into a task or project while preserving lineage on the idea record.",
@@ -245,6 +439,52 @@ function registerTools(server: McpServer, bearerToken: string) {
       }),
     },
     async (input) => toToolResult(await apiFetch(bearerToken, "/entity-notes", "POST", input)),
+  );
+
+  server.registerTool(
+    "list_entity_notes",
+    {
+      description: "List shared markdown notes.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/entity-notes")),
+  );
+
+  server.registerTool(
+    "read_entity_note",
+    {
+      description: "Read a shared markdown note.",
+      inputSchema: z.object({ noteId: z.string().min(1) }),
+    },
+    async ({ noteId }) => toToolResult(await apiFetch(bearerToken, `/entity-notes/${noteId}`)),
+  );
+
+  server.registerTool(
+    "update_entity_note",
+    {
+      description: "Update a shared markdown note without deleting it.",
+      inputSchema: z.object({ noteId: z.string().min(1), bodyMd: z.string().min(1) }),
+    },
+    async ({ noteId, bodyMd }) =>
+      toToolResult(await apiFetch(bearerToken, `/entity-notes/${noteId}`, "PATCH", { bodyMd })),
+  );
+
+  server.registerTool(
+    "list_entity_docs",
+    {
+      description: "List shared markdown docs.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/entity-docs")),
+  );
+
+  server.registerTool(
+    "read_entity_doc",
+    {
+      description: "Read a shared markdown doc.",
+      inputSchema: z.object({ docId: z.string().min(1) }),
+    },
+    async ({ docId }) => toToolResult(await apiFetch(bearerToken, `/entity-docs/${docId}`)),
   );
 
   server.registerTool(
@@ -290,6 +530,30 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_milestones",
+    {
+      description: "List Project milestones.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/milestones")),
+  );
+
+  server.registerTool(
+    "update_milestone",
+    {
+      description: "Update, reorder, complete, or reopen a Project milestone.",
+      inputSchema: z.object({
+        milestoneId: z.string().min(1),
+        title: z.string().min(1).optional(),
+        status: z.enum(["open", "completed"]).optional(),
+        sortOrder: z.number().int().optional(),
+      }),
+    },
+    async ({ milestoneId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/milestones/${milestoneId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
     "complete_milestone",
     {
       description: "Mark a project milestone complete without deleting it.",
@@ -310,6 +574,55 @@ function registerTools(server: McpServer, bearerToken: string) {
       inputSchema: z.object({}),
     },
     async () => toToolResult(await apiFetch(bearerToken, "/calendar-events")),
+  );
+
+  server.registerTool(
+    "read_calendar_event",
+    {
+      description: "Read a calendar event.",
+      inputSchema: z.object({ eventId: z.string().min(1) }),
+    },
+    async ({ eventId }) => toToolResult(await apiFetch(bearerToken, `/calendar-events/${eventId}`)),
+  );
+
+  server.registerTool(
+    "create_calendar_event",
+    {
+      description: "Create an audited local calendar event.",
+      inputSchema: z.object({
+        title: z.string().min(1),
+        start: z.string().datetime(),
+        end: z.string().datetime(),
+        location: z.string().optional(),
+      }),
+    },
+    async (input) => toToolResult(await apiFetch(bearerToken, "/calendar-events", "POST", input)),
+  );
+
+  server.registerTool(
+    "update_calendar_event",
+    {
+      description: "Update an audited local calendar event.",
+      inputSchema: z.object({
+        eventId: z.string().min(1),
+        title: z.string().min(1).optional(),
+        start: z.string().datetime().optional(),
+        end: z.string().datetime().optional(),
+        location: z.string().optional(),
+        status: z.string().optional(),
+      }),
+    },
+    async ({ eventId, ...body }) =>
+      toToolResult(await apiFetch(bearerToken, `/calendar-events/${eventId}`, "PATCH", body)),
+  );
+
+  server.registerTool(
+    "list_notifications",
+    {
+      description: "List recent audit notifications.",
+      inputSchema: z.object({}),
+    },
+    async () => toToolResult(await apiFetch(bearerToken, "/notifications")),
   );
 
   server.registerTool(
@@ -507,6 +820,16 @@ function registerTools(server: McpServer, bearerToken: string) {
   );
 
   server.registerTool(
+    "list_routine_completions",
+    {
+      description: "List completion history for a routine.",
+      inputSchema: z.object({ routineId: z.string().min(1) }),
+    },
+    async ({ routineId }) =>
+      toToolResult(await apiFetch(bearerToken, `/routines/${routineId}/completions`)),
+  );
+
+  server.registerTool(
     "create_routine",
     {
       description:
@@ -622,33 +945,32 @@ async function apiFetch(
   method = "GET",
   body?: unknown,
 ) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${bearerToken}`,
-      "Content-Type": "application/json",
-    },
-    body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
-  });
+  let response: globalThis.Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        "Content-Type": "application/json",
+      },
+      body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
+    });
+  } catch {
+    return mcpApiError(502);
+  }
 
   const text = await response.text();
-  const json = text ? JSON.parse(text) : null;
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
   if (!response.ok) {
-    throw new Error(JSON.stringify(json ?? { error: response.statusText }));
+    return mcpApiError(response.status);
   }
 
   return json;
-}
-
-function toToolResult(data: unknown) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: JSON.stringify(data, null, 2),
-      },
-    ],
-  };
 }
 
 async function handleMcpRequest(req: Request, res: Response) {
@@ -758,6 +1080,8 @@ app.all("/api/mcp", (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`[home-base-mcp] listening on :${PORT}`);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  app.listen(PORT, () => {
+    console.log(`[home-base-mcp] listening on :${PORT}`);
+  });
+}

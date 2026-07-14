@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readLaterMcpSchemas, readLaterProxyRequest } from "./read-later-tools";
+import { toToolResult } from "./proxy-result";
 
 export type ReadLaterApiFetch = (
   bearerToken: string,
@@ -7,12 +8,6 @@ export type ReadLaterApiFetch = (
   method?: string,
   body?: unknown,
 ) => Promise<unknown>;
-
-function toToolResult(data: unknown) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
-  };
-}
 
 export function registerReadLaterTools(
   server: Pick<McpServer, "registerTool">,
