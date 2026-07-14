@@ -41,7 +41,7 @@ The app's best product principle is capture first, organize later. Captures are 
 |---|---|---|---|
 | Lossless capture | Persistent bottom capture bar with voice, explicit type, Area, Project, and optional task due date | REST capture plus `capture_input`; preservation-first capture contract | Shipped; picker accessibility and recovery need work |
 | Home | Daily status, Today preview, upcoming commitments, attention, top tasks, routines, resurfacing | Today/all-clear, notifications, reviews, resurfacing tools | Shipped; good concise launch surface |
-| Today | Calendar, due today, tomorrow, starred tasks, routines, task inbox, resurfacing | Today and calendar reads; task mutations | Shipped; recent-capture duplication remains |
+| Today | Calendar, due today, tomorrow, starred tasks, routines, task inbox, resurfacing | Today and calendar reads; task mutations | Shipped; resolved capture receipts are suppressed |
 | Tasks | Quick add, filters, sections, starring, completion, scheduling, reorder, subtasks | Full task list/read/create/update/star/complete | Shipped; Quick Edit is release-quality, drag recovery is not |
 | Nested Areas | Tree index, breadcrumb paths, optional parent on creation, reparenting with cycle prevention | Area list/read/aggregate/create/update/reparent | Shipped on branch |
 | Projects | Active/someday/parked lifecycle, milestones, tasks, notes/docs/files, check-ins, activity, optional Area | Project list/read/activity/create/update/file/park/unpark | Shipped on branch; unfiled Project Inbox surfacing is incomplete |
@@ -54,7 +54,7 @@ The app's best product principle is capture first, organize later. Captures are 
 | Reviews and resurfacing | Scheduled reviews, capture proposals, memory resurfacing | List/settle/respond tools | Shipped |
 | Routines | Due routines and completion history | List/history/create/complete tools | Shipped |
 | People CRM | People, structured facts, interactions, meeting links | List/read/create/fact/interaction tools | Shipped |
-| Notes/docs/files/check-ins | Shared Area/Project depth components and detail surfaces | Read/write coverage for notes, docs, check-ins; files are web-only | Shipped; attachment boundary is a release risk |
+| Notes/docs/files/check-ins | Shared Area/Project depth components and detail surfaces | Read/write coverage for notes, docs, check-ins; files are web-only | Shipped; attachment uploads are bounded and streamed |
 | Journal | Entries, editing, export, photo attachments | List/create | Shipped |
 | Notifications/audit | Database-backed audit notifications and Pushover | Readable through REST/MCP | No human notification center |
 | Hermes | Typed MCP proxy over authenticated REST; 74-tool manifest | Complete non-destructive registry and contract suite | Contract-complete; authenticated live setup not complete |
@@ -92,7 +92,7 @@ Primary job: execute the day without opening the full planning system.
 - Empty Today and Tomorrow sections explain the state rather than leaving blank cards.
 - Calendar freshness/configuration is visible.
 
-Remaining mismatch: `RecentCapturesStrip` still appears even when a capture has already become a visible task, recreating the redundancy the user asked to remove.
+Resolved capture receipts are suppressed through `selectActionableCaptures()`. Only ambiguous, failed, or otherwise unresolved captures remain visible for intervention.
 
 ### Tasks — `/tasks`, `/tasks/[taskId]`
 

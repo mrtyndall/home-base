@@ -12,7 +12,7 @@
 
 Home Base has crossed from prototype into a credible personal operating system. The product model is now coherent: one nested Area hierarchy, Projects that can begin unfiled, a durable Inbox, global media/People, References with Read Later, and non-destructive human/agent mutations. The visual language is calm and specific, and the new Task Quick Edit demonstrates the right interaction standard: direct facts, lazy data, optimistic feedback, serialized writes, Undo, Retry, and safe mobile presentation.
 
-It is not ready for unrestricted real-data production use until the access and attachment P0s are closed. It is also one focused workflow pass away from feeling consistently excellent: Search still creates dead ends, Inbox omits unfiled Projects and is difficult to reach, Today repeats recent captures, and legacy drag/capture interactions do not match the recovery and accessibility quality of Task Quick Edit.
+It is not ready for unrestricted real-data production use until the access P0 is closed. The attachment P0 identified during review has been fixed on this branch. It is also one focused workflow pass away from feeling consistently excellent: Search still creates dead ends, Inbox omits unfiled Projects and is difficult to reach, and legacy drag/capture interactions do not match the recovery and accessibility quality of Task Quick Edit.
 
 The recommendation is not a wholesale redesign. Keep the quiet stone/teal, Newsreader/Geist identity and the capture-first model. Make the new Task Quick Edit behavior the interaction contract for every frequent move/date/status action, then close navigation and security gaps.
 
@@ -91,11 +91,11 @@ The active MCP registry contains 74 typed tools, mirrors authenticated REST, rej
 
 ### P0-2 — Bound and validate attachments before real use
 
-**State:** remaining release blocker.
+**State:** fixed on branch after the reviewed checkpoint.
 
 **Evidence:** `src/app/api/documents/presign/route.ts` accepts any positive declared size and client MIME; local upload reads the complete body with `request.arrayBuffer()` and never compares bytes to the declared size; download is unauthenticated. A caller can create orphan document rows and consume memory/storage.
 
-**Required outcome:** enforce an explicit maximum size and allowlist; authenticate/authorize all three routes through the chosen browser boundary; verify actual byte count/content type; stream local uploads or reject before buffering; expire/settle incomplete uploads; sanitize download headers.
+**Implemented outcome:** a centralized 25 MiB limit and safe MIME allowlist now apply at client and server boundaries. R2 signing binds MIME and content length. Local upload requires matching length/type, streams with an actual byte cap into a private temporary file, removes failed/partial state, and atomically publishes only a verified file. The external browser access boundary remains covered by P0-1.
 
 **Acceptance:** over-limit, mismatched, disallowed, interrupted, and unauthenticated uploads fail without a durable active attachment or unbounded memory use; valid upload/download works through Access and R2/local modes.
 
@@ -123,15 +123,9 @@ The active MCP registry contains 74 typed tools, mirrors authenticated REST, rej
 
 **Acceptance:** every result is a keyboard-focusable deep link or lands on a clearly anchored parent; an exact Task/Project/Person title is not displaced by incidental capture text; empty and failed searches are distinct.
 
-### P1-3 — Remove resolved captures from Today
+### Fixed — Today shows only actionable captures
 
-**State:** remaining and explicitly contrary to the user's mobile feedback.
-
-**Evidence:** Today still renders `RecentCapturesStrip` between routines and Task Inbox. When recent captures created Tasks already displayed above, the same work appears twice and lengthens an already dock-constrained mobile page.
-
-**Recommendation:** remove the strip from Today, or restrict it strictly to unresolved/pending outcomes that need action. Durable capture history remains available in Capture detail/Inbox.
-
-**Acceptance:** a newly captured Task appears once in the relevant task section; ambiguous/failed capture appears once in Inbox/attention; no “receipt” duplicates the actual task.
+Today still has a narrowly scoped review surface, but `selectActionableCaptures()` removes successful captures that already became Tasks or other durable entities. Only ambiguous, failed, or unresolved outcomes remain. This satisfies the user's request to remove redundant capture receipts while preserving the work that still needs intervention.
 
 ### P1-4 — Give drag/reorder the same recovery guarantees as Quick Edit
 
