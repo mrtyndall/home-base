@@ -59,12 +59,26 @@ for (const [table, column] of [
 }
 
 for (const table of ["entity_notes", "entity_docs", "documents"]) {
+  for (const column of ["parent_type", "parent_id"]) {
+    assert.match(
+      migration,
+      new RegExp(`ALTER TABLE "${table}" ALTER COLUMN "${column}" DROP NOT NULL;`, "i"),
+      `${table}.${column} must explicitly drop NOT NULL`,
+    );
+  }
   assert.match(
     migration,
     new RegExp(`UPDATE "${table}"[\\s\\S]*?"parent_type" = NULL[\\s\\S]*?"parent_id" = NULL`, "i"),
     `${table} must detach the legacy Inbox parent`,
   );
-  assert.match(migration, new RegExp(`${table}_parent_pair_check`, "i"), `${table} must enforce an all-null or all-present parent pair`);
+  assert.match(
+    migration,
+    new RegExp(
+      `ADD CONSTRAINT "${table}_parent_pair_check"[\\s\\S]*?CHECK \\(\\("parent_type" IS NULL\\) = \\("parent_id" IS NULL\\)\\);`,
+      "i",
+    ),
+    `${table} must enforce an exact all-null or all-present parent pair check`,
+  );
 }
 
 assert.ok(verifier, "The area-first migration verifier must exist");
@@ -82,3 +96,8 @@ assert.match(verifier, /projectWithoutAreaCount/, "Verifier must count projects 
 assert.match(verifier, /bookCount/, "Verifier must count Books");
 assert.match(verifier, /movieCount/, "Verifier must count Movies");
 assert.match(verifier, /localhost|127\.0\.0\.1/, "Verifier must reject non-local database hosts");
+assert.match(
+  verifier,
+  /hostname\.replace\([^\n]+\)/,
+  "Verifier must normalize bracketed IPv6 hostnames before the loopback allowlist check",
+);

@@ -31,9 +31,9 @@ function assertDisposableLocalDatabase(connectionString: string | undefined) {
     throw new Error("DATABASE_URL must reference a disposable local restore.");
   }
 
-  const { hostname } = new URL(connectionString);
+  const hostname = new URL(connectionString).hostname.replace(/^\[|\]$/g, "");
   if (!new Set(["localhost", "127.0.0.1", "::1"]).has(hostname)) {
-    throw new Error("Migration verification is restricted to localhost/127.0.0.1 disposable databases.");
+    throw new Error("Migration verification is restricted to localhost/127.0.0.1/::1 disposable databases.");
   }
 }
 
