@@ -81,3 +81,22 @@ Modified:
 
 - The expand migration intentionally retains a required physical `areas.domain_id` column until the later contract release, while the generated Prisma model no longer exposes it. Fresh-database QA revealed that ordinary `prisma.area.create()` in seed code therefore violates the physical null constraint. The seed paths now use parameterized raw inserts solely for new Areas, assigning the hidden compatibility group; web/runtime UI and DTOs do not expose Domains. The later contract migration should remove this compatibility code with the physical column.
 - Interactive screenshot, narrow-layout, keyboard-focus, and click-through creation QA still needs a browser-enabled task.
+
+## Review remediation
+
+The seven review findings were addressed in a follow-up pass:
+
+- Added the isolated expand-schema shim `src/lib/area-compat.ts`. It upserts and returns the actual hidden System Domain ID with parameterized SQL, then creates an Area with the still-required physical `domain_id`. `createArea` and the Prisma seed share this helper. The module is explicitly marked for deletion with the contract migration.
+- Updated the runtime JavaScript seed to use the System ID returned by `ON CONFLICT ... DO UPDATE ... RETURNING id`; neither seed assumes `domain_system` owns the unique System name.
+- Reworked capture options around the flat `{ areas, projects }` response and added runtime normalization. System Areas are excluded from the API response.
+- Rejected system Areas in `createProject`, including forged form posts.
+- Limited Inbox References to `kind: "reference"` before the result cap, added unfiled Entity Docs and uploaded Documents, and replaced all remaining `/#inbox` backlinks with `/areas/inbox`.
+
+Follow-up TDD evidence:
+
+- RED: the five focused review tests failed for the intended missing behaviors.
+- GREEN: `npx tsx --test scripts/area-creation-ui.test.ts scripts/capture-options-runtime.test.ts scripts/project-area-creation-ui.test.ts scripts/global-inbox-ui.test.ts scripts/seed-area-compat.test.ts` passed 5/5.
+- Full suite: `npm test` passed 52/52.
+- `npm run lint`, `npx tsc --noEmit`, and `npm run build` exited successfully.
+
+Disposable PostgreSQL 17 integration QA migrated a fresh loopback database, changed the existing System row to a non-default ID, created an Area through `createCompatibleArea`, and verified its name, next sort order, physical foreign key, non-system visibility, and Domain-free return shape. It also ran both seed implementations against that row. The throwaway database was dropped and absence was verified afterward.

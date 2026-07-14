@@ -142,7 +142,7 @@ export default async function AreaPage({ params }: AreaPageProps) {
 type GlobalInboxData = Extract<Awaited<ReturnType<typeof loadGlobalInbox>>, { ok: true }>;
 
 function GlobalInbox({ data }: { data: GlobalInboxData }) {
-  const unfiledCount = data.tasks.length + data.ideas.length + data.references.length + data.notes.length;
+  const unfiledCount = data.tasks.length + data.ideas.length + data.references.length + data.notes.length + data.entityDocs.length + data.documents.length;
   const total = data.pendingCaptures.length + data.reviewProposals.length + data.reviews.length + unfiledCount;
   return (
     <div className="space-y-6">
@@ -197,6 +197,8 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
           {data.tasks.length ? <SimpleInboxGroup title="Tasks" items={data.tasks.map((item) => ({ id: item.id, label: item.title, href: `/tasks/${item.id}` }))} /> : null}
           {data.ideas.length ? <SimpleInboxGroup title="Ideas" items={data.ideas.map((item) => ({ id: item.id, label: item.title, href: "/ideas" }))} /> : null}
           {data.references.length ? <SimpleInboxGroup title="References" items={data.references.map((item) => ({ id: item.id, label: item.title ?? item.body, href: `/references/${item.id}` }))} /> : null}
+          {data.entityDocs.length ? <SimpleInboxGroup title="Docs" items={data.entityDocs.map((item) => ({ id: item.id, label: item.title, href: `/search?q=${encodeURIComponent(item.title)}` }))} /> : null}
+          {data.documents.length ? <SimpleInboxGroup title="Files" items={data.documents.map((item) => ({ id: item.id, label: item.filename, href: `/api/documents/${item.id}/download` }))} /> : null}
           {data.notes.length ? (
             <InboxPanel title="Notes" count={data.notes.length}>{data.notes.map((note) => <p key={note.id} className="line-clamp-3 p-4 text-sm leading-relaxed text-stone-700">{note.bodyMd}</p>)}</InboxPanel>
           ) : null}
@@ -280,7 +282,7 @@ function Panel({ title, children }: { title: string; children: ReactNode[] }) {
 async function loadGlobalInbox() {
   try {
     const today = dateOnlyFromString(localDateString());
-    const [areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes] = await Promise.all([
+    const [areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes, entityDocs, documents] = await Promise.all([
       prisma.area.findMany({ where: { status: "active", isSystem: false }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
       prisma.capture.findMany({
         where: {
@@ -309,10 +311,12 @@ async function loadGlobalInbox() {
       }),
       prisma.task.findMany({ where: { status: "open", areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
       prisma.idea.findMany({ where: { status: { in: ["seed", "developing"] }, areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
-      prisma.reference.findMany({ where: { areaId: null, projectId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
+      prisma.reference.findMany({ where: { kind: "reference", areaId: null, projectId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
       prisma.entityNote.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
+      prisma.entityDoc.findMany({ where: { parentType: null, parentId: null, status: "active" }, orderBy: { updatedAt: "desc" }, take: 30 }),
+      prisma.document.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
     ]);
-    return { ok: true as const, areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes };
+    return { ok: true as const, areas, pendingCaptures, reviewProposals, reviews, tasks, ideas, references, notes, entityDocs, documents };
   } catch {
     return { ok: false as const };
   }

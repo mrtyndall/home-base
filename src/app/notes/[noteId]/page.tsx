@@ -98,7 +98,7 @@ async function loadNote(noteId: string) {
           parent?.name ?? (!note.parentType ? "Inbox" : note.parentType === "area" ? "Area" : "Project"),
         href:
           !note.parentType || !note.parentId
-            ? "/#inbox"
+            ? "/areas/inbox"
             : note.parentType === "area"
             ? `/areas/${note.parentId}`
             : `/projects/${note.parentId}`,

@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { config } from "dotenv";
 import pg from "pg";
+import { createCompatibleArea } from "../src/lib/area-compat";
 
 config({ path: ".env.local" });
 config();
@@ -52,14 +53,6 @@ const areas: SeedArea[] = [
 ];
 
 async function main() {
-  // The expand migration intentionally retains the physical Domain column
-  // until the later contract release. Keep that legacy detail hidden here.
-  await prisma.$executeRaw`
-    INSERT INTO domains (id, name, description, sort_order, is_system, active)
-    VALUES ('domain_system', 'System', 'Hidden migration compatibility group.', 0, true, false)
-    ON CONFLICT (name) DO NOTHING
-  `;
-
   for (const area of areas) {
     const areaId = "id" in area ? area.id : `area_seed_${area.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
     const existingArea = await prisma.area.findFirst({
@@ -78,12 +71,10 @@ async function main() {
         },
       });
     } else {
-      await prisma.$executeRaw`
-        INSERT INTO areas
-          (id, name, domain_id, status, current_state, next_step, sort_order, is_system, created_at, updated_at)
-        VALUES
-          (${areaId}, ${area.name}, 'domain_system', 'active', ${area.currentState ?? null}, ${area.nextStep ?? null}, ${area.sortOrder}, ${area.isSystem ?? false}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
+      await createCompatibleArea(prisma, {
+        ...area,
+        id: areaId,
+      });
     }
   }
 

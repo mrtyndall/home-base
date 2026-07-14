@@ -34,13 +34,21 @@ const pool = new pg.Pool({
 });
 
 try {
-  await pool.query(
+  const compatibilityDomain = await pool.query(
     `
     INSERT INTO domains (id, name, description, sort_order, is_system, active)
-    VALUES ('domain_system', 'System', 'Hidden migration compatibility group.', 0, true, false)
-    ON CONFLICT (name) DO NOTHING
+    VALUES ($1, 'System', 'Hidden migration compatibility group.', 0, true, false)
+    ON CONFLICT (name) DO UPDATE SET
+      description = EXCLUDED.description,
+      sort_order = EXCLUDED.sort_order,
+      is_system = EXCLUDED.is_system,
+      active = EXCLUDED.active
+    RETURNING id
     `,
+    [crypto.randomUUID()],
   );
+  const compatibilityDomainId = compatibilityDomain.rows[0]?.id;
+  if (!compatibilityDomainId) throw new Error("Could not resolve the compatibility Domain.");
 
   for (const area of areas) {
     const existingArea = await pool.query(
@@ -57,7 +65,7 @@ try {
       INSERT INTO areas
         (id, name, domain_id, status, current_state, next_step, sort_order, is_system, created_at, updated_at)
       VALUES
-        ($1, $2, 'domain_system', 'active', $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ($1, $2, $3, 'active', $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         current_state = COALESCE(EXCLUDED.current_state, areas.current_state),
@@ -69,6 +77,7 @@ try {
       [
         areaId,
         area.name,
+        compatibilityDomainId,
         area.currentState ?? null,
         area.nextStep ?? null,
         area.sortOrder,

@@ -11,9 +11,22 @@ assert.match(home, /areaId:\s*null/, "Inbox must load unfiled records rather tha
 for (const type of ["tasks", "ideas", "references", "notes"] as const) {
   assert.match(home, new RegExp(`\\b${type}\\b`), `Inbox must include unfiled ${type}.`);
 }
+assert.match(home, /kind:\s*"reference"/, "Inbox References must exclude book and movie library records before applying the cap.");
+assert.match(home, /entityDocs/, "Inbox must query unfiled Entity Docs.");
+assert.match(home, /documents/, "Inbox must query unfiled uploaded Documents.");
+assert.match(home, /title="Docs"/, "Inbox must render unfiled Entity Docs.");
+assert.match(home, /title="Files"/, "Inbox must render unfiled uploaded Documents.");
 assert.match(home, /Pending captures/, "Inbox must include pending captures.");
 assert.match(home, /Inbox is clear/, "Inbox must have a calm empty state.");
 assert.doesNotMatch(home, /unfiled[^\n<]{0,80}(?:error|warning)|(?:error|warning)[^\n<]{0,80}unfiled/i, "Unfiled content must never be framed as an error.");
 assert.doesNotMatch([home, areaPage, nav, fileActions].join("\n"), /area_inbox/, "UI must not depend on the retired Inbox Area.");
 assert.doesNotMatch(fileActions, /\bDomain\b|\bdomains\b/, "Filing controls must consume flat Areas.");
 assert.equal(existsSync("src/app/domains/[domainId]/page.tsx"), false, "The legacy Domain page must be removed.");
+
+for (const file of [
+  "src/app/captures/[captureId]/page.tsx",
+  "src/app/notes/[noteId]/page.tsx",
+  "src/components/check-in-feed.tsx",
+]) {
+  assert.doesNotMatch(readFileSync(file, "utf8"), /\/#inbox/, `${file} must link to the global Inbox route.`);
+}

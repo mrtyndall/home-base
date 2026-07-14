@@ -55,7 +55,7 @@ export default async function CapturePage({ params }: CapturePageProps) {
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-3">
         <Link
-          href="/#inbox"
+          href="/areas/inbox"
           className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
         >
           <ArrowLeft size={15} />
@@ -214,7 +214,7 @@ function itemHref(item: CreatedItem) {
   if (item.type === "person") return `/people/${item.id}`;
   if (item.type === "journal_entry") return "/ideas";
   if (item.type === "idea" || item.type === "idea_note") return "/ideas";
-  if (item.type === "pending_capture") return "/#inbox";
+  if (item.type === "pending_capture") return "/areas/inbox";
   return null;
 }
 

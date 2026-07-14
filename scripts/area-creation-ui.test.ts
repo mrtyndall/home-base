@@ -21,7 +21,7 @@ assert.match(newAreaPage, /action=\{createArea\}/, "The Area form must call crea
 assert.match(newAreaPage, /name="name"[\s\S]{0,120}required/, "Area name must be required.");
 assert.doesNotMatch(newAreaPage, /name="(?:domain|description|status|sortOrder)"/, "Area creation must only ask for a name.");
 assert.match(actions, /export async function createArea\(formData: FormData\)/, "Area creation must have a server action.");
-assert.match(actions, /area\.aggregate\([\s\S]{0,120}_max:\s*\{\s*sortOrder:\s*true/, "New Areas must append to Area ordering.");
+assert.match(actions, /createCompatibleArea/, "Area creation must use the expand-schema compatibility helper.");
 assert.match(actions, /redirect\(`\/areas\/\$\{area\.id\}`\)/, "Area creation must open the new Area.");
 assert.match(areaPage, /href=\{`\/projects\/new\?areaId=\$\{area\.id\}`\}/, "Area pages must expose scoped Project creation.");
 assert.equal(nav.includes('label: "Projects"'), false, "Primary navigation must name the Areas destination Areas.");
@@ -30,4 +30,3 @@ assert.equal(nav.includes('label: "Areas"'), true, "Primary navigation must expo
 const uiSource = [areasIndex, areaPage, newAreaPage, nav].join("\n");
 assert.doesNotMatch(uiSource, /\/domains\//, "Area-first UI must not link to Domain pages.");
 assert.doesNotMatch(uiSource, />\s*Domain(?:s)?\s*</, "Area-first UI must not show Domain labels.");
-

@@ -12,6 +12,10 @@ import {
   Square,
   TriangleAlert,
 } from "lucide-react";
+import {
+  normalizeCaptureOptions,
+  type CaptureOptions,
+} from "@/lib/capture-options";
 
 type CaptureResponse = {
   status: "parsed" | "ambiguous" | "failed";
@@ -20,22 +24,6 @@ type CaptureResponse = {
 
 type CaptureIntent = "auto" | "task" | "note" | "idea" | "reference";
 type CapturePickerId = "area" | "project";
-
-type CaptureOptions = {
-  domains: Array<{
-    id: string;
-    name: string;
-    isSystem: boolean;
-    areas: Array<{ id: string; name: string; domainId: string }>;
-  }>;
-  projects: Array<{
-    id: string;
-    name: string;
-    areaId: string;
-    areaName: string;
-    domainName: string;
-  }>;
-};
 
 const captureIntents: Array<{ value: CaptureIntent; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -117,9 +105,7 @@ export function CaptureBar() {
   );
   const selectedAreaName =
     captureAreaId.length > 0
-      ? captureOptions?.domains
-          .flatMap((domain) => domain.areas)
-          .find((area) => area.id === captureAreaId)?.name
+      ? captureOptions?.areas.find((area) => area.id === captureAreaId)?.name
       : "Inbox";
   const visibleProjects =
     captureAreaId.length > 0
@@ -132,15 +118,15 @@ export function CaptureBar() {
       label: "System",
       options: [{ value: "", label: "Inbox" }],
     },
-    ...(captureOptions?.domains
-      .filter((domain) => !domain.isSystem)
-      .map((domain) => ({
-        label: domain.name,
-        options: domain.areas.map((area) => ({
+    ...(captureOptions?.areas.length
+      ? [{
+        label: "Areas",
+        options: captureOptions.areas.map((area) => ({
           value: area.id,
           label: area.name,
         })),
-      })) ?? []),
+      }]
+      : []),
   ].filter((group) => group.options.length > 0);
   const projectPickerGroups: PickerGroup[] = [
     {
@@ -149,7 +135,7 @@ export function CaptureBar() {
     },
     ...Array.from(
       visibleProjects.reduce((groups, project) => {
-        const key = project.domainName;
+        const key = project.areaName;
         const options = groups.get(key) ?? [];
         options.push({
           value: project.id,
@@ -302,7 +288,7 @@ export function CaptureBar() {
     if (!response.ok) {
       return;
     }
-    setCaptureOptions((await response.json()) as CaptureOptions);
+    setCaptureOptions(normalizeCaptureOptions(await response.json()));
   }
 
   useEffect(() => {

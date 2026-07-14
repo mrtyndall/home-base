@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 export async function GET() {
   const [areas, projects] = await Promise.all([
     prisma.area.findMany({
-      where: { status: { in: ["active", "parked"] } },
+      where: { status: { in: ["active", "parked"] }, isSystem: false },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,

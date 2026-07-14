@@ -14,3 +14,9 @@ assert.match(projectForm, /href="\/areas\/new"/, "An empty Project form must dir
 assert.match(areaPage, /href=\{`\/projects\/new\?areaId=\$\{area\.id\}`\}/, "Area pages must pass their Area ID into Project creation.");
 assert.doesNotMatch(projectForm, /prisma\.domain|\bdomains\b/, "Project creation must query Areas directly.");
 
+const actions = readFileSync("src/app/actions.ts", "utf8");
+const createProjectBody = actions.slice(
+  actions.indexOf("export async function createProject"),
+  actions.indexOf("export async function createArea"),
+);
+assert.match(createProjectBody, /isSystem:\s*false/, "Forged Project posts must reject system Areas.");

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { createCompatibleArea } from "@/lib/area-compat";
 import { resolveVerifiedDestination } from "@/lib/destinations";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
@@ -873,7 +874,7 @@ export async function createProject(formData: FormData) {
   if (!name || !areaId) return;
 
   const area = await prisma.area.findFirst({
-    where: { id: areaId, status: "active" },
+    where: { id: areaId, status: "active", isSystem: false },
     select: { id: true },
   });
   if (!area) return;
@@ -913,10 +914,9 @@ export async function createArea(formData: FormData) {
   const name = getTrimmedString(formData, "name");
   if (!name) return;
 
-  const last = await prisma.area.aggregate({ _max: { sortOrder: true } });
-  const area = await prisma.area.create({
-    data: { name, sortOrder: (last._max.sortOrder ?? -1) + 1 },
-  });
+  const area = await prisma.$transaction((transaction) =>
+    createCompatibleArea(transaction, { name }),
+  );
 
   revalidatePath("/projects");
   redirect(`/areas/${area.id}`);
