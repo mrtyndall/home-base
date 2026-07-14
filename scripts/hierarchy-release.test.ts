@@ -31,7 +31,7 @@ const completeReadLaterProtection = {
   readLaterActiveUrlIndexDefinition:
     "CREATE UNIQUE INDEX references_active_read_later_normalized_url_key ON public.references USING btree (normalized_url) WHERE ((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
   readLaterActiveUrlIndexPredicate:
-    "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (read_status = ANY (ARRAY['unread'::text, 'read'::text])))",
+    "kind = 'read_later'::text AND normalized_url IS NOT NULL AND (read_status = ANY (ARRAY['unread'::text, 'read'::text]))",
   readLaterActiveUrlIndexIsUnique: true,
   readLaterActiveUrlIndexIsValid: true,
   readLaterActiveUrlIndexIsReady: true,
@@ -315,6 +315,46 @@ test("strict postflight rejects a negated status clause that contains the expect
     runStrictWithProtection({
       readLaterActiveUrlIndexPredicate:
         "((kind = 'read_later'::text) AND (normalized_url IS NOT NULL) AND (NOT (read_status = ANY (ARRAY['unread'::text, 'read'::text]))))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight preserves literal case when comparing the index predicate", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "kind = 'READ_LATER'::text AND normalized_url IS NOT NULL AND (read_status = ANY (ARRAY['unread'::text, 'read'::text]))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight does not erase cast-like text inside a predicate literal", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "kind = 'read::text_later'::text AND normalized_url IS NOT NULL AND (read_status = ANY (ARRAY['unread'::text, 'read'::text]))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight preserves status literal case", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "kind = 'read_later'::text AND normalized_url IS NOT NULL AND (read_status = ANY (ARRAY['Unread'::text, 'read'::text]))",
+    }),
+    /Read Later active URL index is missing or invalid/,
+  );
+});
+
+test("strict postflight preserves doubled quotes and parentheses inside literals", async () => {
+  await assert.rejects(
+    runStrictWithProtection({
+      readLaterActiveUrlIndexPredicate:
+        "kind = 'read_''later)'::text AND normalized_url IS NOT NULL AND (read_status = ANY (ARRAY['unread'::text, 'read'::text]))",
     }),
     /Read Later active URL index is missing or invalid/,
   );

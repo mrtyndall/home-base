@@ -115,19 +115,52 @@ function sqlLiterals(definition: string) {
 }
 
 function normalizedSql(definition: string) {
-  return definition
-    .toLowerCase()
-    .replaceAll('"', "")
-    .replace(/::(?:pg_catalog\.)?text/g, "")
-    .replace(/\s+/g, "");
+  let normalized = "";
+  for (let index = 0; index < definition.length; index += 1) {
+    const character = definition[index];
+    if (character === "'") {
+      normalized += character;
+      for (index += 1; index < definition.length; index += 1) {
+        normalized += definition[index];
+        if (definition[index] !== "'") continue;
+        if (definition[index + 1] === "'") {
+          normalized += definition[index + 1];
+          index += 1;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+    if (/\s/.test(character) || character === '"') continue;
+    if (definition.startsWith("::", index)) {
+      const cast = definition.slice(index).match(/^::\s*(?:pg_catalog\s*\.\s*)?text\b/i)?.[0];
+      if (cast) {
+        index += cast.length - 1;
+        continue;
+      }
+    }
+    normalized += character.toLowerCase();
+  }
+  return normalized;
 }
 
 function withoutRedundantOuterParentheses(expression: string) {
   let normalized = expression;
   while (normalized.startsWith("(") && normalized.endsWith(")")) {
     let depth = 0;
+    let insideLiteral = false;
     let wrapsWholeExpression = true;
     for (let index = 0; index < normalized.length; index += 1) {
+      if (normalized[index] === "'") {
+        if (insideLiteral && normalized[index + 1] === "'") {
+          index += 1;
+          continue;
+        }
+        insideLiteral = !insideLiteral;
+        continue;
+      }
+      if (insideLiteral) continue;
       if (normalized[index] === "(") depth += 1;
       if (normalized[index] === ")") depth -= 1;
       if (depth === 0 && index < normalized.length - 1) {
@@ -135,6 +168,7 @@ function withoutRedundantOuterParentheses(expression: string) {
         break;
       }
     }
+    if (depth !== 0 || insideLiteral) wrapsWholeExpression = false;
     if (!wrapsWholeExpression) break;
     normalized = normalized.slice(1, -1);
   }
@@ -177,8 +211,8 @@ function hasValidReadLaterActiveUrlIndex(capabilities: ReleaseSchemaCapabilities
 
   const canonicalPredicate = withoutRedundantOuterParentheses(normalizedSql(predicate));
   const expectedPredicate = withoutRedundantOuterParentheses(normalizedSql(`
-    ("kind" = 'read_later'::text)
-    AND ("normalized_url" IS NOT NULL)
+    "kind" = 'read_later'::text
+    AND "normalized_url" IS NOT NULL
     AND ("read_status" = ANY (ARRAY['unread'::text, 'read'::text]))
   `));
   return canonicalPredicate === expectedPredicate;
