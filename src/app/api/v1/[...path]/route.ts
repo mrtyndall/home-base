@@ -1001,47 +1001,69 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
     if (resource === "tasks") {
       const parsed = patchTaskSchema.parse(body);
-      const current = await prisma.task.findUnique({
-        where: { id },
-        select: { areaId: true, projectId: true },
+      const task = await prisma.$transaction(async (tx) => {
+        const current = await tx.task.findUnique({
+          where: { id },
+          select: { areaId: true, projectId: true },
+        });
+        if (!current) return null;
+
+        const nextProjectId = parsed.projectId === undefined
+          ? current.projectId
+          : parsed.projectId;
+        let explicitAreaId = parsed.areaId;
+        if (parsed.areaName) {
+          const namedArea = await tx.area.findFirst({
+            where: { name: { equals: parsed.areaName, mode: "insensitive" } },
+            orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+          });
+          if (!namedArea) throw new Error("Area not found.");
+          if (explicitAreaId && namedArea.id !== explicitAreaId) {
+            throw new Error("Conflicting Area fields.");
+          }
+          explicitAreaId = namedArea.id;
+        }
+
+        const destination = await resolveVerifiedDestination({
+          areaId: nextProjectId
+            ? explicitAreaId
+            : explicitAreaId === undefined
+              ? current.areaId
+              : explicitAreaId,
+          projectId: nextProjectId,
+        }, tx);
+        const updated = await tx.task.update({
+          where: { id },
+          data: {
+            title: parsed.title,
+            notes: parsed.notes,
+            dueDate: parseDateOnly(parsed.dueDate),
+            dueTime: parsed.dueTime,
+            priority: parsed.priority,
+            areaId: destination.areaId,
+            projectId: destination.projectId,
+            parentTaskId: parsed.parentTaskId,
+            someday: parsed.someday,
+            recurrenceRule: parsed.recurrenceRule,
+            reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
+            source: `api:${apiKey.label}`,
+          },
+        });
+        await tx.notification.create({
+          data: {
+            type: "task_updated",
+            title: "Task updated",
+            sourceRef: {
+              type: "task",
+              id,
+              source: "api",
+              actor: apiKey.label,
+            },
+          },
+        });
+        return updated;
       });
-      if (!current) return notFound();
-      const nextProjectId = parsed.projectId === undefined ? current.projectId : parsed.projectId;
-      const project = nextProjectId
-        ? await prisma.project.findUnique({
-            where: { id: nextProjectId },
-            select: { areaId: true },
-          })
-        : null;
-      const requestedAreaId = parsed.areaName
-        ? await resolveAreaReference(parsed.areaId ?? undefined, parsed.areaName)
-        : parsed.areaId === undefined ? current.areaId : parsed.areaId;
-      const destination = await resolveVerifiedDestination({
-        areaId: project?.areaId ?? requestedAreaId,
-        projectId: nextProjectId,
-      });
-      const task = await prisma.task.update({
-        where: { id },
-        data: {
-          title: parsed.title,
-          notes: parsed.notes,
-          status: parsed.status,
-          dueDate: parseDateOnly(parsed.dueDate),
-          dueTime: parsed.dueTime,
-          priority: parsed.priority,
-          areaId: destination.areaId,
-          projectId: destination.projectId,
-          parentTaskId: parsed.parentTaskId,
-          someday: parsed.someday,
-          recurrenceRule: parsed.recurrenceRule,
-          reminderOffsets: parsed.reminderOffsets as Prisma.InputJsonValue,
-          source: `api:${apiKey.label}`,
-        },
-      });
-      await auditApiWrite(apiKey, "task_updated", "Task updated", {
-        type: "task",
-        id,
-      });
+      if (!task) return notFound();
       return { task };
     }
 
@@ -1436,9 +1458,7 @@ const apiCaptureSchema = z.object({
   deviceContext: z.record(z.string(), z.unknown()).optional(),
 });
 
-const patchTaskSchema = createTaskSchema.partial().extend({
-  status: z.enum(["open", "completed", "killed"]).optional(),
-});
+export const patchTaskSchema = createTaskSchema.partial().strict();
 
 const createProjectSchema = z.object({
   name: z.string().min(1),

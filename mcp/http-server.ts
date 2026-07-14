@@ -122,7 +122,6 @@ export function registerTools(server: McpServer, bearerToken: string) {
         taskId: z.string().min(1),
         title: z.string().min(1).optional(),
         notes: z.string().optional(),
-        status: z.enum(["open", "completed", "killed"]).optional(),
         dueDate: z.string().optional(),
         dueTime: z.string().optional(),
         priority: z.string().optional(),
@@ -132,7 +131,7 @@ export function registerTools(server: McpServer, bearerToken: string) {
         someday: z.boolean().optional(),
         recurrenceRule: z.string().optional(),
         reminderOffsets: z.array(z.union([z.string(), z.number()])).optional(),
-      }),
+      }).strict(),
     },
     async ({ taskId, ...body }) =>
       toToolResult(await apiFetch(bearerToken, apiPath("/tasks", taskId), "PATCH", body)),
