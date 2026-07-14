@@ -135,28 +135,10 @@ export async function GET(request: Request, context: RouteCtx) {
       const starredParam = url.searchParams.get("starred");
       const viewParam = url.searchParams.get("view");
       return {
-        tasks: await prisma.task.findMany({
-          where: {
-            ...(query.q
-              ? { title: { contains: query.q, mode: "insensitive" } }
-              : {}),
-            ...(starredParam === "1" || starredParam === "true"
-              ? { starred: true }
-              : {}),
-            ...(viewParam === "open"
-              ? { status: "open" as const }
-              : viewParam === "done"
-                ? { status: "completed" as const }
-                : {}),
-          },
-          include: { area: true, project: true, subtasks: true },
-          orderBy: [
-            { status: "asc" },
-            { dueDate: "asc" },
-            { createdAt: "desc" },
-          ],
-          take: query.limit,
-          ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        tasks: await listTasksForApi({
+          ...query,
+          starred: starredParam === "1" || starredParam === "true",
+          view: viewParam === "open" || viewParam === "done" ? viewParam : undefined,
         }),
       };
     }
@@ -396,6 +378,59 @@ export async function GET(request: Request, context: RouteCtx) {
 
     return notFound();
   });
+}
+
+type TaskListQuery = {
+  limit: number;
+  cursor?: string;
+  q?: string;
+  starred?: boolean;
+  view?: "open" | "done";
+};
+
+type TaskListClient = Pick<Prisma.TransactionClient, "task">;
+
+export async function listTasksForApi(
+  query: TaskListQuery,
+  client: TaskListClient = prisma,
+) {
+  const where: Prisma.TaskWhereInput = {
+    ...(query.q
+      ? { title: { contains: query.q, mode: "insensitive" } }
+      : {}),
+    ...(query.starred ? { starred: true } : {}),
+    ...(query.view === "open"
+      ? { status: "open" }
+      : query.view === "done"
+        ? { status: "completed" }
+        : {}),
+  };
+
+  if (query.cursor) {
+    const cursor = await client.task.findFirst({
+      where: { ...where, id: query.cursor },
+      select: { id: true },
+    });
+    if (!cursor) throw new Error("Task pagination cursor not found.");
+  }
+
+  const tasks = await client.task.findMany({
+    where,
+    include: { area: true, project: true, subtasks: true },
+    orderBy: [
+      { status: "asc" },
+      { dueDate: "asc" },
+      { createdAt: "desc" },
+      { id: "desc" },
+    ],
+    take: query.limit,
+    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+  });
+
+  if (query.cursor && tasks.some((task) => task.id === query.cursor)) {
+    throw new Error("Task pagination cursor repeated.");
+  }
+  return tasks;
 }
 
 export async function POST(request: Request, context: RouteCtx) {
