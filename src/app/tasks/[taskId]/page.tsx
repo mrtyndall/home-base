@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { addSubtask, updateTaskDetail } from "@/app/actions";
 import { TaskCompleteButton } from "@/components/task-complete-button";
+import { TaskQuickAssignment } from "@/components/task-quick-assignment";
 import { TaskStarButton } from "@/components/task-star-button";
 import { SetupNotice } from "@/components/setup-notice";
 import { formatDateOnly } from "@/lib/dates";
@@ -32,7 +33,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     notFound();
   }
 
-  const { task, domains, projects } = result;
+  const { task, domains, projects, assignmentProjects } = result;
   const reminderOffsets = parseReminderOffsets(task.reminderOffsets).join(", ");
   const parsedReminderOffsets = parseReminderOffsets(task.reminderOffsets);
   const labelsText = task.tags.join(", ");
@@ -95,6 +96,18 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
           ) : null}
         </div>
       </header>
+
+      {task.status === "open" && !task.areaId && !task.projectId ? (
+        <TaskQuickAssignment
+          taskId={task.id}
+          areas={domains.map(({ id, name }) => ({ id, name }))}
+          projects={assignmentProjects.map(({ id, name, areaId }) => ({
+            id,
+            name,
+            areaId,
+          }))}
+        />
+      ) : null}
 
       {facts.length > 0 ? (
         <section className="rounded-[14px] border border-[#E2E6DF] bg-white px-4">
@@ -381,7 +394,7 @@ async function loadTaskDetail(taskId: string) {
       return { ok: true as const, task: null };
     }
 
-    const [domains, projects] = await Promise.all([
+    const [domains, projects, assignmentProjects] = await Promise.all([
       prisma.area.findMany({
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -393,11 +406,23 @@ async function loadTaskDetail(taskId: string) {
         },
         orderBy: { name: "asc" },
       }) : Promise.resolve([]),
+      !task.areaId && !task.projectId
+        ? prisma.project.findMany({
+            where: { status: { in: ["active", "parked", "someday"] } },
+            orderBy: { name: "asc" },
+          })
+        : Promise.resolve([]),
     ]);
 
-    return { ok: true as const, task, domains, projects };
+    return { ok: true as const, task, domains, projects, assignmentProjects };
   } catch {
-    return { ok: false as const, task: null, domains: [], projects: [] };
+    return {
+      ok: false as const,
+      task: null,
+      domains: [],
+      projects: [],
+      assignmentProjects: [],
+    };
   }
 }
 
