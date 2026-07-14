@@ -15,6 +15,7 @@ const areaPage = readFileSync(
   join(root, "src/app/areas/[areaId]/page.tsx"),
   "utf8",
 );
+const inboxData = readFileSync(join(root, "src/lib/global-inbox.ts"), "utf8");
 const actions = readFileSync(join(root, "src/app/actions.ts"), "utf8");
 const route = readFileSync(
   join(root, "src/app/api/cron/capture-review-proposals/route.ts"),
@@ -33,7 +34,7 @@ assert.match(route, /createCaptureReviewProposals/);
 assert.match(areaPage, /reviewProposals/);
 assert.match(areaPage, /Suggested:/);
 assert.match(areaPage, /proposalId={proposal\.id}/);
-assert.match(areaPage, /reviewProposals:\s*\{\s*none:/);
+assert.match(inboxData, /reviewProposals:\s*\{\s*none:/);
 
 assert.match(actions, /proposalId/);
 assert.match(actions, /captureReviewProposal\.update/);

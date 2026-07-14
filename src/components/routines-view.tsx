@@ -75,7 +75,7 @@ function RoutineGroup({
 
 function RoutineCard({ routine }: { routine: RoutineWithState }) {
   return (
-    <details className="p-4">
+    <details id={`routine-${routine.id}`} className="scroll-mt-24 p-4">
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">

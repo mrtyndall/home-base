@@ -2,18 +2,19 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const home = readFileSync("src/app/areas/[areaId]/page.tsx", "utf8");
+const inboxData = readFileSync("src/lib/global-inbox.ts", "utf8");
 const areaPage = readFileSync("src/app/areas/[areaId]/page.tsx", "utf8");
 const nav = readFileSync("src/components/nav-tabs.tsx", "utf8");
 const fileActions = readFileSync("src/components/capture-file-actions.tsx", "utf8");
 
 assert.match(home, /function GlobalInbox/, "The existing Inbox surface must render globally unfiled content.");
-assert.match(home, /areaId:\s*null/, "Inbox must load unfiled records rather than a synthetic Inbox Area.");
+assert.match(inboxData, /areaId:\s*null/, "Inbox must load unfiled records rather than a synthetic Inbox Area.");
 for (const type of ["tasks", "ideas", "references", "notes"] as const) {
-  assert.match(home, new RegExp(`\\b${type}\\b`), `Inbox must include unfiled ${type}.`);
+  assert.match(inboxData, new RegExp(`\\b${type}\\b`), `Inbox must include unfiled ${type}.`);
 }
-assert.match(home, /kind:\s*"reference"/, "Inbox References must exclude book and movie library records before applying the cap.");
-assert.match(home, /entityDocs/, "Inbox must query unfiled Entity Docs.");
-assert.match(home, /documents/, "Inbox must query unfiled uploaded Documents.");
+assert.match(inboxData, /kind:\s*"reference"/, "Inbox References must exclude book and movie library records before applying the cap.");
+assert.match(inboxData, /entityDocs/, "Inbox must query unfiled Entity Docs.");
+assert.match(inboxData, /documents/, "Inbox must query unfiled uploaded Documents.");
 assert.match(home, /title="Docs"/, "Inbox must render unfiled Entity Docs.");
 assert.match(home, /title="Files"/, "Inbox must render unfiled uploaded Documents.");
 assert.match(home, /Pending captures/, "Inbox must include pending captures.");

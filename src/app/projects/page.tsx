@@ -19,6 +19,7 @@ import { SetupNotice } from "@/components/setup-notice";
 import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
 import { projectLastActivityFact } from "@/lib/slippage";
 import { buildAreaTree, type AreaTreeNode } from "@/lib/hierarchy";
+import { countGlobalInbox } from "@/lib/global-inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -459,7 +460,7 @@ async function loadProjects() {
         where: { status: { in: ["active", "parked"] }, isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
-      loadGlobalInboxCount(today),
+      countGlobalInbox(today),
     ]);
 
     const projectIds = projects.map((project) => project.id);
@@ -627,30 +628,4 @@ async function loadProjects() {
   } catch {
     return { ok: false as const };
   }
-}
-
-async function loadGlobalInboxCount(today: Date) {
-  const counts = await Promise.all([
-    prisma.capture.count({
-      where: {
-        status: "active",
-        OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
-        reviewProposals: { none: { status: { in: ["pending", "snoozed"] } } },
-      },
-    }),
-    prisma.captureReviewProposal.count({
-      where: { OR: [{ status: "pending" }, { status: "snoozed", snoozedUntil: { lte: new Date() } }] },
-    }),
-    prisma.scheduledReview.count({
-      where: { OR: [{ status: "surfaced" }, { status: "pending", reviewAt: { lte: today } }, { status: "pending", reviewAt: null }] },
-    }),
-    prisma.task.count({ where: { status: "open", areaId: null, projectId: null } }),
-    prisma.project.count({ where: { areaId: null, status: { in: ["active", "someday", "parked"] } } }),
-    prisma.idea.count({ where: { status: { in: ["seed", "developing"] }, areaId: null, projectId: null } }),
-    prisma.reference.count({ where: { kind: "reference", areaId: null, projectId: null } }),
-    prisma.entityNote.count({ where: { parentType: null, parentId: null } }),
-    prisma.entityDoc.count({ where: { parentType: null, parentId: null, status: "active" } }),
-    prisma.document.count({ where: { parentType: null, parentId: null } }),
-  ]);
-  return counts.reduce((total, count) => total + count, 0);
 }

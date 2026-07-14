@@ -1,5 +1,5 @@
-import type { AreaHierarchyRecord } from "@/lib/hierarchy";
-import { flattenAreaOptions } from "@/lib/hierarchy";
+import type { ChangeEventHandler } from "react";
+import { flattenAreaOptions, type AreaHierarchyRecord } from "@/lib/area-options";
 
 type AreaPickerProps = {
   areas: readonly AreaHierarchyRecord[];
@@ -10,6 +10,9 @@ type AreaPickerProps = {
   excludedAreaIds?: readonly string[];
   selectableAreaIds?: readonly string[];
   label?: string;
+  value?: string;
+  disabled?: boolean;
+  onChange?: ChangeEventHandler<HTMLSelectElement>;
 };
 
 export function AreaPicker({
@@ -21,6 +24,9 @@ export function AreaPicker({
   excludedAreaIds = [],
   selectableAreaIds,
   label = "Area",
+  value,
+  disabled = false,
+  onChange,
 }: AreaPickerProps) {
   const excluded = new Set(excludedAreaIds);
   const selectable = selectableAreaIds ? new Set(selectableAreaIds) : null;
@@ -44,9 +50,12 @@ export function AreaPicker({
       <span>{label}</span>
       <select
         name={name}
-        defaultValue={defaultAreaId ?? ""}
+        value={value}
+        defaultValue={value === undefined ? defaultAreaId ?? "" : undefined}
+        disabled={disabled}
+        onChange={onChange}
         required={!nullable}
-        className="mt-1 min-h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"
+        className="mt-1 min-h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 disabled:cursor-wait disabled:bg-stone-100 disabled:text-stone-500"
       >
         {nullable ? <option value="">No area yet</option> : null}
         {!nullable && !defaultAreaId ? <option value="" disabled>Choose an area</option> : null}

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Capture } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Ellipsis, Plus } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Ellipsis, Plus } from "lucide-react";
 import {
   dismissCapture,
   dismissCaptureReviewProposal,
@@ -11,10 +11,10 @@ import {
   snoozeCaptureReviewProposalOneDay,
   updateCaptureText,
   updateAreaParent,
-  updateProjectArea,
   unparkAreaById,
 } from "@/app/actions";
 import { AreaPicker } from "@/components/area-picker";
+import { InboxFilingControl } from "@/components/inbox-filing-control";
 import { dismissReview, markReviewDone, snoozeReviewOneDay } from "@/app/review-actions";
 import { CaptureFileActions } from "@/components/capture-file-actions";
 import { CheckInFeed } from "@/components/check-in-feed";
@@ -30,19 +30,26 @@ import {
 import { prisma } from "@/lib/db";
 import { loadReferenceMentions } from "@/lib/reference-mentions";
 import { flattenAreaOptions } from "@/lib/hierarchy";
+import { loadGlobalInboxPage } from "@/lib/global-inbox";
 
 export const dynamic = "force-dynamic";
 
-type AreaPageProps = { params: Promise<{ areaId: string }> };
+type AreaPageProps = {
+  params: Promise<{ areaId: string }>;
+  searchParams?: Promise<{ page?: string | string[] }>;
+};
 
-export default async function AreaPage({ params }: AreaPageProps) {
+export default async function AreaPage({ params, searchParams }: AreaPageProps) {
   const { areaId } = await params;
   if (!process.env.DATABASE_URL) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
   }
 
   if (areaId === "inbox") {
-    const inbox = await loadGlobalInbox();
+    const query = await searchParams;
+    const rawPage = Array.isArray(query?.page) ? query.page[0] : query?.page;
+    const page = Math.max(0, Number.parseInt(rawPage ?? "1", 10) - 1 || 0);
+    const inbox = await loadGlobalInbox(page);
     if (!inbox.ok) return <SetupNotice reason="Database is not migrated or reachable." />;
     return <GlobalInbox data={inbox} />;
   }
@@ -172,8 +179,9 @@ export default async function AreaPage({ params }: AreaPageProps) {
 type GlobalInboxData = Extract<Awaited<ReturnType<typeof loadGlobalInbox>>, { ok: true }>;
 
 function GlobalInbox({ data }: { data: GlobalInboxData }) {
-  const unfiledCount = data.tasks.length + data.projects.length + data.ideas.length + data.references.length + data.notes.length + data.entityDocs.length + data.documents.length;
-  const total = data.pendingCaptures.length + data.reviewProposals.length + data.reviews.length + unfiledCount;
+  const total = data.totalCount;
+  const activeAreas = data.areas.filter((area) => area.status === "active");
+  const selectableAreaIds = activeAreas.map((area) => area.id);
   return (
     <div className="space-y-6">
       <header className="space-y-2 border-b border-[#DDE2DA] pb-5">
@@ -192,7 +200,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                   <EditableCaptureText capture={proposal.capture} />
                   <p className="rounded-[10px] bg-[#F2FAF7] px-3 py-2 text-[13px] text-stone-700">Suggested: {proposal.suggestedType ?? "Review"}{proposal.suggestedArea ? ` into ${proposal.suggestedArea.name}` : " in Inbox"}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={proposal.captureId} proposalId={proposal.id} areas={data.areas} label="File as…" defaultAreaId={proposal.suggestedArea?.id ?? ""} />
+                    <CaptureFileActions captureId={proposal.captureId} proposalId={proposal.id} areas={activeAreas} label="File as…" defaultAreaId={proposal.suggestedArea?.id ?? ""} />
                     <form action={snoozeCaptureReviewProposalOneDay}><input type="hidden" name="proposalId" value={proposal.id} /><SmallAction>Snooze 1 day</SmallAction></form>
                     <form action={dismissCaptureReviewProposal}><input type="hidden" name="proposalId" value={proposal.id} /><SmallAction>Dismiss</SmallAction></form>
                   </div>
@@ -202,7 +210,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                 <div key={review.id} className="space-y-2 p-4">
                   <EditableCaptureText capture={review.capture} />
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={review.captureId} reviewId={review.id} areas={data.areas} label="File as…" />
+                    <CaptureFileActions captureId={review.captureId} reviewId={review.id} areas={activeAreas} label="File as…" />
                     <form action={snoozeReviewOneDay}><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Snooze 1 day</SmallAction></form>
                     <form action={markReviewDone}><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Done</SmallAction></form>
                     <form action={dismissReview} aria-label="Archive capture"><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Archive</SmallAction></form>
@@ -217,14 +225,15 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                 <div key={capture.id} className="space-y-2 p-4">
                   <EditableCaptureText capture={capture} />
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={capture.id} areas={data.areas} label="File as…" />
+                    <CaptureFileActions captureId={capture.id} areas={activeAreas} label="File as…" />
                     <form action={dismissCapture}><input type="hidden" name="captureId" value={capture.id} /><SmallAction>Dismiss</SmallAction></form>
                   </div>
                 </div>
               ))}
             </InboxPanel>
           ) : null}
-          {data.projects.length ? <ProjectInboxGroup projects={data.projects} areas={data.areas} /> : null}
+          {data.projects.length ? <ProjectInboxGroup projects={data.projects} areas={data.areas} selectableAreaIds={selectableAreaIds} /> : null}
+          {data.routines.length ? <RoutineInboxGroup routines={data.routines} areas={data.areas} selectableAreaIds={selectableAreaIds} /> : null}
           {data.tasks.length ? <SimpleInboxGroup title="Tasks" items={data.tasks.map((item) => ({ id: item.id, label: item.title, href: `/tasks/${item.id}` }))} /> : null}
           {data.ideas.length ? <SimpleInboxGroup title="Ideas" items={data.ideas.map((item) => ({ id: item.id, label: item.title, href: `/ideas#idea-${item.id}` }))} /> : null}
           {data.references.length ? <SimpleInboxGroup title="References" items={data.references.map((item) => ({ id: item.id, label: item.title ?? item.body, href: `/references/${item.id}` }))} /> : null}
@@ -235,6 +244,17 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
           ) : null}
         </div>
       )}
+      {data.hasPreviousPage || data.hasNextPage ? (
+        <nav aria-label="Inbox pages" className="flex items-center justify-between gap-3 border-t border-[#DDE2DA] pt-4">
+          {data.hasPreviousPage ? (
+            <Link href={`/areas/inbox?page=${data.page}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[#D8DDD5] bg-white px-4 text-sm font-medium text-stone-700 hover:text-teal-700"><ChevronLeft size={15} /> Previous</Link>
+          ) : <span />}
+          <span className="text-xs font-medium text-stone-500">Page {data.page + 1}</span>
+          {data.hasNextPage ? (
+            <Link href={`/areas/inbox?page=${data.page + 2}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-sm font-medium text-white hover:bg-teal-800">More <ChevronRight size={15} /></Link>
+          ) : <span />}
+        </nav>
+      ) : null}
     </div>
   );
 }
@@ -242,9 +262,11 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
 function ProjectInboxGroup({
   projects,
   areas,
+  selectableAreaIds,
 }: {
   projects: GlobalInboxData["projects"];
   areas: GlobalInboxData["areas"];
+  selectableAreaIds: string[];
 }) {
   return (
     <InboxPanel title="Projects" count={projects.length}>
@@ -257,18 +279,30 @@ function ProjectInboxGroup({
             <span className="min-w-0 break-words text-sm font-medium text-stone-900 [overflow-wrap:anywhere]">{project.name}</span>
             <span className="shrink-0 rounded-full bg-[#F2F5F0] px-2 py-1 text-[11px] font-medium capitalize text-stone-500">{project.status}</span>
           </Link>
-          <details className="mt-1">
-            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full text-[13px] font-medium text-teal-700 transition hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 [&::-webkit-details-marker]:hidden">
-              Assign area
-            </summary>
-            <form action={updateProjectArea} className="space-y-3 rounded-[12px] bg-[#F7F9F5] p-3">
-              <input type="hidden" name="projectId" value={project.id} />
-              <AreaPicker areas={areas} defaultAreaId={null} label="Move to" />
-              <button type="submit" className="h-11 w-full rounded-full bg-teal-700 px-5 text-sm font-medium text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">
-                Save area
-              </button>
-            </form>
-          </details>
+          <InboxFilingControl entityType="project" entityId={project.id} areas={areas} selectableAreaIds={selectableAreaIds} />
+        </article>
+      ))}
+    </InboxPanel>
+  );
+}
+
+function RoutineInboxGroup({
+  routines,
+  areas,
+  selectableAreaIds,
+}: {
+  routines: GlobalInboxData["routines"];
+  areas: GlobalInboxData["areas"];
+  selectableAreaIds: string[];
+}) {
+  return (
+    <InboxPanel title="Routines" count={routines.length}>
+      {routines.map((routine) => (
+        <article key={routine.id} className="p-3.5">
+          <Link href={`/tasks#routine-${routine.id}`} className="flex min-h-11 items-center rounded-[10px] px-1 text-sm font-medium text-stone-900 transition hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
+            <span className="break-words [overflow-wrap:anywhere]">{routine.name}</span>
+          </Link>
+          <InboxFilingControl entityType="routine" entityId={routine.id} areas={areas} selectableAreaIds={selectableAreaIds} />
         </article>
       ))}
     </InboxPanel>
@@ -346,49 +380,9 @@ function Panel({ title, children }: { title: string; children: ReactNode[] }) {
   );
 }
 
-async function loadGlobalInbox() {
+async function loadGlobalInbox(page = 0) {
   try {
-    const today = dateOnlyFromString(localDateString());
-    const [areas, pendingCaptures, reviewProposals, reviews, tasks, projects, ideas, references, notes, entityDocs, documents] = await Promise.all([
-      prisma.area.findMany({ where: { status: "active", isSystem: false }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
-      prisma.capture.findMany({
-        where: {
-          status: "active",
-          OR: [{ parseStatus: "ambiguous" }, { parseStatus: "failed" }],
-          reviewProposals: { none: { status: { in: ["pending", "snoozed"] } } },
-        },
-        include: { textEdits: { orderBy: { createdAt: "desc" }, take: 1, select: { text: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-      }),
-      prisma.captureReviewProposal.findMany({
-        where: { OR: [{ status: "pending" }, { status: "snoozed", snoozedUntil: { lte: new Date() } }] },
-        include: {
-          capture: { select: { id: true, rawText: true, textEdits: { orderBy: { createdAt: "desc" }, take: 1, select: { text: true } } } },
-          suggestedArea: true,
-        },
-        orderBy: { createdAt: "asc" },
-        take: 30,
-      }),
-      prisma.scheduledReview.findMany({
-        where: { OR: [{ status: "surfaced" }, { status: "pending", reviewAt: { lte: today } }, { status: "pending", reviewAt: null }] },
-        include: { capture: { select: { id: true, rawText: true, textEdits: { orderBy: { createdAt: "desc" }, take: 1, select: { text: true } } } } },
-        orderBy: [{ reviewAt: "asc" }, { createdAt: "asc" }],
-        take: 30,
-      }),
-      prisma.task.findMany({ where: { status: "open", areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
-      prisma.project.findMany({
-        where: { areaId: null, status: { in: ["active", "someday", "parked"] } },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-      }),
-      prisma.idea.findMany({ where: { status: { in: ["seed", "developing"] }, areaId: null, projectId: null }, orderBy: { updatedAt: "desc" }, take: 30 }),
-      prisma.reference.findMany({ where: { kind: "reference", areaId: null, projectId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
-      prisma.entityNote.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
-      prisma.entityDoc.findMany({ where: { parentType: null, parentId: null, status: "active" }, orderBy: { updatedAt: "desc" }, take: 30 }),
-      prisma.document.findMany({ where: { parentType: null, parentId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
-    ]);
-    return { ok: true as const, areas, pendingCaptures, reviewProposals, reviews, tasks, projects, ideas, references, notes, entityDocs, documents };
+    return { ok: true as const, ...await loadGlobalInboxPage(page) };
   } catch {
     return { ok: false as const };
   }
