@@ -36,7 +36,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         where: {
           id: projectId,
           status: { in: ["active", "parked", "someday"] },
-          area: { is: { status: "active", isSystem: false } },
+          OR: [
+            { areaId: null },
+            { area: { is: { status: "active", isSystem: false } } },
+          ],
         },
         select: { id: true, areaId: true },
       })

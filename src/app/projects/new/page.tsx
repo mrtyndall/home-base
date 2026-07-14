@@ -4,6 +4,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { createProject } from "@/app/actions";
 import { prisma } from "@/lib/db";
 import { SetupNotice } from "@/components/setup-notice";
+import { AreaPicker } from "@/components/area-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -45,21 +46,7 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
         ) : null}
       </header>
 
-      {result.areas.length === 0 ? (
-        <section className="max-w-2xl rounded-[18px] border border-[#E2E6DF] bg-white p-5">
-          <p className="font-serif text-xl text-stone-950">Projects need an Area.</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-[#6B7268]">
-            Create an ongoing part of life first, then give this project a home.
-          </p>
-          <Link
-            href="/areas/new"
-            className="mt-4 inline-flex h-10 items-center rounded-full bg-teal-700 px-4 text-sm font-medium text-white transition hover:bg-teal-800"
-          >
-            Create your first area
-          </Link>
-        </section>
-      ) : (
-        <form
+      <form
           action={createProject}
           className="max-w-2xl space-y-4 rounded-[14px] border border-[#E2E6DF] bg-white p-4"
         >
@@ -72,24 +59,11 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
               className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
             />
           </label>
-          {scopedArea ? (
-            <input type="hidden" name="areaId" value={scopedArea.id} />
-          ) : (
-            <label className="block text-[13px] font-medium text-stone-600">
-              <span>Area</span>
-              <select
-                name="areaId"
-                required
-                defaultValue=""
-                className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700"
-              >
-                <option value="" disabled>Choose an area</option>
-                {result.areas.map((area) => (
-                  <option key={area.id} value={area.id}>{area.name}</option>
-                ))}
-              </select>
-            </label>
-          )}
+          <AreaPicker
+            areas={result.areas}
+            defaultAreaId={scopedArea?.id}
+            lockedAreaId={scopedArea?.id}
+          />
           <label className="block text-[13px] font-medium text-stone-600">
             <span>Target date</span>
             <input type="date" name="targetDate" className="mt-1 h-10 w-full rounded-full border border-[#E2E6DF] bg-white px-3.5 text-sm outline-none transition focus:border-teal-700" />
@@ -114,8 +88,12 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
               <Plus size={14} /> Create project
             </button>
           </div>
+          {result.areas.length === 0 ? (
+            <p className="text-xs leading-relaxed text-[#6B7268]">
+              You can file this later, or <Link href="/areas/new" className="font-medium text-teal-700 hover:text-teal-800">create an area now</Link>.
+            </p>
+          ) : null}
         </form>
-      )}
     </div>
   );
 }

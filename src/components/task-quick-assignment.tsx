@@ -110,7 +110,7 @@ export function TaskQuickAssignment({
                 (candidate) => candidate.id === nextProjectId,
               );
               setProjectId(nextProjectId);
-              if (project) setAreaId(project.areaId);
+              if (project) setAreaId(project.areaId ?? "");
               setError(null);
             }}
             className="mt-1 h-11 w-full rounded-[12px] border border-[#D7DDD4] bg-white px-3 text-base text-stone-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20"

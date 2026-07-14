@@ -76,8 +76,8 @@ type DraggableTaskLinkProps = {
   projects?: Array<{
     id: string;
     name: string;
-    areaId: string;
-    areaName: string;
+    areaId: string | null;
+    areaName: string | null;
   }>;
   today: string;
   tomorrow: string;
@@ -628,7 +628,7 @@ function ScheduleMenu({
                   <option value="">No project</option>
                   {filteredProjects.map((project) => (
                     <option key={project.id} value={project.id}>
-                      {project.name} / {project.areaName}
+                      {project.name} / {project.areaName ?? "No area yet"}
                     </option>
                   ))}
                 </select>

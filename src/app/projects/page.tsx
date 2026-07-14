@@ -18,6 +18,7 @@ import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
 import { projectLastActivityFact } from "@/lib/slippage";
+import { buildAreaTree, type AreaTreeNode } from "@/lib/hierarchy";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,8 @@ export default async function ProjectsPage() {
 }
 
 function AreaShelves({ areas }: { areas: AreaListItem[] }) {
+  const areasById = new Map(areas.map((area) => [area.id, area]));
+  const tree = buildAreaTree(areas);
   return (
     <section className="space-y-4">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -87,11 +90,46 @@ function AreaShelves({ areas }: { areas: AreaListItem[] }) {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {areas.map((area) => <AreaCard key={area.id} area={area} />)}
+        <div className="space-y-3">
+          {tree.map((node) => (
+            <AreaTreeBranch key={node.id} node={node} areasById={areasById} depth={0} />
+          ))}
         </div>
       )}
     </section>
+  );
+}
+
+function AreaTreeBranch({
+  node,
+  areasById,
+  depth,
+}: {
+  node: AreaTreeNode;
+  areasById: Map<string, AreaListItem>;
+  depth: number;
+}) {
+  const area = areasById.get(node.id);
+  if (!area) return null;
+  const visualDepth = Math.min(depth, 3);
+
+  return (
+    <div style={{ paddingInlineStart: `${visualDepth * 12}px` }}>
+      <AreaCard area={area} />
+      {node.children.length > 0 ? (
+        <details open className="group mt-1">
+          <summary className="flex h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-[#7B8278] [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="transition group-open:rotate-90">›</span>
+            {node.children.length} subarea{node.children.length === 1 ? "" : "s"}
+          </summary>
+          <div className="space-y-3 border-l border-[#DDE2DA] pl-1">
+            {node.children.map((child) => (
+              <AreaTreeBranch key={child.id} node={child} areasById={areasById} depth={depth + 1} />
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -183,7 +221,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
           className="-m-1 min-w-0 flex-1 rounded-[10px] p-1 transition hover:bg-[#F7F9F5]"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-            {project.area.name}
+            {project.area?.name ?? "No area yet"}
           </p>
           <h2
             className={`mt-1 text-[17px] font-medium leading-[1.3] ${
@@ -267,7 +305,7 @@ function ProjectCard({ project }: { project: ProjectListItem }) {
 }
 
 type ProjectListItem = Project & {
-  area: Area;
+  area: Area | null;
   tasks: Array<
     Pick<Task, "title" | "status" | "dueDate" | "completedAt" | "createdAt">
   >;

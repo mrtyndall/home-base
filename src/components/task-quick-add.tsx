@@ -16,8 +16,8 @@ type SavedTask = {
 export type QuickAddProject = {
   id: string;
   name: string;
-  areaId: string;
-  areaName: string;
+  areaId: string | null;
+  areaName: string | null;
 };
 
 export type QuickAddAreaGroup = {
@@ -196,7 +196,7 @@ export function TaskQuickAdd({
                   <option
                     key={project.id}
                     value={project.name}
-                    label={`${project.areaName} / ${project.name}`}
+                    label={`${project.areaName ?? "No area yet"} / ${project.name}`}
                   />
                 ))}
               </datalist>
@@ -215,7 +215,7 @@ export function TaskQuickAdd({
             </div>
             {selectedProject ? (
               <p className="text-xs text-[#9AA096] sm:col-start-2">
-                Filing to {selectedProject.areaName} / {selectedProject.name}
+                Filing to {selectedProject.areaName ?? "No area yet"} / {selectedProject.name}
               </p>
             ) : null}
           </div>

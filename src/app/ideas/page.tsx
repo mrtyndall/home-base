@@ -201,7 +201,7 @@ function IdeaCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-              {idea.project?.area.name ?? idea.area?.name ?? "Inbox"}
+              {idea.project?.area?.name ?? idea.area?.name ?? "Inbox"}
               {" / "}
               {idea.project?.name ?? idea.area?.name ?? idea.status}
             </p>

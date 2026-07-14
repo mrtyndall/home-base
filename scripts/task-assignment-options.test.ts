@@ -9,6 +9,13 @@ const duplicateProject = {
   areaName: "Work",
 };
 
+const unfiledProject = {
+  id: "project-2",
+  name: "Loose plan",
+  areaId: null,
+  areaName: null,
+};
+
 assert.equal(
   assignmentProjectLabel(duplicateProject, ""),
   "Planning — Work",
@@ -19,6 +26,11 @@ assert.equal(
   "Planning",
   "Once an Area scopes the picker, the redundant Area suffix should disappear.",
 );
+assert.equal(
+  assignmentProjectLabel(unfiledProject, ""),
+  "Loose plan — No area yet",
+  "An unfiled Project must stay available and explain its filing state.",
+);
 
 const detailSource = fs.readFileSync("src/app/tasks/[taskId]/page.tsx", "utf8");
 const assignmentRouteSource = fs.readFileSync(
@@ -27,8 +39,8 @@ const assignmentRouteSource = fs.readFileSync(
 );
 assert.match(
   detailSource,
-  /area:\s*\{\s*is:\s*\{\s*status:\s*"active",\s*isSystem:\s*false\s*\}\s*\}/,
-  "Quick filing must fetch Projects only through active, non-system Areas.",
+  /OR:\s*\[\s*\{\s*areaId:\s*null\s*\},\s*\{\s*area:\s*\{\s*is:\s*\{\s*status:\s*"active",\s*isSystem:\s*false/,
+  "Quick filing must include unfiled Projects alongside Projects in eligible Areas.",
 );
 assert.match(
   detailSource,

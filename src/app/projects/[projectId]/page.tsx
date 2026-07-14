@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, Plus } from "lucide-react";
-import { addProjectTask, updateProjectTimeframe } from "@/app/actions";
+import { addProjectTask, updateProjectArea, updateProjectTimeframe } from "@/app/actions";
+import { AreaPicker } from "@/components/area-picker";
 import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { CheckInFeed } from "@/components/check-in-feed";
@@ -17,6 +18,7 @@ import { formatDateOnly, formatShortDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { loadReferenceMentions } from "@/lib/reference-mentions";
 import { formatRecurrenceRule } from "@/lib/recurrence";
+import { flattenAreaOptions } from "@/lib/hierarchy";
 
 export const dynamic = "force-dynamic";
 
@@ -51,27 +53,24 @@ export default async function ProjectDetailPage({
   ).length;
   const milestoneTotal = project.milestones.length;
   const latestCheckIn = project.checkIns[0] ?? null;
+  const projectPath = project.areaId
+    ? flattenAreaOptions(project.allAreas).find((option) => option.id === project.areaId)?.path ?? project.area?.name
+    : null;
 
   return (
     <div className="space-y-6">
       <header className="space-y-3 border-b border-[#DDE2DA] pb-5">
-        <Link
-          href="/projects"
-          className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
-        >
-          <ArrowLeft size={15} />
-          Areas
-        </Link>
+        <nav aria-label="Project path" className="flex min-h-11 flex-wrap items-center gap-1.5 text-sm text-stone-500">
+          <Link href="/projects" className="inline-flex h-11 items-center gap-2 font-medium transition hover:text-stone-950"><ArrowLeft size={15} />Areas</Link>
+          <span aria-hidden="true" className="text-[#B0B6AD]">/</span>
+          {project.area ? <Link href={`/areas/${project.area.id}`} className="py-2 transition hover:text-teal-700">{projectPath}</Link> : <span className="py-2">No area yet</span>}
+          <span aria-hidden="true" className="text-[#B0B6AD]">/</span>
+          <span aria-current="page" className="min-w-0 truncate py-2 text-stone-700">{project.name}</span>
+        </nav>
         <div className="flex items-start justify-between gap-5">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-              <Link
-                href={`/areas/${project.area.id}`}
-                className="transition hover:text-teal-700"
-              >
-                {project.area.name}
-              </Link>
-              {" · Project"}
+              {projectPath ?? "No area yet"} · Project
             </p>
             <h1 className="mt-1.5 font-serif text-[26px] font-medium leading-[1.2] tracking-[-0.01em] text-stone-950 lg:text-[32px]">
               {project.name}
@@ -111,6 +110,17 @@ export default async function ProjectDetailPage({
           </div>
         </div>
       </header>
+
+      <details className="rounded-[14px] border border-[#E2E6DF] bg-white">
+        <summary className="flex h-11 cursor-pointer list-none items-center justify-between px-3.5 text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
+          Project area <span className="text-[#9AA096]">{projectPath ?? "No area yet"}</span>
+        </summary>
+        <form action={updateProjectArea} className="space-y-3 border-t border-[#EEF1EC] p-3.5">
+          <input type="hidden" name="projectId" value={project.id} />
+          <AreaPicker areas={project.allAreas} defaultAreaId={project.areaId} />
+          <div className="flex justify-end"><button type="submit" className="h-11 rounded-full bg-teal-700 px-5 text-sm font-medium text-white transition hover:bg-teal-800">Save area</button></div>
+        </form>
+      </details>
 
       <CheckInFeed
         parentType="project"
@@ -213,7 +223,7 @@ function ProjectTasksSection({ project }: { project: LoadedProject }) {
                 </p>
                 <p className="mt-0.5 text-xs text-[#6B7268]">
                   {[
-                    project.area.name,
+                    project.area?.name ?? "No area yet",
                     task.dueDate ? formatDateOnly(task.dueDate) : null,
                     task.recurrenceRule
                       ? formatRecurrenceRule(task.recurrenceRule)
@@ -351,7 +361,7 @@ async function loadProject(projectId: string) {
       },
     });
 
-    const [notes, docs, attachments, checkIns] = project
+    const [notes, docs, attachments, checkIns, allAreas] = project
       ? await Promise.all([
           prisma.entityNote.findMany({
             where: { parentType: "project", parentId: project.id },
@@ -377,8 +387,12 @@ async function loadProject(projectId: string) {
             orderBy: { createdAt: "desc" },
             take: 15,
           }),
+          prisma.area.findMany({
+            where: { status: "active", isSystem: false },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          }),
         ])
-      : [[], [], [], []];
+      : [[], [], [], [], []];
 
     const noteMentions =
       project && notes.length > 0
@@ -400,6 +414,7 @@ async function loadProject(projectId: string) {
             docs,
             attachments,
             checkIns,
+            allAreas,
           }
         : null,
     };

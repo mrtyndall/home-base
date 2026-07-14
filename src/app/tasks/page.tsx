@@ -64,7 +64,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     .filter(
       (item) =>
         selectedDomainIds.length === 0 ||
-        selectedDomainIds.includes(item.areaId),
+        Boolean(item.areaId && selectedDomainIds.includes(item.areaId)),
     )
     .map((item) => item.id);
   const selectedProjectIds = normalizeFilterValues(project, allowedProjectIds);
@@ -124,7 +124,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     id: project.id,
     name: project.name,
     areaId: project.areaId,
-    areaName: project.area.name,
+    areaName: project.area?.name ?? null,
   }));
 
   return (
@@ -477,7 +477,7 @@ function TaskFilters({
   view,
 }: {
   domains: Area[];
-  projects: Array<Project & { area: Area }>;
+  projects: Array<Project & { area: Area | null }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   projectSearch: string;
@@ -576,7 +576,7 @@ function ProjectFilter({
   starredOnly,
   view,
 }: {
-  projects: Array<Project & { area: Area }>;
+  projects: Array<Project & { area: Area | null }>;
   selectedDomainIds: string[];
   selectedProjectIds: string[];
   projectSearch: string;
@@ -588,10 +588,10 @@ function ProjectFilter({
   const visibleProjects = projects.filter((project) => {
     const inDomain =
       selectedDomainIds.length === 0 ||
-      selectedDomainIds.includes(project.areaId);
+      Boolean(project.areaId && selectedDomainIds.includes(project.areaId));
     if (!inDomain) return false;
     if (!normalizedSearch) return true;
-    return [project.name, project.area.name]
+    return [project.name, project.area?.name ?? "No area yet"]
       .join(" ")
       .toLowerCase()
       .includes(normalizedSearch);
@@ -1027,8 +1027,8 @@ type TaskAreaGroup = {
 type TaskProjectOption = {
   id: string;
   name: string;
-  areaId: string;
-  areaName: string;
+  areaId: string | null;
+  areaName: string | null;
 };
 
 function formatTaskDetail(task: TaskListItem, slipDays: number) {

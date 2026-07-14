@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { createCompatibleArea } from "@/lib/area-compat";
+import { assertValidAreaParent, fileProject } from "@/lib/hierarchy";
 import { resolveVerifiedDestination } from "@/lib/destinations";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
@@ -871,18 +872,20 @@ export async function createProject(formData: FormData) {
   const areaId = getTrimmedString(formData, "areaId");
   const targetDate = getTrimmedString(formData, "targetDate");
   const startMode = getTrimmedString(formData, "startMode");
-  if (!name || !areaId) return;
+  if (!name) return;
 
-  const area = await prisma.area.findFirst({
-    where: { id: areaId, status: "active", isSystem: false },
-    select: { id: true },
-  });
-  if (!area) return;
+  const area = areaId
+    ? await prisma.area.findFirst({
+        where: { id: areaId, status: "active", isSystem: false },
+        select: { id: true },
+      })
+    : null;
+  if (areaId && !area) return;
 
   const project = await prisma.project.create({
     data: {
       name,
-      areaId: area.id,
+      areaId: area?.id ?? null,
       status: startMode === "someday" ? "someday" : "active",
       targetDate: targetDate ? dateOnlyFromString(targetDate) : null,
       activity: {
@@ -912,14 +915,72 @@ export async function createProject(formData: FormData) {
 
 export async function createArea(formData: FormData) {
   const name = getTrimmedString(formData, "name");
+  const parentAreaId = getTrimmedString(formData, "parentAreaId") || null;
   if (!name) return;
 
-  const area = await prisma.$transaction((transaction) =>
-    createCompatibleArea(transaction, { name }),
-  );
+  const area = await prisma.$transaction(async (transaction) => {
+    if (parentAreaId) {
+      const parent = await transaction.area.findFirst({
+        where: { id: parentAreaId, status: "active", isSystem: false },
+        select: { id: true },
+      });
+      if (!parent) throw new Error("Parent Area not found.");
+    }
+    return createCompatibleArea(transaction, { name, parentAreaId });
+  });
 
   revalidatePath("/projects");
   redirect(`/areas/${area.id}`);
+}
+
+export async function updateAreaParent(formData: FormData) {
+  const areaId = getTrimmedString(formData, "areaId");
+  const parentAreaId = getTrimmedString(formData, "parentAreaId") || null;
+  if (!areaId) return;
+
+  const previous = await prisma.area.findUnique({
+    where: { id: areaId },
+    select: { parentAreaId: true },
+  });
+  if (!previous) return;
+
+  await prisma.$transaction(async (transaction) => {
+    if (parentAreaId) {
+      const parent = await transaction.area.findFirst({
+        where: { id: parentAreaId, status: "active", isSystem: false },
+        select: { id: true },
+      });
+      if (!parent) throw new Error("Parent Area not found.");
+    }
+    await assertValidAreaParent(areaId, parentAreaId, transaction);
+    await transaction.area.update({ where: { id: areaId }, data: { parentAreaId } });
+  });
+
+  revalidatePath("/projects");
+  revalidatePath("/areas/inbox");
+  revalidatePath(`/areas/${areaId}`);
+  if (previous.parentAreaId) revalidatePath(`/areas/${previous.parentAreaId}`);
+  if (parentAreaId) revalidatePath(`/areas/${parentAreaId}`);
+}
+
+export async function updateProjectArea(formData: FormData) {
+  const projectId = getTrimmedString(formData, "projectId");
+  const areaId = getTrimmedString(formData, "areaId") || null;
+  if (!projectId) return;
+
+  const previous = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { areaId: true },
+  });
+  if (!previous) return;
+
+  await fileProject(projectId, areaId);
+  revalidatePath("/");
+  revalidatePath("/projects");
+  revalidatePath("/areas/inbox");
+  revalidatePath(`/projects/${projectId}`);
+  if (previous.areaId) revalidatePath(`/areas/${previous.areaId}`);
+  if (areaId) revalidatePath(`/areas/${areaId}`);
 }
 
 export async function updateProjectState(formData: FormData) {

@@ -390,7 +390,7 @@ async function toolProject(projectMatch: string) {
     href: `/projects/${project.id}`,
     name: project.name,
     status: project.status,
-    area: project.area.name,
+    area: project.area?.name ?? null,
     target_date: project.targetDate?.toISOString().slice(0, 10) ?? null,
     milestones: project.milestones.map((milestone) => ({
       title: milestone.title,

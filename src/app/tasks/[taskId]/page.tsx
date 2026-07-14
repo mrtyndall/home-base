@@ -105,7 +105,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
             id,
             name,
             areaId,
-            areaName: area.name,
+            areaName: area?.name ?? null,
           }))}
         />
       ) : null}
@@ -411,7 +411,10 @@ async function loadTaskDetail(taskId: string) {
         ? prisma.project.findMany({
             where: {
               status: { in: ["active", "parked", "someday"] },
-              area: { is: { status: "active", isSystem: false } },
+              OR: [
+                { areaId: null },
+                { area: { is: { status: "active", isSystem: false } } },
+              ],
             },
             select: {
               id: true,

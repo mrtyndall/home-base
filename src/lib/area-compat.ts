@@ -13,6 +13,7 @@ type CompatibleAreaInput = {
   isSystem?: boolean;
   currentState?: string | null;
   nextStep?: string | null;
+  parentAreaId?: string | null;
 };
 
 type CompatibleArea = {
@@ -47,7 +48,7 @@ export async function createCompatibleArea(
   const sortOrder = input.sortOrder ?? null;
   const rows = await client.$queryRaw<CompatibleArea[]>(Prisma.sql`
     INSERT INTO areas
-      (id, name, domain_id, status, current_state, next_step, sort_order, is_system, created_at, updated_at)
+      (id, name, domain_id, status, current_state, next_step, sort_order, is_system, parent_area_id, created_at, updated_at)
     VALUES
       (
         ${input.id ?? randomUUID()},
@@ -58,6 +59,7 @@ export async function createCompatibleArea(
         ${input.nextStep ?? null},
         COALESCE(${sortOrder}, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM areas)),
         ${input.isSystem ?? false},
+        ${input.parentAreaId ?? null},
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
       )

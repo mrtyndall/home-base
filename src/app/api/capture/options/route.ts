@@ -33,7 +33,7 @@ export async function GET() {
       id: project.id,
       name: project.name,
       areaId: project.areaId,
-      areaName: project.area.name,
+      areaName: project.area?.name ?? null,
     })),
   });
 }
