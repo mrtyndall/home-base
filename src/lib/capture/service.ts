@@ -9,6 +9,7 @@ import { createPersonRecord, findPersonByMatch } from "@/lib/people";
 import { syncReferenceMentions } from "@/lib/reference-mentions";
 import { completeRoutineByMatch } from "@/lib/routines";
 import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
+import { resolveVerifiedDestination } from "@/lib/destinations";
 import {
   captureInputSchema,
   type CaptureConfirmation,
@@ -18,16 +19,9 @@ import {
   type ParserAction,
 } from "@/lib/capture/types";
 
-type DomainContext = {
-  id: string;
-  name: string;
-  areas: AreaContext[];
-};
-
 type AreaContext = {
   id: string;
   name: string;
-  domain: string;
   status: string;
 };
 
@@ -35,8 +29,6 @@ type ExecutionContext = {
   captureId: string;
   rawText: string;
   captureSource: CaptureInput["source"];
-  inboxAreaId: string;
-  domains: DomainContext[];
   areas: AreaContext[];
   actor: { source: "capture" | "api"; label?: string };
   writeSource: string;
@@ -45,16 +37,45 @@ type ExecutionContext = {
 
 export async function submitCapture(
   input: CaptureInput,
+  trustedActor?: { apiKeyLabel: string },
 ): Promise<CaptureConfirmation> {
   const parsedInput = captureInputSchema.parse(input);
 
-  const capture = await prisma.capture.create({
-    data: {
+  const capture = parsedInput.idempotencyKey
+    ? await prisma.capture.upsert({
+        where: { id: parsedInput.idempotencyKey },
+        update: {},
+        create: {
+          id: parsedInput.idempotencyKey,
+          rawText: parsedInput.rawText,
+          source: parsedInput.source,
+          deviceContext: parsedInput.deviceContext as Prisma.InputJsonValue,
+        },
+      })
+    : await prisma.capture.create({ data: {
       rawText: parsedInput.rawText,
       source: parsedInput.source,
       deviceContext: parsedInput.deviceContext as Prisma.InputJsonValue,
-    },
-  });
+    } });
+
+  if (
+    capture.rawText !== parsedInput.rawText ||
+    capture.source !== parsedInput.source
+  ) {
+    throw new Error("Idempotency key was already used for a different capture.");
+  }
+
+  if (capture.parseStatus) {
+    return {
+      captureId: capture.id,
+      status: capture.parseStatus,
+      message: buildConfirmationMessage(
+        capture.parseStatus,
+        (capture.createdItems as CreatedItemRef[] | null) ?? [],
+      ),
+      createdItems: (capture.createdItems as CreatedItemRef[] | null) ?? [],
+    };
+  }
 
   let actions: ParserAction[] = [];
   let status: CaptureParseStatus = "parsed";
@@ -78,10 +99,8 @@ export async function submitCapture(
       captureId: capture.id,
       rawText: parsedInput.rawText,
       captureSource: parsedInput.source,
-      inboxAreaId: await getInboxAreaId(),
-      domains: parserContext.domains,
       areas: parserContext.areas,
-      ...buildActorContext(parsedInput),
+      ...buildActorContext(parsedInput, trustedActor),
     };
 
     if (status === "parsed" && executableActions.length > 0) {
@@ -102,10 +121,8 @@ export async function submitCapture(
       captureId: capture.id,
       rawText: parsedInput.rawText,
       captureSource: parsedInput.source,
-      inboxAreaId: await getInboxAreaId(),
-      domains: [],
       areas: [],
-      ...buildActorContext(parsedInput),
+      ...buildActorContext(parsedInput, trustedActor),
     });
   }
 
@@ -127,23 +144,15 @@ export async function submitCapture(
 }
 
 async function buildParserContext(source: string) {
-  const [domains, projects, recentIdeas] = await Promise.all([
-    prisma.domain.findMany({
-      where: { active: true, isSystem: false },
+  const [areas, projects, recentIdeas] = await Promise.all([
+    prisma.area.findMany({
+      where: { status: { in: ["active", "parked"] } },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        areas: {
-          where: { status: { in: ["active", "parked"] } },
-          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          select: { id: true, name: true, status: true },
-        },
-      },
+      select: { id: true, name: true, status: true },
     }),
     prisma.project.findMany({
       where: { status: { in: ["active", "someday", "parked"] } },
-      include: { area: { include: { domain: { select: { name: true } } } } },
+      include: { area: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.idea.findMany({
@@ -158,23 +167,10 @@ async function buildParserContext(source: string) {
     }),
   ]);
 
-  const domainContext = domains.map((domain) => ({
-    id: domain.id,
-    name: domain.name,
-    areas: domain.areas.map((area) => ({
-      id: area.id,
-      name: area.name,
-      domain: domain.name,
-      status: area.status,
-    })),
-  }));
-  const areas = domainContext.flatMap((domain) => domain.areas);
-
   return {
     now: new Date().toISOString(),
     timezone: "America/New_York" as const,
     source,
-    domains: domainContext,
     areas,
     projects: projects.map((project) => ({
       id: project.id,
@@ -190,7 +186,10 @@ function isExecutableAction(action: ParserAction): action is ExecutableAction {
   return "type" in action;
 }
 
-function buildActorContext(input: CaptureInput) {
+function buildActorContext(
+  input: CaptureInput,
+  trustedActor?: { apiKeyLabel: string },
+) {
   if (input.source !== "api") {
     return {
       actor: { source: "capture" as const },
@@ -199,11 +198,10 @@ function buildActorContext(input: CaptureInput) {
     };
   }
 
-  const label =
-    isRecord(input.deviceContext) &&
-    typeof input.deviceContext.apiKeyLabel === "string"
-      ? input.deviceContext.apiKeyLabel
-      : undefined;
+  if (!trustedActor) {
+    throw new Error("API capture audit identity must be server-verified.");
+  }
+  const label = trustedActor.apiKeyLabel;
 
   return {
     actor: { source: "api" as const, label },
@@ -259,46 +257,6 @@ function actionsFromCaptureIntent(input: CaptureInput): ParserAction[] {
     case "auto":
       return [];
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-async function getInboxAreaId() {
-  const systemDomain = await prisma.domain.upsert({
-    where: { name: "System" },
-    update: { active: false, isSystem: true },
-    create: {
-      name: "System",
-      description: "Hidden system grouping for the Inbox area.",
-      sortOrder: 0,
-      isSystem: true,
-      active: false,
-    },
-  });
-
-  const inbox = await prisma.area.upsert({
-    where: { id: "area_inbox" },
-    update: {
-      name: "Inbox",
-      domainId: systemDomain.id,
-      isSystem: true,
-      status: "active",
-    },
-    create: {
-      id: "area_inbox",
-      name: "Inbox",
-      domainId: systemDomain.id,
-      isSystem: true,
-      status: "active",
-      currentState:
-        "System catch-all for quick-add and genuinely ambiguous captures.",
-      nextStep: "Route items when the right area becomes clear.",
-    },
-  });
-
-  return inbox.id;
 }
 
 async function executeActions(
@@ -480,8 +438,11 @@ async function createTask(
   const project = await resolveProject(action.project_id, action.project_match);
   const areaId =
     project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context)) ??
-    context.inboxAreaId;
+    (await resolveAreaId(action.area_id, action.area_match, context));
+  const destination = await resolveVerifiedDestination({
+    areaId,
+    projectId: project?.id,
+  });
 
   const task = await prisma.task.create({
     data: {
@@ -491,8 +452,8 @@ async function createTask(
       dueTime: action.due_time,
       priority: action.priority,
       reminderOffsets: action.reminder_offsets as Prisma.InputJsonValue,
-      areaId,
-      projectId: project?.id,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
       someday: action.someday ?? false,
       starred: action.starred ?? false,
       source: context.writeSource,
@@ -504,7 +465,7 @@ async function createTask(
   return {
     type: "task" as const,
     id: task.id,
-    label: `Task added to ${task.project?.name ?? task.area.name}`,
+    label: `Task added to ${task.project?.name ?? task.area?.name ?? "Inbox"}`,
   };
 }
 
@@ -512,19 +473,12 @@ async function createArea(
   action: Extract<ExecutableAction, { type: "create_area" }>,
   context: ExecutionContext,
 ) {
-  const domain = matchDomain(action.domain_match, context.domains);
-  if (!domain) {
-    throw new Error(`No domain matched "${action.domain_match}".`);
-  }
-
   const area = await prisma.area.create({
     data: {
       name: action.name,
-      domainId: domain.id,
       currentState: "Created from capture. Current state needs detail.",
       nextStep: "Define the next physical step.",
     },
-    include: { domain: true },
   });
 
   const note = await prisma.entityNote.create({
@@ -540,7 +494,7 @@ async function createArea(
   return {
     type: "area" as const,
     id: area.id,
-    label: `Area in ${area.domain.name}: ${area.name}`,
+    label: `Area created: ${area.name}`,
     noteId: note.id,
   };
 }
@@ -629,8 +583,11 @@ async function createProject(
   action: Extract<ExecutableAction, { type: "create_project" }>,
   context: ExecutionContext,
 ) {
-  const areaId =
-    matchAreaId(action.area_match, context.areas) ?? context.inboxAreaId;
+  const areaId = matchAreaId(action.area_match, context.areas);
+  if (!areaId) {
+    throw new Error("Project captures require an Area.");
+  }
+  await resolveVerifiedDestination({ areaId });
 
   const project = await prisma.project.create({
     data: {
@@ -765,15 +722,18 @@ async function createIdea(
   const project = await resolveProject(action.project_id, action.project_match);
   const areaId =
     project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context)) ??
-    context.inboxAreaId;
+    (await resolveAreaId(action.area_id, action.area_match, context));
+  const destination = await resolveVerifiedDestination({
+    areaId,
+    projectId: project?.id,
+  });
   const idea = await prisma.idea.create({
     data: {
       title: action.title,
       body: action.body,
       tags: action.tags ?? [],
-      areaId,
-      projectId: project?.id,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
       source: context.writeSource,
       captureId: context.captureId,
     },
@@ -892,15 +852,18 @@ async function createReference(
   const project = await resolveProject(action.project_id, action.project_match);
   const areaId =
     project?.areaId ??
-    (await resolveAreaId(action.area_id, action.area_match, context)) ??
-    context.inboxAreaId;
+    (await resolveAreaId(action.area_id, action.area_match, context));
+  const destination = await resolveVerifiedDestination({
+    areaId,
+    projectId: project?.id,
+  });
   const reference = await prisma.reference.create({
     data: {
       body: action.body,
       url: action.url,
       tags: action.tags ?? [],
-      areaId,
-      projectId: project?.id,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
       relatedType: action.related_match ? "unknown" : undefined,
       relatedId: action.related_match,
       source: context.writeSource,
@@ -932,8 +895,8 @@ async function createEntityNote(
 
   const note = await prisma.entityNote.create({
     data: {
-      parentType: parent.type,
-      parentId: parent.id,
+      parentType: parent?.type ?? null,
+      parentId: parent?.id ?? null,
       bodyMd: action.body_md,
       source: context.writeSource,
       captureId: context.captureId,
@@ -944,7 +907,7 @@ async function createEntityNote(
   return {
     type: "entity_note" as const,
     id: note.id,
-    label: `Note added to ${parent.label}`,
+    label: `Note added to ${parent?.label ?? "Inbox"}`,
   };
 }
 
@@ -963,8 +926,8 @@ async function createEntityDoc(
 
   const doc = await prisma.entityDoc.create({
     data: {
-      parentType: parent.type,
-      parentId: parent.id,
+      parentType: parent?.type ?? null,
+      parentId: parent?.id ?? null,
       title: action.title,
       bodyMd: action.body_md,
       source: context.writeSource,
@@ -975,20 +938,8 @@ async function createEntityDoc(
   return {
     type: "entity_doc" as const,
     id: doc.id,
-    label: `Doc added to ${parent.label}: ${doc.title}`,
+    label: `Doc added to ${parent?.label ?? "Inbox"}: ${doc.title}`,
   };
-}
-
-function matchDomain(
-  domainMatch: string | undefined,
-  domains: DomainContext[],
-) {
-  if (!domainMatch) {
-    return undefined;
-  }
-
-  const normalized = normalizeMatch(domainMatch);
-  return domains.find((domain) => normalizeMatch(domain.name) === normalized);
 }
 
 function matchAreaId(areaMatch: string | undefined, areas: AreaContext[]) {
@@ -1281,14 +1232,14 @@ async function executeCheckIn(
 }
 
 async function resolveEntityParent(
-  parentType: "area" | "project",
+  parentType: "area" | "project" | undefined,
   areaId: string | undefined,
   areaMatch: string | undefined,
   projectId: string | undefined,
   projectMatch: string | undefined,
   context: ExecutionContext,
 ) {
-  if (parentType === "project") {
+  if (parentType === "project" || projectId || projectMatch) {
     const project = await resolveProject(projectId, projectMatch);
     if (!project) {
       throw new Error("Project note/doc requires a valid project.");
@@ -1297,9 +1248,7 @@ async function resolveEntityParent(
     return { type: "project" as const, id: project.id, label: project.name };
   }
 
-  if (!areaId && !areaMatch) {
-    return { type: "area" as const, id: context.inboxAreaId, label: "Inbox" };
-  }
+  if (!areaId && !areaMatch) return null;
 
   const resolvedAreaId = await resolveAreaId(areaId, areaMatch, context);
   if (!resolvedAreaId) {

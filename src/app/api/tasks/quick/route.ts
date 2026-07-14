@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { dateOnlyFromString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { createTaskWithDefaultArea } from "@/lib/tasks";
+import { createTask } from "@/lib/tasks";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       })
     : null;
 
-  const task = await createTaskWithDefaultArea(
+  const task = await createTask(
     { title, dueDate, areaId: project?.areaId ?? area?.id, projectId: project?.id },
     { source: "manual" },
   );
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     task: {
       id: task.id,
       title: task.title,
-      areaName: task.area.name,
+      areaName: task.area?.name ?? null,
       projectName: task.project?.name ?? null,
       dueDate: task.dueDate?.toISOString().slice(0, 10) ?? null,
     },

@@ -367,7 +367,7 @@ async function toolProject(projectMatch: string) {
   const project = await prisma.project.findFirst({
     where: { name: { contains: projectMatch, mode: "insensitive" } },
     include: {
-      area: { include: { domain: true } },
+      area: true,
       milestones: { orderBy: { sortOrder: "asc" } },
       tasks: {
         where: { status: "open" },
@@ -390,7 +390,6 @@ async function toolProject(projectMatch: string) {
     href: `/projects/${project.id}`,
     name: project.name,
     status: project.status,
-    domain: project.area.domain.name,
     area: project.area.name,
     target_date: project.targetDate?.toISOString().slice(0, 10) ?? null,
     milestones: project.milestones.map((milestone) => ({
@@ -427,7 +426,7 @@ async function toolTasks(dueThroughToday: boolean, limit: number) {
       title: task.title,
       due: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
       starred: task.starred,
-      area: task.area.name,
+      area: task.area?.name ?? null,
       project: task.project?.name ?? null,
       href: `/tasks/${task.id}`,
     })),

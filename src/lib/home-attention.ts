@@ -19,17 +19,17 @@ export function getHomeAttentionItems({
 
   if (pendingCaptureCount > 0) {
     items.push({
-      href: "/areas/area_inbox#pending-captures",
+      href: "/#pending-captures",
       label: `${pendingCaptureCount} capture${pendingCaptureCount === 1 ? "" : "s"} to sort`,
-      detail: "Inbox",
+      detail: "Captures",
     });
   }
 
   if (reviewDueCount > 0) {
     items.push({
-      href: "/areas/area_inbox#needs-review",
+      href: "/#needs-review",
       label: `${reviewDueCount} review${reviewDueCount === 1 ? "" : "s"} waiting`,
-      detail: "Inbox",
+      detail: "Reviews",
     });
   }
 

@@ -52,7 +52,7 @@ export async function createCaptureReviewProposals({
       data: {
         captureId: capture.id,
         suggestedType: suggestion.targetType,
-        suggestedAreaId: suggestion.areaId ?? "area_inbox",
+        suggestedAreaId: suggestion.areaId,
         reason: suggestion.reason ?? null,
         model,
       },
@@ -89,19 +89,11 @@ async function loadPendingCaptures(limit: number): Promise<CaptureForProposal[]>
 }
 
 async function loadRouterContext() {
-  const [domains, projects] = await Promise.all([
-    prisma.domain.findMany({
-      where: { active: true },
-      orderBy: [{ isSystem: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        areas: {
-          where: { status: "active" },
-          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-          select: { id: true, name: true },
-        },
-      },
+  const [areas, projects] = await Promise.all([
+    prisma.area.findMany({
+      where: { status: "active" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
     }),
     prisma.project.findMany({
       where: { status: { in: ["active", "someday", "parked"] } },
@@ -116,7 +108,7 @@ async function loadRouterContext() {
   ]);
 
   return {
-    domains,
+    areas,
     projects,
     targetTypes,
   };
@@ -138,7 +130,7 @@ Use task only for clear action intent. Use idea for possibilities and "idea:" th
 Use note for facts, details, status, observations, and durable context.
 Use reference for links, recommendations, books, movies, products, resources, or facts from outside sources.
 Use null when the text is too vague or context-free.
-Prefer an existing area by id. If no area clearly matches, use area_inbox.
+Prefer an existing area by id. If no area clearly matches, use null.
 Never create projects here. Never invent missing facts.`,
     messages: [
       {
@@ -166,9 +158,7 @@ function validAreaId(
   context: Awaited<ReturnType<typeof loadRouterContext>>,
 ) {
   if (!areaId) return false;
-  return context.domains.some((domain) =>
-    domain.areas.some((area) => area.id === areaId),
-  );
+  return context.areas.some((area) => area.id === areaId);
 }
 
 function effectiveCaptureText(capture: CaptureForProposal) {

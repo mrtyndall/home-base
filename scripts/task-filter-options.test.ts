@@ -5,23 +5,23 @@ const projects = [
   {
     id: "project_ham",
     name: "Antenna build",
-    area: { domainId: "domain_hobbies", domain: { name: "Hobbies" } },
+    area: { id: "area_ham", name: "Ham Radio" },
   },
   {
     id: "project_home",
     name: "Garage shelves",
-    area: { domainId: "domain_home", domain: { name: "Home" } },
+    area: { id: "area_home", name: "Home" },
   },
   {
     id: "project_radio",
     name: "Radio desk",
-    area: { domainId: "domain_hobbies", domain: { name: "Hobbies" } },
+    area: { id: "area_ham", name: "Ham Radio" },
   },
 ];
 
-assert.deepEqual(buildProjectFilterGroups(projects, "domain_hobbies"), [
+assert.deepEqual(buildProjectFilterGroups(projects, "area_ham"), [
   {
-    domainName: "Hobbies",
+    areaName: "Ham Radio",
     projects: [
       { id: "project_ham", name: "Antenna build" },
       { id: "project_radio", name: "Radio desk" },
@@ -31,14 +31,14 @@ assert.deepEqual(buildProjectFilterGroups(projects, "domain_hobbies"), [
 
 assert.deepEqual(buildProjectFilterGroups(projects, ""), [
   {
-    domainName: "Hobbies",
+    areaName: "Ham Radio",
     projects: [
       { id: "project_ham", name: "Antenna build" },
       { id: "project_radio", name: "Radio desk" },
     ],
   },
   {
-    domainName: "Home",
+    areaName: "Home",
     projects: [{ id: "project_home", name: "Garage shelves" }],
   },
 ]);

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { resolveVerifiedDestination } from "@/lib/destinations";
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -13,8 +14,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     projectId?: unknown;
   } | null;
 
-  const areaId = typeof body?.areaId === "string" ? body.areaId : "";
-  const projectId = typeof body?.projectId === "string" ? body.projectId : "";
+  let areaId = typeof body?.areaId === "string" ? body.areaId : null;
+  const projectId = typeof body?.projectId === "string" ? body.projectId : null;
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
@@ -36,22 +37,22 @@ export async function PATCH(request: Request, context: RouteContext) {
         select: { id: true, areaId: true },
       })
     : null;
-  const area = !project
-    ? await prisma.area.findFirst({
-        where: { id: areaId || "area_inbox", status: "active" },
-        select: { id: true },
-      })
-    : null;
-
-  if (!project && !area) {
-    return NextResponse.json({ error: "Area or project not found." }, { status: 404 });
+  if (project) areaId = project.areaId;
+  let destination;
+  try {
+    destination = await resolveVerifiedDestination({ areaId, projectId });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Destination not found." },
+      { status: 404 },
+    );
   }
 
   const updated = await prisma.task.update({
     where: { id: task.id },
     data: {
-      areaId: project?.areaId ?? area!.id,
-      projectId: project?.id ?? null,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
     },
   });
 

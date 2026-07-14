@@ -5,11 +5,7 @@ type ParserContext = {
   now: string;
   timezone: "America/New_York";
   source: string;
-  domains: Array<{
-    id: string;
-    name: string;
-    areas: Array<{ id: string; name: string; status: string }>;
-  }>;
+  areas: Array<{ id: string; name: string; status: string }>;
   projects: Array<{
     id: string;
     name: string;
@@ -25,7 +21,7 @@ Each action is an object whose "type" field names the action, plus that action's
 { "type": "create_task", "title": "...", "area_match": "...", "due_date": "..." }
 { "type": "create_entity_note", "parent_type": "area", "area_match": "...", "body_md": "..." }
 { "type": "check_in", "project_match": "...", "body_md": "..." }
-create_entity_note and create_entity_doc require parent_type set to "area" or "project".
+create_entity_note and create_entity_doc may omit parent_type to create unfiled content.
 Use these action types:
 - create_task
 - complete_task
@@ -53,8 +49,7 @@ Use these action types:
 
 Rules:
 - Multiple actions per capture are common.
-- Hierarchy is Domains -> Areas -> Projects -> Tasks.
-- Domains are category headers only. Tasks attach to an area or project, never directly to a domain.
+- Hierarchy is Areas -> Projects -> Tasks.
 - Areas are ongoing responsibilities and information canvases with no finish line. They are the default home for facts, details, references, observations, durable context, and loose notes.
 - Projects are finite pushes inside areas. Create or route to a project only when the capture clearly names a bounded outcome, deliverable, end state, deadline, time gate, milestone path, or temporary focused effort.
 - Do not create a project merely because the capture contains a noun, topic, tool, hobby, device, or research thread. If it is ongoing context, create an area note/reference/check-in instead.
@@ -62,7 +57,7 @@ Rules:
 - If it can be completed or delivered, it may be a project. If Matt would still be responsible for it a year from now, route it as an area.
 - Use area_match, project_match, task_match, and idea_match as fuzzy names from context.
 - If the named container matches a known project from context, use project_match, never area_match. Only use area_match for known areas.
-- If the user gives no area or project, omit area_match and project_match so the server can place it in the Inbox area.
+- If the user gives no area or project, omit area_match and project_match so eligible content remains unfiled.
 - Capture classifies, never coerces. Do not manufacture a task from non-task input.
 - Clear action intent ("do", "buy", "call", "fix", "schedule", "renew") creates a task.
 - A thought, opinion, or possibility ("what if", "I wonder", "idea:") creates an idea.
@@ -252,7 +247,6 @@ function fallbackParse(rawText: string): ParserAction[] {
       {
         type: "create_area",
         name: areaMatch[1].trim(),
-        domain_match: areaMatch[2]?.trim() ?? "Hobbies",
       },
     ];
   }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const captureInputSchema = z.object({
+  idempotencyKey: z.string().uuid().optional(),
   rawText: z.string().trim().min(1).max(10_000),
   source: z
     .enum(["in_app_text", "in_app_voice", "ios_shortcut", "android_shortcut", "api"])
@@ -50,7 +51,6 @@ const starTaskAction = z.object({
 const createAreaAction = z.object({
   type: z.literal("create_area"),
   name: z.string().min(1),
-  domain_match: z.string().min(1),
 });
 
 const updateAreaStateAction = z.object({
@@ -203,7 +203,7 @@ const checkInAction = z.object({
 
 const createEntityNoteAction = z.object({
   type: z.literal("create_entity_note"),
-  parent_type: z.enum(["area", "project"]),
+  parent_type: z.enum(["area", "project"]).optional(),
   area_id: z.string().optional(),
   area_match: z.string().optional(),
   project_id: z.string().optional(),
@@ -213,7 +213,7 @@ const createEntityNoteAction = z.object({
 
 const createEntityDocAction = z.object({
   type: z.literal("create_entity_doc"),
-  parent_type: z.enum(["area", "project"]),
+  parent_type: z.enum(["area", "project"]).optional(),
   area_id: z.string().optional(),
   area_match: z.string().optional(),
   project_id: z.string().optional(),

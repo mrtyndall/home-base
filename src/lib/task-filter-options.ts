@@ -2,33 +2,31 @@ type ProjectFilterSource = {
   id: string;
   name: string;
   area: {
-    domainId: string;
-    domain: {
-      name: string;
-    };
+    id: string;
+    name: string;
   };
 };
 
 type ProjectFilterGroup = {
-  domainName: string;
+  areaName: string;
   projects: Array<{ id: string; name: string }>;
 };
 
 export function buildProjectFilterGroups(
   projects: ProjectFilterSource[],
-  selectedDomainId: string | undefined,
+  selectedAreaId: string | undefined,
 ): ProjectFilterGroup[] {
   const groups = new Map<string, ProjectFilterGroup>();
 
   for (const project of projects) {
-    if (selectedDomainId && project.area.domainId !== selectedDomainId) {
+    if (selectedAreaId && project.area.id !== selectedAreaId) {
       continue;
     }
 
-    const domainName = project.area.domain.name;
-    const group = groups.get(domainName) ?? { domainName, projects: [] };
+    const areaName = project.area.name;
+    const group = groups.get(areaName) ?? { areaName, projects: [] };
     group.projects.push({ id: project.id, name: project.name });
-    groups.set(domainName, group);
+    groups.set(areaName, group);
   }
 
   return Array.from(groups.values());

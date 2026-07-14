@@ -3,6 +3,7 @@ import { RRule } from "rrule";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { APP_TIMEZONE } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { resolveVerifiedDestination } from "@/lib/destinations";
 
 export type WriteActor = {
   source: "manual" | "capture" | "api" | "scheduler";
@@ -15,7 +16,7 @@ export type CreateTaskInput = {
   dueDate?: Date | null;
   dueTime?: string | null;
   priority?: string | null;
-  areaId: string;
+  areaId?: string | null;
   projectId?: string | null;
   parentTaskId?: string | null;
   someday?: boolean | null;
@@ -25,31 +26,18 @@ export type CreateTaskInput = {
   captureId?: string | null;
 };
 
-export type CreateTaskWithDefaultAreaInput = Omit<
-  CreateTaskInput,
-  "areaId"
-> & {
-  areaId?: string | null;
-};
-
-export async function createTaskWithDefaultArea(
-  input: CreateTaskWithDefaultAreaInput,
+export async function createTask(
+  input: CreateTaskInput,
   actor: WriteActor,
 ) {
-  const areaId = input.areaId ?? (await getDefaultAreaId());
-  if (!areaId) {
-    throw new Error("No active area is available for task creation.");
-  }
-
-  return createTaskWithAudit({ ...input, areaId }, actor);
+  return createTaskWithAudit(input, actor);
 }
-
-export const createTaskWithDefaultDomain = createTaskWithDefaultArea;
 
 export async function createTaskWithAudit(
   input: CreateTaskInput,
   actor: WriteActor,
 ) {
+  const destination = await resolveVerifiedDestination(input);
   const task = await prisma.task.create({
     data: {
       title: input.title,
@@ -57,8 +45,8 @@ export async function createTaskWithAudit(
       dueDate: input.dueDate ?? undefined,
       dueTime: input.dueTime ?? undefined,
       priority: input.priority ?? undefined,
-      areaId: input.areaId,
-      projectId: input.projectId ?? undefined,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
       parentTaskId: input.parentTaskId ?? undefined,
       someday: input.someday ?? undefined,
       recurrenceRule: input.recurrenceRule ?? undefined,
@@ -228,24 +216,6 @@ function getNextRecurrenceDue(task: Task) {
       `${formatInTimeZone(next, APP_TIMEZONE, "yyyy-MM-dd")}T00:00:00.000Z`,
     ),
   };
-}
-
-async function getDefaultAreaId() {
-  const inbox = await prisma.area.findUnique({
-    where: { id: "area_inbox" },
-    select: { id: true, status: true },
-  });
-  if (inbox?.status === "active") {
-    return inbox.id;
-  }
-
-  const fallback = await prisma.area.findFirst({
-    where: { status: "active" },
-    orderBy: { sortOrder: "asc" },
-    select: { id: true },
-  });
-
-  return fallback?.id ?? null;
 }
 
 export function getTaskDueDateTime(

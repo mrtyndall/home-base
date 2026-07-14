@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { resolveVerifiedDestination } from "@/lib/destinations";
 import { syncBookLoreSnippetsForReference } from "@/lib/booklore-snippets";
 import type { CreatedItemRef } from "@/lib/capture/types";
 import { dateOnlyFromString } from "@/lib/dates";
@@ -12,8 +13,8 @@ import { syncReferenceMentions } from "@/lib/reference-mentions";
 import { completeRoutineById, undoRoutineCompletionById } from "@/lib/routines";
 import {
   completeTaskById,
+  createTask,
   createTaskWithAudit,
-  createTaskWithDefaultArea,
 } from "@/lib/tasks";
 
 export async function completeRoutine(formData: FormData) {
@@ -116,7 +117,7 @@ export async function createQuickTask(formData: FormData) {
         })
       : null;
 
-  await createTaskWithDefaultArea(
+  await createTask(
     {
       title,
       dueDate: dueDateValue ? dateOnlyFromString(dueDateValue) : null,
@@ -140,15 +141,13 @@ export async function updateTaskDetail(formData: FormData) {
   });
   if (!task) return;
 
-  const areaId = getTrimmedString(formData, "areaId");
-  if (!areaId) return;
+  const areaId = getTrimmedString(formData, "areaId") || null;
 
   const projectId = getTrimmedString(formData, "projectId");
   const validProject = projectId
     ? await prisma.project.findFirst({
         where: {
           id: projectId,
-          areaId,
           status: { in: ["active", "parked", "someday"] },
         },
         select: { id: true, areaId: true },
@@ -165,14 +164,18 @@ export async function updateTaskDetail(formData: FormData) {
     getTrimmedString(formData, "reminderOffsets"),
   );
 
+  const destination = await resolveVerifiedDestination({
+    areaId: validProject?.areaId ?? areaId,
+    projectId: validProject?.id,
+  });
   const updated = await prisma.task.update({
     where: { id: taskId },
     data: {
       dueDate: dueDate ? dateOnlyFromString(dueDate) : null,
       dueTime: dueTime || null,
       priority: priority || null,
-      areaId: validProject?.areaId ?? areaId,
-      projectId: validProject?.id ?? null,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
       notes: notes || null,
       tags,
       recurrenceRule: recurrenceRule || null,
@@ -1028,25 +1031,23 @@ export async function addEntityNote(formData: FormData) {
   const parentType = getTrimmedString(formData, "parentType");
   const parentId = getTrimmedString(formData, "parentId");
   const bodyMd = getTrimmedString(formData, "bodyMd");
-  if (
-    (parentType !== "area" && parentType !== "project") ||
-    !parentId ||
-    !bodyMd
-  ) {
-    return;
-  }
+  if (!bodyMd) return;
+  const parent = await resolveFormParent(parentType, parentId);
+  if (!parent) return;
 
   const note = await prisma.entityNote.create({
     data: {
-      parentType,
-      parentId,
+      parentType: parent.parentType,
+      parentId: parent.parentId,
       bodyMd,
       source: "manual",
     },
   });
   await syncReferenceMentions("entity_note", note.id, bodyMd);
 
-  revalidateEntityParent(parentType, parentId);
+  if (parent.parentType && parent.parentId) {
+    revalidateEntityParent(parent.parentType, parent.parentId);
+  }
 }
 
 export async function updateEntityNote(formData: FormData) {
@@ -1075,7 +1076,9 @@ export async function updateEntityNote(formData: FormData) {
     },
   });
 
-  revalidateEntityParent(note.parentType, note.parentId);
+  if (note.parentType && note.parentId) {
+    revalidateEntityParent(note.parentType, note.parentId);
+  }
 }
 
 async function getEffectiveCaptureText(captureId: string, rawText: string) {
@@ -1115,7 +1118,6 @@ export async function updateCaptureText(formData: FormData) {
     },
   });
 
-  revalidatePath("/areas/area_inbox");
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/search");
@@ -1152,20 +1154,18 @@ export async function dismissCapture(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/projects");
-  revalidatePath("/areas/area_inbox");
   revalidatePath("/search");
   revalidatePath(`/captures/${capture.id}`);
 }
 
 export async function convertPendingCapture(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
-  const areaId = getTrimmedString(formData, "areaId");
+  const areaId = getTrimmedString(formData, "areaId") || null;
   const targetType = getTrimmedString(formData, "targetType");
   const reviewId = getTrimmedString(formData, "reviewId");
   const proposalId = getTrimmedString(formData, "proposalId");
   if (
     !captureId ||
-    !areaId ||
     (targetType !== "task" &&
       targetType !== "idea" &&
       targetType !== "note" &&
@@ -1176,12 +1176,16 @@ export async function convertPendingCapture(formData: FormData) {
 
   const [capture, area] = await Promise.all([
     prisma.capture.findUnique({ where: { id: captureId } }),
-    prisma.area.findFirst({
-      where: { id: areaId, status: "active" },
-      include: { domain: true },
-    }),
+    areaId
+      ? prisma.area.findFirst({ where: { id: areaId, status: "active" } })
+      : Promise.resolve(null),
   ]);
-  if (!capture || !area) return;
+  if (!capture || (areaId && !area)) return;
+  const existingItems = normalizeCreatedItems(capture.createdItems);
+  const alreadyConverted = existingItems.find(
+    (existing) => existing.type !== "pending_capture" && existing.type !== "notification",
+  );
+  if (alreadyConverted) return;
   const captureText = await getEffectiveCaptureText(
     capture.id,
     capture.rawText,
@@ -1192,29 +1196,29 @@ export async function convertPendingCapture(formData: FormData) {
     const task = await createTaskWithAudit(
       {
         title: captureText,
-        areaId: area.id,
+        areaId: area?.id,
         captureId: capture.id,
         source: "manual",
       },
       { source: "manual" },
     );
-    item = { type: "task", id: task.id, label: `Task added to ${area.name}` };
+    item = { type: "task", id: task.id, label: `Task added to ${area?.name ?? "Inbox"}` };
   } else if (targetType === "idea") {
     const idea = await prisma.idea.create({
       data: {
         title: captureText,
         body: captureText,
-        areaId: area.id,
+        areaId: area?.id,
         source: "manual",
         captureId: capture.id,
       },
     });
-    item = { type: "idea", id: idea.id, label: `Idea saved to ${area.name}` };
+    item = { type: "idea", id: idea.id, label: `Idea saved to ${area?.name ?? "Inbox"}` };
   } else if (targetType === "note") {
     const note = await prisma.entityNote.create({
       data: {
-        parentType: "area",
-        parentId: area.id,
+        parentType: area ? "area" : null,
+        parentId: area?.id ?? null,
         bodyMd: captureText,
         source: "manual",
         captureId: capture.id,
@@ -1223,14 +1227,14 @@ export async function convertPendingCapture(formData: FormData) {
     item = {
       type: "entity_note",
       id: note.id,
-      label: `Note added to ${area.name}`,
+      label: `Note added to ${area?.name ?? "Inbox"}`,
     };
     await syncReferenceMentions("entity_note", note.id, captureText);
   } else {
     const reference = await prisma.reference.create({
       data: {
         body: captureText,
-        areaId: area.id,
+        areaId: area?.id,
         source: "manual",
         captureId: capture.id,
       },
@@ -1238,12 +1242,11 @@ export async function convertPendingCapture(formData: FormData) {
     item = {
       type: "reference",
       id: reference.id,
-      label: `Reference saved to ${area.name}`,
+      label: `Reference saved to ${area?.name ?? "Inbox"}`,
     };
     await syncReferenceMentions("reference", reference.id, captureText);
   }
 
-  const existingItems = normalizeCreatedItems(capture.createdItems);
   await prisma.capture.update({
     where: { id: capture.id },
     data: {
@@ -1332,8 +1335,7 @@ export async function convertPendingCapture(formData: FormData) {
   revalidatePath("/today");
   revalidatePath("/search");
   revalidatePath(`/captures/${capture.id}`);
-  revalidatePath(`/areas/${area.id}`);
-  revalidatePath("/areas/area_inbox");
+  if (area) revalidatePath(`/areas/${area.id}`);
 }
 
 export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {
@@ -1364,7 +1366,6 @@ export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/areas/area_inbox");
   revalidatePath(`/captures/${proposal.captureId}`);
 }
 
@@ -1393,7 +1394,6 @@ export async function dismissCaptureReviewProposal(formData: FormData) {
   });
 
   revalidatePath("/");
-  revalidatePath("/areas/area_inbox");
   revalidatePath(`/captures/${proposal.captureId}`);
 }
 
@@ -1402,40 +1402,32 @@ export async function createEntityDoc(formData: FormData) {
   const parentId = getTrimmedString(formData, "parentId");
   const title = getTrimmedString(formData, "title");
   const bodyMd = getTrimmedString(formData, "bodyMd");
-  if (
-    (parentType !== "area" && parentType !== "project") ||
-    !parentId ||
-    !title ||
-    !bodyMd
-  ) {
-    return;
-  }
+  if (!title || !bodyMd) return;
+  const parent = await resolveFormParent(parentType, parentId);
+  if (!parent) return;
 
   await prisma.entityDoc.create({
     data: {
-      parentType,
-      parentId,
+      parentType: parent.parentType,
+      parentId: parent.parentId,
       title,
       bodyMd,
       source: "manual",
     },
   });
 
-  revalidateEntityParent(parentType, parentId);
+  if (parent.parentType && parent.parentId) {
+    revalidateEntityParent(parent.parentType, parent.parentId);
+  }
 }
 
 export async function importEntityDocMarkdown(formData: FormData) {
   const parentType = getTrimmedString(formData, "parentType");
   const parentId = getTrimmedString(formData, "parentId");
   const file = formData.get("markdownFile");
-  if (
-    (parentType !== "area" && parentType !== "project") ||
-    !parentId ||
-    !(file instanceof File) ||
-    file.size === 0
-  ) {
-    return;
-  }
+  if (!(file instanceof File) || file.size === 0) return;
+  const parent = await resolveFormParent(parentType, parentId);
+  if (!parent) return;
 
   const bodyMd = await file.text();
   const fallbackTitle = file.name.replace(/\.(md|markdown|txt)$/i, "").trim();
@@ -1444,15 +1436,17 @@ export async function importEntityDocMarkdown(formData: FormData) {
 
   await prisma.entityDoc.create({
     data: {
-      parentType,
-      parentId,
+      parentType: parent.parentType,
+      parentId: parent.parentId,
       title,
       bodyMd,
       source: "manual",
     },
   });
 
-  revalidateEntityParent(parentType, parentId);
+  if (parent.parentType && parent.parentId) {
+    revalidateEntityParent(parent.parentType, parent.parentId);
+  }
 }
 
 export async function updateEntityDoc(formData: FormData) {
@@ -1466,7 +1460,9 @@ export async function updateEntityDoc(formData: FormData) {
     data: { title, bodyMd },
   });
 
-  revalidateEntityParent(doc.parentType, doc.parentId);
+  if (doc.parentType && doc.parentId) {
+    revalidateEntityParent(doc.parentType, doc.parentId);
+  }
 }
 
 export async function archiveEntityDoc(formData: FormData) {
@@ -1478,7 +1474,9 @@ export async function archiveEntityDoc(formData: FormData) {
     data: { status: "archived" },
   });
 
-  revalidateEntityParent(doc.parentType, doc.parentId);
+  if (doc.parentType && doc.parentId) {
+    revalidateEntityParent(doc.parentType, doc.parentId);
+  }
 }
 
 export async function addMilestone(formData: FormData) {
@@ -1583,27 +1581,24 @@ function revalidateEntityParent(parentType: EntityParentType, parentId: string) 
   }
 }
 
-export async function updateDomainDescription(formData: FormData) {
-  const domainId = getTrimmedString(formData, "domainId");
-  if (!domainId) return;
-
-  const description = getTrimmedString(formData, "description");
-  const domain = await prisma.domain.update({
-    where: { id: domainId },
-    data: { description: description || null },
-  });
-
-  await prisma.notification.create({
-    data: {
-      type: "domain_updated",
-      title: "Domain description updated",
-      body: domain.name,
-      sourceRef: { type: "domain", id: domain.id, source: "manual" },
-    },
-  });
-
-  revalidatePath(`/domains/${domainId}`);
-  redirect(`/domains/${domainId}`);
+async function resolveFormParent(parentType: string, parentId: string) {
+  if (!parentType && !parentId) {
+    return { parentType: null, parentId: null };
+  }
+  if (parentType === "area" && parentId) {
+    const destination = await resolveVerifiedDestination({ areaId: parentId });
+    return { parentType: "area" as const, parentId: destination.areaId };
+  }
+  if (parentType === "project" && parentId) {
+    const project = await prisma.project.findUnique({
+      where: { id: parentId },
+      select: { areaId: true },
+    });
+    if (!project) return null;
+    await resolveVerifiedDestination({ areaId: project.areaId, projectId: parentId });
+    return { parentType: "project" as const, parentId };
+  }
+  return null;
 }
 
 export async function parkArea(formData: FormData) {

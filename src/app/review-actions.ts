@@ -43,7 +43,7 @@ async function settleReview(reviewId: string, status: "done" | "dismissed") {
     },
   });
 
-  revalidatePath("/areas/area_inbox");
+  revalidatePath("/");
 }
 
 export async function markReviewDone(formData: FormData) {
@@ -73,7 +73,7 @@ export async function snoozeReview(formData: FormData) {
     },
   });
 
-  revalidatePath("/areas/area_inbox");
+  revalidatePath("/");
 }
 
 export async function snoozeReviewOneDay(formData: FormData) {
@@ -101,5 +101,5 @@ export async function snoozeReviewOneDay(formData: FormData) {
     },
   });
 
-  revalidatePath("/areas/area_inbox");
+  revalidatePath("/");
 }
