@@ -1,0 +1,9 @@
+{
+  "name": "home-base-codex-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@openai/codex-sdk": "0.144.4",
+    "zod": "4.4.3"
+  }
+}

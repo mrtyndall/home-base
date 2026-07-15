@@ -175,6 +175,7 @@ export default async function TodayPage() {
               <RecentCapturesStrip
                 captures={data.recentCaptures}
                 areas={data.areas}
+                projects={data.destinationProjects}
               />
               <div className="space-y-2.5">
                 <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/55 p-3">
@@ -265,9 +266,11 @@ type RecentCapture = Capture;
 function RecentCapturesStrip({
   captures,
   areas,
+  projects,
 }: {
   captures: RecentCapture[];
   areas: Area[];
+  projects: Array<{ id: string; name: string; areaId: string | null }>;
 }) {
   const actionableCaptures = selectActionableCaptures(captures);
 
@@ -307,6 +310,7 @@ function RecentCapturesStrip({
               <CaptureFileActions
                 captureId={capture.id}
                 areas={areas}
+                projects={projects}
                 align="right"
               />
             </div>

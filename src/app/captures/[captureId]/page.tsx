@@ -25,7 +25,7 @@ export default async function CapturePage({ params }: CapturePageProps) {
     return <SetupNotice reason="DATABASE_URL is not configured." />;
   }
 
-  const [capture, areas] = await Promise.all([
+  const [capture, areas, projects] = await Promise.all([
     prisma.capture.findUnique({
       where: { id: captureId },
       include: {
@@ -39,6 +39,12 @@ export default async function CapturePage({ params }: CapturePageProps) {
     prisma.area.findMany({
       where: { status: "active", isSystem: false },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.project.findMany({
+      where: { status: { in: ["active", "parked", "someday"] } },
+      select: { id: true, name: true, areaId: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
     }),
   ]);
 
@@ -102,6 +108,7 @@ export default async function CapturePage({ params }: CapturePageProps) {
             <CaptureFileActions
               captureId={capture.id}
               areas={areas}
+              projects={projects}
               align="right"
               label="File as..."
             />

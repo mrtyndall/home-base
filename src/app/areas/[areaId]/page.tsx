@@ -182,6 +182,19 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
   const total = data.totalCount;
   const activeAreas = data.areas.filter((area) => area.status === "active");
   const selectableAreaIds = activeAreas.map((area) => area.id);
+  const destinationProjects = Array.from(
+    new Map(
+      [
+        ...data.destinationProjects,
+        ...data.reviewProposals.flatMap((proposal) =>
+          proposal.suggestedProject ? [proposal.suggestedProject] : [],
+        ),
+      ].map((project) => [
+        project.id,
+        { id: project.id, name: project.name, areaId: project.areaId },
+      ]),
+    ).values(),
+  );
   return (
     <div className="space-y-6">
       <header className="space-y-2 border-b border-[#DDE2DA] pb-5">
@@ -198,9 +211,25 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
               {data.reviewProposals.map((proposal) => (
                 <div key={proposal.id} className="space-y-2 p-4">
                   <EditableCaptureText capture={proposal.capture} />
-                  <p className="rounded-[10px] bg-[#F2FAF7] px-3 py-2 text-[13px] text-stone-700">Suggested: {proposal.suggestedType ?? "Review"}{proposal.suggestedArea ? ` into ${proposal.suggestedArea.name}` : " in Inbox"}</p>
+                  <p className="rounded-[10px] bg-[#F2FAF7] px-3 py-2 text-[13px] text-stone-700">
+                    Suggested: {proposal.suggestedType ?? "Review"}
+                    {proposal.suggestedProject
+                      ? ` into ${proposal.suggestedProject.name}`
+                      : proposal.suggestedArea
+                        ? ` into ${proposal.suggestedArea.name}`
+                        : " in Global / Inbox"}
+                  </p>
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={proposal.captureId} proposalId={proposal.id} areas={activeAreas} label="File as…" defaultAreaId={proposal.suggestedArea?.id ?? ""} />
+                    <CaptureFileActions
+                      captureId={proposal.captureId}
+                      proposalId={proposal.id}
+                      areas={activeAreas}
+                      projects={destinationProjects}
+                      label="File as…"
+                      defaultAreaId={proposal.suggestedArea?.id ?? ""}
+                      defaultProjectId={proposal.suggestedProject?.id ?? ""}
+                      defaultType={proposal.suggestedType}
+                    />
                     <form action={snoozeCaptureReviewProposalOneDay}><input type="hidden" name="proposalId" value={proposal.id} /><SmallAction>Snooze 1 day</SmallAction></form>
                     <form action={dismissCaptureReviewProposal}><input type="hidden" name="proposalId" value={proposal.id} /><SmallAction>Dismiss</SmallAction></form>
                   </div>
@@ -210,7 +239,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                 <div key={review.id} className="space-y-2 p-4">
                   <EditableCaptureText capture={review.capture} />
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={review.captureId} reviewId={review.id} areas={activeAreas} label="File as…" />
+                    <CaptureFileActions captureId={review.captureId} reviewId={review.id} areas={activeAreas} projects={destinationProjects} label="File as…" />
                     <form action={snoozeReviewOneDay}><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Snooze 1 day</SmallAction></form>
                     <form action={markReviewDone}><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Done</SmallAction></form>
                     <form action={dismissReview} aria-label="Archive capture"><input type="hidden" name="reviewId" value={review.id} /><SmallAction>Archive</SmallAction></form>
@@ -225,7 +254,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                 <div key={capture.id} className="space-y-2 p-4">
                   <EditableCaptureText capture={capture} />
                   <div className="flex flex-wrap gap-1.5">
-                    <CaptureFileActions captureId={capture.id} areas={activeAreas} label="File as…" />
+                    <CaptureFileActions captureId={capture.id} areas={activeAreas} projects={destinationProjects} label="File as…" />
                     <form action={dismissCapture}><input type="hidden" name="captureId" value={capture.id} /><SmallAction>Dismiss</SmallAction></form>
                   </div>
                 </div>

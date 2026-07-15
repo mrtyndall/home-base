@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+worker/dist
+coverage
+backups
+.data
+.env*
+*.dump
+*.log
+.DS_Store

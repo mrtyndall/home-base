@@ -8,6 +8,7 @@
     "test:read-later-postgres": "tsx scripts/read-later-postgres.integration.ts",
     "test:hierarchy-postgres": "tsx scripts/hierarchy-postgres.integration.ts",
     "test:task-completion-postgres": "tsx scripts/task-completion-postgres.integration.ts",
+    "test:agent-queue-postgres": "tsx scripts/agent-queue-postgres.integration.ts",
     "build": "prisma generate && next build && npm run build:standalone-assets",
     "build:standalone-assets": "rm -rf .next/standalone/.next/static .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static && cp -R public .next/standalone/public",
     "start": "prisma migrate deploy && DOTENV_CONFIG_PATH=.env.local HOSTNAME=0.0.0.0 PORT=${PORT:-3002} node -r dotenv/config .next/standalone/server.js",
@@ -28,6 +29,8 @@
     "reminders:send": "tsx scripts/send-reminders.ts",
     "api:key:register": "tsx scripts/register-api-key.ts",
     "mcp:http": "tsx mcp/http-server.ts",
+    "worker:build": "tsc -p worker/tsconfig.json",
+    "worker:test": "tsx --test scripts/codex-worker-contracts.test.ts scripts/codex-worker-runtime.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -35,6 +38,7 @@
     "@aws-sdk/client-s3": "^3.1079.0",
     "@aws-sdk/s3-request-presigner": "^3.1079.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openai/codex-sdk": "0.144.4",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "csv-parse": "^7.0.1",

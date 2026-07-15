@@ -162,6 +162,41 @@ enum MilestoneStatus {
   completed
 }
 
+enum AgentWorkerRole {
+  sorter
+  assistant
+}
+
+enum AgentJobKind {
+  capture_sort
+  assistant_turn
+}
+
+enum AgentJobStatus {
+  queued
+  leased
+  retry_wait
+  succeeded
+  dead_letter
+}
+
+enum ChatMessageRole {
+  user
+  assistant
+}
+
+enum ChatMessageStatus {
+  pending
+  completed
+  failed
+}
+
+enum CaptureRoutingFeedbackOutcome {
+  accepted
+  corrected
+  dismissed
+}
+
 model Capture {
   id            String              @id @default(uuid())
   rawText       String              @map("raw_text")
@@ -188,6 +223,8 @@ model Capture {
   projectActivity    ProjectActivity[]
   references         Reference[]
   tasks              Task[]
+  agentJobs          AgentJob[]
+  routingFeedback    CaptureRoutingFeedback[]
 
   @@index([createdAt])
   @@index([parseStatus])
@@ -250,12 +287,13 @@ model Project {
   killedAt          DateTime?     @map("killed_at")
   createdAt         DateTime      @default(now()) @map("created_at")
 
-  area       Area?             @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  activity   ProjectActivity[]
-  ideas      Idea[]
-  references Reference[]
-  milestones Milestone[]
-  tasks      Task[]
+  area            Area?                   @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  activity        ProjectActivity[]
+  ideas           Idea[]
+  references      Reference[]
+  milestones      Milestone[]
+  tasks           Task[]
+  reviewProposals CaptureReviewProposal[]
 
   @@index([areaId, status])
   @@index([targetDate])
@@ -446,11 +484,11 @@ model EntityNote {
   id         String            @id @default(uuid())
   parentType EntityParentType? @map("parent_type")
   parentId   String?           @map("parent_id")
-  bodyMd     String           @map("body_md")
+  bodyMd     String            @map("body_md")
   source     String?
-  captureId  String?          @map("capture_id")
-  starredAt  DateTime?        @map("starred_at")
-  createdAt  DateTime         @default(now()) @map("created_at")
+  captureId  String?           @map("capture_id")
+  starredAt  DateTime?         @map("starred_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
 
@@ -571,24 +609,116 @@ model ScheduledReview {
 }
 
 model CaptureReviewProposal {
-  id              String                      @id @default(uuid())
-  captureId       String                      @map("capture_id")
-  status          CaptureReviewProposalStatus @default(pending)
-  suggestedType   String                      @map("suggested_type")
-  suggestedAreaId String?                     @map("suggested_area_id")
-  reason          String?
-  model           String?
-  snoozedUntil    DateTime?                   @map("snoozed_until")
-  createdAt       DateTime                    @default(now()) @map("created_at")
-  resolvedAt      DateTime?                   @map("resolved_at")
+  id                 String                      @id @default(uuid())
+  captureId          String                      @map("capture_id")
+  status             CaptureReviewProposalStatus @default(pending)
+  suggestedType      String                      @map("suggested_type")
+  suggestedAreaId    String?                     @map("suggested_area_id")
+  suggestedProjectId String?                     @map("suggested_project_id")
+  reason             String?
+  confidence         Float?
+  model              String?
+  promptVersion      String?                     @map("prompt_version")
+  agentJobId         String?                     @unique @map("agent_job_id")
+  snoozedUntil       DateTime?                   @map("snoozed_until")
+  createdAt          DateTime                    @default(now()) @map("created_at")
+  resolvedAt         DateTime?                   @map("resolved_at")
 
-  capture       Capture @relation(fields: [captureId], references: [id])
-  suggestedArea Area?   @relation(fields: [suggestedAreaId], references: [id])
+  capture          Capture                 @relation(fields: [captureId], references: [id])
+  suggestedArea    Area?                   @relation(fields: [suggestedAreaId], references: [id])
+  suggestedProject Project?                @relation(fields: [suggestedProjectId], references: [id])
+  agentJob         AgentJob?               @relation(fields: [agentJobId], references: [id])
+  routingFeedback  CaptureRoutingFeedback?
 
   @@index([status, snoozedUntil, createdAt])
   @@index([captureId, status])
   @@index([suggestedAreaId])
+  @@index([suggestedProjectId])
   @@map("capture_review_proposals")
+}
+
+model AgentJob {
+  id             String          @id @default(uuid())
+  role           AgentWorkerRole
+  kind           AgentJobKind
+  status         AgentJobStatus  @default(queued)
+  idempotencyKey String          @unique @map("idempotency_key")
+  payload        Json
+  result         Json?
+  error          String?
+  attempt        Int             @default(0)
+  maxAttempts    Int             @default(5) @map("max_attempts")
+  availableAt    DateTime        @default(now()) @map("available_at")
+  leaseOwner     String?         @map("lease_owner")
+  leaseTokenHash String?         @map("lease_token_hash")
+  leaseExpiresAt DateTime?       @map("lease_expires_at")
+  model          String?
+  promptVersion  String?         @map("prompt_version")
+  captureId      String?         @map("capture_id")
+  chatMessageId  String?         @unique @map("chat_message_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  completedAt    DateTime?       @map("completed_at")
+
+  capture        Capture?               @relation(fields: [captureId], references: [id])
+  chatMessage    ChatMessage?           @relation(fields: [chatMessageId], references: [id])
+  reviewProposal CaptureReviewProposal?
+
+  @@index([role, status, availableAt, createdAt])
+  @@index([captureId, kind, status])
+  @@map("agent_jobs")
+}
+
+model ChatThread {
+  id        String        @id @default(uuid())
+  title     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  messages  ChatMessage[]
+
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id        String            @id @default(uuid())
+  threadId  String            @map("thread_id")
+  sequence  Int
+  role      ChatMessageRole
+  status    ChatMessageStatus @default(completed)
+  content   String
+  error     String?
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  thread   ChatThread @relation(fields: [threadId], references: [id])
+  agentJob AgentJob?
+
+  @@unique([threadId, sequence])
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+model CaptureRoutingFeedback {
+  id                String                        @id @default(uuid())
+  captureId         String                        @map("capture_id")
+  proposalId        String?                       @unique @map("proposal_id")
+  outcome           CaptureRoutingFeedbackOutcome
+  effectiveText     String                        @map("effective_text")
+  effectiveTextHash String                        @map("effective_text_hash")
+  proposed          Json?
+  final             Json?
+  eligibleAsExample Boolean                       @default(false) @map("eligible_as_example")
+  reviewer          String                        @default("manual")
+  model             String?
+  promptVersion     String?                       @map("prompt_version")
+  createdAt         DateTime                      @default(now()) @map("created_at")
+
+  capture  Capture                @relation(fields: [captureId], references: [id])
+  proposal CaptureReviewProposal? @relation(fields: [proposalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([captureId, createdAt])
+  @@index([eligibleAsExample, createdAt])
+  @@map("capture_routing_feedback")
 }
 
 model ResurfacingSeen {
@@ -646,12 +776,12 @@ model EntityDoc {
   parentType EntityParentType? @map("parent_type")
   parentId   String?           @map("parent_id")
   title      String
-  bodyMd     String           @map("body_md")
-  status     EntityDocStatus  @default(active)
+  bodyMd     String            @map("body_md")
+  status     EntityDocStatus   @default(active)
   source     String?
-  captureId  String?          @map("capture_id")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  captureId  String?           @map("capture_id")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
 
   capture Capture? @relation(fields: [captureId], references: [id])
 
@@ -665,10 +795,10 @@ model Document {
   parentType EntityParentType? @map("parent_type")
   parentId   String?           @map("parent_id")
   filename   String
-  r2Key      String           @map("r2_key")
+  r2Key      String            @map("r2_key")
   mime       String
   size       Int
-  createdAt  DateTime         @default(now()) @map("created_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
 
   @@index([parentType, parentId])
   @@map("documents")

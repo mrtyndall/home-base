@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { enqueueUnresolvedCaptureJobs } from "@/lib/agent/sorter";
 
 const targetTypes = ["task", "idea", "note", "reference"] as const;
 
@@ -21,6 +22,17 @@ export async function createCaptureReviewProposals({
 }: {
   limit?: number;
 } = {}) {
+  if (process.env.HOME_BASE_CODEX_SORTER_ENABLED === "true") {
+    const queued = await enqueueUnresolvedCaptureJobs(limit);
+    return {
+      ok: true as const,
+      skipped: false,
+      provider: "codex_worker" as const,
+      queued,
+      created: 0,
+    };
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.ANTHROPIC_INBOX_ROUTER_MODEL;
   if (!apiKey || !model) {

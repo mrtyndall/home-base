@@ -11,10 +11,16 @@ export async function loadGlobalInboxPage(
   const skip = safePage * GLOBAL_INBOX_PAGE_SIZE;
   const take = GLOBAL_INBOX_PAGE_SIZE + 1;
   const today = dateOnlyFromString(localDateString());
-  const [areas, pendingCaptures, reviewProposals, reviews, tasks, projects, routines, ideas, references, notes, entityDocs, documents, totalCount] = await Promise.all([
+  const [areas, destinationProjects, pendingCaptures, reviewProposals, reviews, tasks, projects, routines, ideas, references, notes, entityDocs, documents, totalCount] = await Promise.all([
     client.area.findMany({
       where: { isSystem: false },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    client.project.findMany({
+      where: { status: { in: ["active", "parked", "someday"] } },
+      select: { id: true, name: true, areaId: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
     }),
     client.capture.findMany({
       where: {
@@ -32,6 +38,7 @@ export async function loadGlobalInboxPage(
       include: {
         capture: { select: { id: true, rawText: true, textEdits: { orderBy: { createdAt: "desc" }, take: 1, select: { text: true } } } },
         suggestedArea: true,
+        suggestedProject: true,
       },
       orderBy: { createdAt: "asc" },
       skip,
@@ -71,6 +78,7 @@ export async function loadGlobalInboxPage(
 
   return {
     areas,
+    destinationProjects,
     pendingCaptures: pageSlice(pendingCaptures),
     reviewProposals: pageSlice(reviewProposals),
     reviews: pageSlice(reviews),

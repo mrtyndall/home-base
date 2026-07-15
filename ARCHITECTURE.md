@@ -8,7 +8,8 @@ Home Base is a single-user personal operations system for tasks, calendar, areas
 - React 19 and Tailwind CSS 4
 - PostgreSQL on Railway as the canonical data store
 - Prisma 7 with `@prisma/adapter-pg`
-- Anthropic API for capture parsing
+- Anthropic API for primary capture parsing and fallback read-only chat
+- Isolated Codex workers for unresolved-capture proposals and read-only Home Base assistance
 - Pushover for reminder delivery
 - Google Calendar OAuth, encrypted refresh-token storage, 15-minute scheduled sync, and local calendar event storage
 - REST API plus streamable HTTP MCP server for agent access
@@ -88,6 +89,8 @@ The MCP server lives in `mcp/http-server.ts` and wraps the REST API over streama
 
 `scripts/verify-agent-integration.ts` is the live client boundary check. It accepts only exact, credential-free API/MCP routes on the reviewed loopback, Tailnet, and Railway origins; generic HTTPS requires the deliberately unsafe `HOME_BASE_UNSAFE_ALLOW_UNVERIFIED_HOST=1` escape hatch. It redacts bearer material from errors, verifies app/MCP health, initializes MCP, checks discovery, and calls a representative read from every documented read capability group. Writes are impossible unless `HOME_BASE_ENABLE_WRITE_SMOKE=1` and a dedicated environment-backed token are both present. The smoke uses a stable idempotency key with `captureIntent: preserve_only`, so capture writes the ledger/pending audit without model parsing. Its fixed-title task is created and completed serially, and cursor-paginated exact-title discovery before and after the write completes every open residue after ambiguous network responses. The complete current-host and 1Password-backed operator procedure is in `docs/hermes-home-base-integration.md`.
 
+The Codex worker boundary is separate from Hermes/MCP. `agent_jobs` provides role-isolated durable leases for a proposal-only sorter and read-only assistant. Both Railway workers use the same locked image with shell, unified exec, apps, plugins, multi-agent, web search, and command network access disabled. The Codex child receives only its authentication home and safe process basics; Home Base service credentials remain in the parent controller. A cached live model probe must succeed before a worker can claim work. Sorter output is validated into `capture_review_proposals`, while `capture_routing_feedback` learns only from explicit manual outcomes and retains the actual worker model. Chat history is canonical in `chat_threads` and `chat_messages`; the browser can submit only a new user turn. `HOME_BASE_CHAT_ENABLED` fails closed over both providers until the browser origin has its user access boundary, and terminal jobs atomically release pending turns. Each worker has one replica, its own `/data/codex` volume, and an independent ChatGPT login. Operational details are in `docs/codex-workers-railway.md`.
+
 ## Calendar Sync
 
 `calendar_sync_states` stores sync freshness and powers the Today screen stale-warning line. Sync is intentionally never triggered on page load. The local scheduler runs `scripts/sync-google-calendar.ts` every 15 minutes.
@@ -149,6 +152,7 @@ Future idea bucket: the system may later suggest notes that could be starred bas
 
 ### 2026-07-14
 
+- Added the durable Codex worker foundation: lossless pre-parse capture persistence, proposal-only unresolved-capture sorting, reviewed-example learning, canonical queued chat, a curated read-only assistant tool broker, role credentials, leases/retries/dead letters, and separate Railway worker images/volumes.
 - Added nested Areas through optional parent Areas and allowed Projects to remain unfiled. Shared hierarchy validation now protects UI, REST, MCP, and in-app chat paths; Project filing keeps Task, Idea, and Reference Area mirrors consistent.
 - Added the read-only hierarchy release gate with cycle/orphan/mirror checks and Book, Movie, Area, Project, and Reference preservation baselines.
 - Added the non-destructive Read Later Reference queue across Library, capture, search, REST, and MCP, with active normalized-URL deduplication, explicit status transitions, and strict release integrity checks.

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { Prisma, type EntityParentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { recordCaptureRoutingFeedback } from "@/lib/agent/sorter";
 import { createCompatibleArea } from "@/lib/area-compat";
 import { fileProject, updateAreaWithValidatedParent } from "@/lib/hierarchy";
 import { resolveVerifiedDestination } from "@/lib/destinations";
@@ -1303,6 +1304,14 @@ async function getEffectiveCaptureText(
   return latestEdit?.text ?? rawText;
 }
 
+async function lockCaptureReviewProposal(
+  client: Prisma.TransactionClient,
+  proposalId: string,
+) {
+  const lockKey = `capture-review-proposal:${proposalId}`;
+  await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+}
+
 export async function updateCaptureText(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
   const text = getTrimmedString(formData, "text");
@@ -1374,6 +1383,7 @@ export async function dismissCapture(formData: FormData) {
 export async function convertPendingCapture(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
   const areaId = getTrimmedString(formData, "areaId") || null;
+  const projectId = getTrimmedString(formData, "projectId") || null;
   const targetType = getTrimmedString(formData, "targetType");
   const reviewId = getTrimmedString(formData, "reviewId");
   const proposalId = getTrimmedString(formData, "proposalId");
@@ -1389,20 +1399,76 @@ export async function convertPendingCapture(formData: FormData) {
 
   const converted = await prisma.$transaction(async (client) => {
     await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${captureId}, 0))`;
-    const [capture, area] = await Promise.all([
-      client.capture.findUnique({ where: { id: captureId } }),
-      areaId
-        ? client.area.findFirst({ where: { id: areaId, status: "active" } })
+    if (proposalId) {
+      await lockCaptureReviewProposal(client, proposalId);
+    }
+    const capture = await client.capture.findUnique({ where: { id: captureId } });
+    if (!capture) return null;
+    let destination: Awaited<ReturnType<typeof resolveVerifiedDestination>>;
+    try {
+      destination = await resolveVerifiedDestination(
+        { areaId, projectId },
+        client,
+      );
+    } catch {
+      return null;
+    }
+    const [area, project] = await Promise.all([
+      destination.areaId
+        ? client.area.findUnique({
+            where: { id: destination.areaId },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve(null),
+      destination.projectId
+        ? client.project.findUnique({
+            where: { id: destination.projectId },
+            select: { id: true, name: true },
+          })
         : Promise.resolve(null),
     ]);
-    if (!capture || (areaId && !area)) return null;
-    await resolveVerifiedDestination({ areaId: area?.id ?? null }, client);
+    const destinationLabel = project?.name ?? area?.name ?? "Inbox";
     const existingItems = normalizeCreatedItems(capture.createdItems);
     const alreadyConverted = existingItems.find(
       (existing) =>
         existing.type !== "pending_capture" && existing.type !== "notification",
     );
-    if (alreadyConverted) return { captureId: capture.id, areaId: area?.id ?? null };
+    if (alreadyConverted) {
+      return {
+        captureId: capture.id,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+      };
+    }
+    const proposal = proposalId
+      ? await client.captureReviewProposal.findFirst({
+          where: {
+            id: proposalId,
+            captureId: capture.id,
+            status: { in: ["pending", "snoozed"] },
+          },
+          select: {
+            id: true,
+            suggestedType: true,
+            suggestedAreaId: true,
+            suggestedProjectId: true,
+            model: true,
+            promptVersion: true,
+          },
+        })
+      : null;
+    if (proposalId && !proposal) return null;
+    if (proposal) {
+      const acceptedProposal = await client.captureReviewProposal.updateMany({
+        where: {
+          id: proposal.id,
+          captureId: capture.id,
+          status: { in: ["pending", "snoozed"] },
+        },
+        data: { status: "accepted", resolvedAt: new Date() },
+      });
+      if (acceptedProposal.count !== 1) return null;
+    }
     const captureText = await getEffectiveCaptureText(
       capture.id,
       capture.rawText,
@@ -1414,30 +1480,36 @@ export async function convertPendingCapture(formData: FormData) {
     const task = await createTaskWithAudit(
       {
         title: captureText,
-        areaId: area?.id,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
         captureId: capture.id,
         source: "manual",
       },
       { source: "manual" },
       client,
     );
-    item = { type: "task", id: task.id, label: `Task added to ${area?.name ?? "Inbox"}` };
+    item = { type: "task", id: task.id, label: `Task added to ${destinationLabel}` };
   } else if (targetType === "idea") {
     const idea = await client.idea.create({
       data: {
         title: captureText,
         body: captureText,
-        areaId: area?.id,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
         source: "manual",
         captureId: capture.id,
       },
     });
-    item = { type: "idea", id: idea.id, label: `Idea saved to ${area?.name ?? "Inbox"}` };
+    item = { type: "idea", id: idea.id, label: `Idea saved to ${destinationLabel}` };
   } else if (targetType === "note") {
     const note = await client.entityNote.create({
       data: {
-        parentType: area ? "area" : null,
-        parentId: area?.id ?? null,
+        parentType: destination.projectId
+          ? "project"
+          : destination.areaId
+            ? "area"
+            : null,
+        parentId: destination.projectId ?? destination.areaId,
         bodyMd: captureText,
         source: "manual",
         captureId: capture.id,
@@ -1446,14 +1518,15 @@ export async function convertPendingCapture(formData: FormData) {
     item = {
       type: "entity_note",
       id: note.id,
-      label: `Note added to ${area?.name ?? "Inbox"}`,
+      label: `Note added to ${destinationLabel}`,
     };
     await syncReferenceMentions("entity_note", note.id, captureText, client);
   } else {
     const reference = await client.reference.create({
       data: {
         body: captureText,
-        areaId: area?.id,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
         source: "manual",
         captureId: capture.id,
       },
@@ -1461,7 +1534,7 @@ export async function convertPendingCapture(formData: FormData) {
     item = {
       type: "reference",
       id: reference.id,
-      label: `Reference saved to ${area?.name ?? "Inbox"}`,
+      label: `Reference saved to ${destinationLabel}`,
     };
     await syncReferenceMentions("reference", reference.id, captureText, client);
   }
@@ -1520,20 +1593,7 @@ export async function convertPendingCapture(formData: FormData) {
     }
   }
 
-  if (proposalId) {
-    const proposal = await client.captureReviewProposal.findFirst({
-      where: {
-        id: proposalId,
-        captureId: capture.id,
-        status: { in: ["pending", "snoozed"] },
-      },
-      select: { id: true },
-    });
-    if (proposal) {
-      await client.captureReviewProposal.update({
-        where: { id: proposal.id },
-        data: { status: "accepted", resolvedAt: new Date() },
-      });
+  if (proposal) {
       await client.notification.create({
         data: {
           type: "capture_review_accepted",
@@ -1547,9 +1607,51 @@ export async function convertPendingCapture(formData: FormData) {
           },
         },
       });
-    }
+      const accepted =
+        proposal.suggestedType === targetType &&
+        (proposal.suggestedAreaId ?? null) === destination.areaId &&
+        (proposal.suggestedProjectId ?? null) === destination.projectId;
+      await recordCaptureRoutingFeedback(
+        {
+          captureId: capture.id,
+          proposalId: proposal.id,
+          outcome: accepted ? "accepted" : "corrected",
+          effectiveText: captureText,
+          proposed: {
+            targetType: proposal.suggestedType,
+            areaId: proposal.suggestedAreaId,
+            projectId: proposal.suggestedProjectId,
+          },
+          final: {
+            targetType,
+            areaId: destination.areaId,
+            projectId: destination.projectId,
+          },
+          model: proposal.model,
+          promptVersion: proposal.promptVersion,
+        },
+        client,
+      );
+  } else if (!proposalId) {
+    await recordCaptureRoutingFeedback(
+      {
+        captureId: capture.id,
+        outcome: "corrected",
+        effectiveText: captureText,
+        final: {
+          targetType,
+          areaId: destination.areaId,
+          projectId: destination.projectId,
+        },
+      },
+      client,
+    );
   }
-    return { captureId: capture.id, areaId: area?.id ?? null };
+    return {
+      captureId: capture.id,
+      areaId: destination.areaId,
+      projectId: destination.projectId,
+    };
   });
   if (!converted) return;
 
@@ -1558,6 +1660,7 @@ export async function convertPendingCapture(formData: FormData) {
   revalidatePath("/search");
   revalidatePath(`/captures/${converted.captureId}`);
   if (converted.areaId) revalidatePath(`/areas/${converted.areaId}`);
+  if (converted.projectId) revalidatePath(`/projects/${converted.projectId}`);
 }
 
 export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {
@@ -1567,25 +1670,37 @@ export async function snoozeCaptureReviewProposalOneDay(formData: FormData) {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const proposal = await prisma.captureReviewProposal.update({
-    where: { id: proposalId },
-    data: { status: "snoozed", snoozedUntil: tomorrow },
-    include: { capture: { select: { rawText: true } } },
-  });
-
-  await prisma.notification.create({
-    data: {
-      type: "capture_review_snoozed",
-      title: "Capture review snoozed",
-      body: proposal.capture.rawText,
-      sourceRef: {
-        type: "capture_review_proposal",
-        id: proposal.id,
-        captureId: proposal.captureId,
-        source: "manual",
+  const proposal = await prisma.$transaction(async (client) => {
+    await lockCaptureReviewProposal(client, proposalId);
+    const snoozed = await client.captureReviewProposal.updateMany({
+      where: {
+        id: proposalId,
+        status: { in: ["pending", "snoozed"] },
       },
-    },
+      data: { status: "snoozed", snoozedUntil: tomorrow },
+    });
+    if (snoozed.count !== 1) return null;
+
+    const updated = await client.captureReviewProposal.findUniqueOrThrow({
+      where: { id: proposalId },
+      include: { capture: { select: { rawText: true } } },
+    });
+    await client.notification.create({
+      data: {
+        type: "capture_review_snoozed",
+        title: "Capture review snoozed",
+        body: updated.capture.rawText,
+        sourceRef: {
+          type: "capture_review_proposal",
+          id: updated.id,
+          captureId: updated.captureId,
+          source: "manual",
+        },
+      },
+    });
+    return updated;
   });
+  if (!proposal) return;
 
   revalidatePath("/");
   revalidatePath(`/captures/${proposal.captureId}`);
@@ -1595,25 +1710,65 @@ export async function dismissCaptureReviewProposal(formData: FormData) {
   const proposalId = getTrimmedString(formData, "proposalId");
   if (!proposalId) return;
 
-  const proposal = await prisma.captureReviewProposal.update({
-    where: { id: proposalId },
-    data: { status: "dismissed", resolvedAt: new Date() },
-    include: { capture: { select: { rawText: true } } },
-  });
-
-  await prisma.notification.create({
-    data: {
-      type: "capture_review_dismissed",
-      title: "Capture review dismissed",
-      body: proposal.capture.rawText,
-      sourceRef: {
-        type: "capture_review_proposal",
-        id: proposal.id,
-        captureId: proposal.captureId,
-        source: "manual",
+  const proposal = await prisma.$transaction(async (client) => {
+    await lockCaptureReviewProposal(client, proposalId);
+    const pending = await client.captureReviewProposal.findFirst({
+      where: {
+        id: proposalId,
+        status: { in: ["pending", "snoozed"] },
       },
-    },
+      include: { capture: { select: { rawText: true } } },
+    });
+    if (!pending) return null;
+    const effectiveText = await getEffectiveCaptureText(
+      pending.captureId,
+      pending.capture.rawText,
+      client,
+    );
+    const claimed = await client.captureReviewProposal.updateMany({
+      where: {
+        id: pending.id,
+        status: { in: ["pending", "snoozed"] },
+      },
+      data: { status: "dismissed", resolvedAt: new Date() },
+    });
+    if (claimed.count !== 1) return null;
+    const dismissed = await client.captureReviewProposal.findUniqueOrThrow({
+      where: { id: pending.id },
+      include: { capture: { select: { rawText: true } } },
+    });
+    await recordCaptureRoutingFeedback(
+      {
+        captureId: dismissed.captureId,
+        proposalId: dismissed.id,
+        outcome: "dismissed",
+        effectiveText,
+        proposed: {
+          targetType: dismissed.suggestedType,
+          areaId: dismissed.suggestedAreaId,
+          projectId: dismissed.suggestedProjectId,
+        },
+        model: dismissed.model,
+        promptVersion: dismissed.promptVersion,
+      },
+      client,
+    );
+    await client.notification.create({
+      data: {
+        type: "capture_review_dismissed",
+        title: "Capture review dismissed",
+        body: dismissed.capture.rawText,
+        sourceRef: {
+          type: "capture_review_proposal",
+          id: dismissed.id,
+          captureId: dismissed.captureId,
+          source: "manual",
+        },
+      },
+    });
+    return dismissed;
   });
+  if (!proposal) return;
 
   revalidatePath("/");
   revalidatePath(`/captures/${proposal.captureId}`);

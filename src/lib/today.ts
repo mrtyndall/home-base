@@ -51,6 +51,7 @@ export async function getTodayDashboard() {
       calendarSync,
       calendarStaleMinutesSetting,
       areas,
+      destinationProjects,
       upcomingTasks,
       upcomingEvents,
     ] = await Promise.all([
@@ -176,6 +177,12 @@ export async function getTodayDashboard() {
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       }),
+      prisma.project.findMany({
+        where: { status: { in: ["active", "parked", "someday"] } },
+        select: { id: true, name: true, areaId: true },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
       prisma.$queryRaw<UpcomingTaskCandidate[]>`
         SELECT
           id,
@@ -268,6 +275,7 @@ export async function getTodayDashboard() {
       resurfacedItem,
       routinesDueToday,
       areas,
+      destinationProjects,
       calendarSync: {
         status: calendarSync?.status ?? "not_configured",
         lastSyncedAt: calendarSync?.lastSyncedAt ?? null,

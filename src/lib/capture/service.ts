@@ -3,6 +3,9 @@ import { Prisma, type CaptureParseStatus } from "@prisma/client";
 import { addHours, parseISO } from "date-fns";
 import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { enqueueAgentJob } from "@/lib/agent/queue";
+import { isAgentWorkerEnabled } from "@/lib/agent/schemas";
+import { SORTER_PROMPT_VERSION } from "@/lib/agent/sorter";
 import { parseCaptureWithContext } from "@/lib/capture/parser";
 import {
   executeReadLaterCaptureAction,
@@ -60,6 +63,10 @@ export async function submitCapture(
       areas: [],
     });
   }
+
+  // The lossless ledger is the first durable boundary. If a remote parser or
+  // process fails after this point, the original input still exists for retry.
+  await ensureCaptureSourceExists(captureId, parsedInput);
 
   let actions: ParserAction[] = [];
   let status: CaptureParseStatus = "parsed";
@@ -167,6 +174,23 @@ async function persistCaptureAtomically(input: {
         ? await executeActions(executableActions, context)
         : await markCapturePending(context);
 
+    if (
+      isAgentWorkerEnabled("sorter") &&
+      (input.status === "ambiguous" || input.status === "failed")
+    ) {
+      await enqueueAgentJob(
+        {
+          role: "sorter",
+          kind: "capture_sort",
+          idempotencyKey: `capture-sort:${input.captureId}:${SORTER_PROMPT_VERSION}`,
+          payload: { captureId: input.captureId },
+          captureId: input.captureId,
+          promptVersion: SORTER_PROMPT_VERSION,
+        },
+        client,
+      );
+    }
+
     await client.capture.update({
       where: { id: input.captureId },
       data: {
@@ -186,6 +210,30 @@ async function persistCaptureAtomically(input: {
     queueMicrotask(() => { void job().catch(() => undefined); });
   }
   return result;
+}
+
+async function ensureCaptureSourceExists(
+  captureId: string,
+  input: CaptureInput,
+) {
+  await prisma.$transaction(async (client) => {
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${captureId}, 0))`;
+    const existing = await client.capture.findUnique({ where: { id: captureId } });
+    if (existing) {
+      if (existing.rawText !== input.rawText || existing.source !== input.source) {
+        throw new Error("Idempotency key was already used for a different capture.");
+      }
+      return;
+    }
+    await client.capture.create({
+      data: {
+        id: captureId,
+        rawText: input.rawText,
+        source: input.source,
+        deviceContext: input.deviceContext as Prisma.InputJsonValue,
+      },
+    });
+  });
 }
 
 async function buildParserContext(source: string) {
