@@ -1,7 +1,8 @@
 "use client";
 
 import type { Area } from "@prisma/client";
-import { useMemo, useState } from "react";
+import { X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { convertPendingCapture } from "@/app/actions";
 
 const targetLabels = {
@@ -42,6 +43,7 @@ export function CaptureFileActions({
   defaultProjectId?: string;
   defaultType?: string | null;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
   const [areaId, setAreaId] = useState(
     defaultProjectId ? "" : defaultAreaId,
   );
@@ -76,15 +78,25 @@ export function CaptureFileActions({
     setProjectId(nextProjectId);
   }
 
+  function closePicker() {
+    detailsRef.current?.removeAttribute("open");
+  }
+
   return (
-    <details className="relative">
+    <details ref={detailsRef} className="relative">
       <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-teal-700/40 bg-white px-3 text-[13px] font-medium text-teal-800 transition hover:border-teal-700 [&::-webkit-details-marker]:hidden">
         {label}
       </summary>
+      <button
+        type="button"
+        aria-label="Dismiss filing options"
+        onClick={closePicker}
+        className="fixed inset-0 z-40 bg-stone-950/20 sm:hidden"
+      />
       <form
         action={convertPendingCapture}
-        className={`absolute z-20 mt-2 w-[min(300px,calc(100vw-2rem))] rounded-[18px] border border-white/65 bg-[#FAFBF9]/90 p-3 shadow-[0_12px_36px_rgba(28,25,23,0.18)] backdrop-blur-xl backdrop-saturate-150 ${
-          align === "right" ? "right-0" : "left-0"
+        className={`fixed inset-x-3 bottom-[calc(var(--app-dock-clearance)+0.75rem)] z-50 max-h-[calc(100dvh-var(--app-dock-clearance)-1.5rem)] overflow-y-auto rounded-[22px] border border-white/65 bg-[#FAFBF9]/95 p-3 shadow-[0_-12px_40px_rgba(28,25,23,0.20)] backdrop-blur-xl backdrop-saturate-150 sm:absolute sm:bottom-auto sm:inset-x-auto sm:mt-2 sm:max-h-none sm:w-[min(300px,calc(100vw-2rem))] sm:overflow-visible sm:rounded-[18px] sm:bg-[#FAFBF9]/90 sm:shadow-[0_12px_36px_rgba(28,25,23,0.18)] ${
+          align === "right" ? "sm:right-0" : "sm:left-0"
         }`}
       >
         <input type="hidden" name="captureId" value={captureId} />
@@ -101,9 +113,19 @@ export function CaptureFileActions({
         {projectId ? (
           <input type="hidden" name="projectId" value={projectId} />
         ) : null}
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
-          File as
-        </p>
+        <div className="flex min-h-11 items-center justify-between gap-3 sm:min-h-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            File as
+          </p>
+          <button
+            type="button"
+            aria-label="Close filing options"
+            onClick={closePicker}
+            className="grid h-11 w-11 place-items-center rounded-full text-stone-500 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 sm:hidden"
+          >
+            <X size={17} />
+          </button>
+        </div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {Object.entries(targetLabels).map(([value, targetLabel]) => (
             <ConvertChoice

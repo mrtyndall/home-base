@@ -35,6 +35,21 @@ assert.ok(
   captureFileActions.includes("Confirm file"),
   "capture filing must require an explicit confirmation",
 );
+assert.match(
+  captureFileActions,
+  /fixed inset-x-3 bottom-\[calc\(var\(--app-dock-clearance\)\+0\.75rem\)\]/,
+  "capture filing must use a viewport-contained sheet above the mobile dock",
+);
+assert.match(
+  captureFileActions,
+  /sm:absolute sm:bottom-auto sm:inset-x-auto/,
+  "capture filing should return to an anchored popover on larger viewports",
+);
+assert.match(
+  captureFileActions,
+  /aria-label="Close filing options"/,
+  "the mobile filing sheet must provide an explicit close control",
+);
 assert.ok(
   actions.includes("revalidatePath(`/captures/${capture.id}`)"),
   "capture conversion must revalidate the capture detail page",
