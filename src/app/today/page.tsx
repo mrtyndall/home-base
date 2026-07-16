@@ -18,7 +18,7 @@ export default async function TodayPage() {
   const data = await getTodayDashboard();
 
   return (
-    <div className="space-y-5 sm:space-y-7">
+    <div className="min-w-0 space-y-5 sm:space-y-7">
       <header>
         <h1 className="font-serif text-[30px] font-medium tracking-[-0.01em] text-stone-950">
           Today
@@ -64,15 +64,15 @@ export default async function TodayPage() {
             </section>
           ) : null}
 
-          <section className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
-            <div className="space-y-5 sm:space-y-7">
+          <section className="grid min-w-0 gap-5 lg:grid-cols-[1.2fr_1fr]">
+            <div className="min-w-0 space-y-5 sm:space-y-7">
               {data.todayEvents.length > 0 ? (
                 <div className="space-y-2.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <SectionHeader title="Today's calendar" />
                     <CalendarSyncMeta data={data.calendarSync} />
                   </div>
-                  <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+                  <div className="min-w-0 divide-y divide-[#EEF1EC] overflow-hidden rounded-[14px] border border-[#E2E6DF] bg-white">
                     {data.todayEvents.map((event) => {
                       const hasPassed =
                         event.end.getTime() <= data.generatedAt.getTime();
@@ -84,19 +84,19 @@ export default async function TodayPage() {
                           key={event.id}
                           className="flex items-baseline gap-3 px-4 py-3"
                         >
-                          <p className={`min-w-14 text-sm ${quietClass}`}>
+                          <p className={`w-14 shrink-0 text-sm ${quietClass}`}>
                             {formatTime(event.start)}
                           </p>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <h3
-                              className={`text-[15px] font-medium ${
+                              className={`break-words text-[15px] font-medium [overflow-wrap:anywhere] ${
                                 hasPassed ? "text-stone-400 line-through" : ""
                               }`}
                             >
                               {event.title}
                             </h3>
                             {event.location ? (
-                              <p className={`mt-0.5 text-sm ${quietClass}`}>
+                              <p className={`mt-0.5 break-words text-sm [overflow-wrap:anywhere] ${quietClass}`}>
                                 {event.location}
                               </p>
                             ) : null}
@@ -130,17 +130,17 @@ export default async function TodayPage() {
                 <SectionHeader title="Tomorrow" />
                 <div className="space-y-2">
                   {data.tomorrowEvents.length > 0 ? (
-                    <div className="divide-y divide-[#EEF1EC] rounded-[14px] border border-[#E2E6DF] bg-white">
+                    <div className="min-w-0 divide-y divide-[#EEF1EC] overflow-hidden rounded-[14px] border border-[#E2E6DF] bg-white">
                       {data.tomorrowEvents.map((event) => (
                         <div
                           key={event.id}
                           className="flex items-baseline gap-3 px-4 py-3"
                         >
-                          <p className="min-w-14 text-sm text-stone-500">
+                          <p className="w-14 shrink-0 text-sm text-stone-500">
                             {formatTime(event.start)}
                           </p>
-                          <div className="min-w-0">
-                            <h3 className="text-[15px] font-medium">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="break-words text-[15px] font-medium [overflow-wrap:anywhere]">
                               {event.title}
                             </h3>
                           </div>
@@ -170,7 +170,7 @@ export default async function TodayPage() {
               </div>
             </div>
 
-            <div className="space-y-5 sm:space-y-7">
+            <div className="min-w-0 space-y-5 sm:space-y-7">
               <TodayRoutinesLine routines={data.routinesDueToday} />
               <RecentCapturesStrip
                 captures={data.recentCaptures}
@@ -342,8 +342,8 @@ function CalendarSyncMeta({
       : "Calendar has not synced yet";
 
   return (
-    <div className={`flex flex-wrap items-center gap-1.5 text-xs ${tone}`}>
-      <p>
+    <div className={`min-w-0 text-right text-xs ${tone}`}>
+      <p className="break-words [overflow-wrap:anywhere]">
         {message}
         {data.stale && configured
           ? ` · stale beyond ${data.staleMinutes} minutes`

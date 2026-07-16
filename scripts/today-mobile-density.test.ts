@@ -20,6 +20,21 @@ assert.doesNotMatch(
 );
 assert.match(todaySource, /space-y-5 sm:space-y-7/);
 assert.match(
+  todaySource,
+  /<section className="grid min-w-0 gap-5 lg:grid-cols-\[1\.2fr_1fr\]">/,
+  "The Today dashboard grid must allow long calendar content to shrink within the mobile viewport.",
+);
+assert.match(
+  todaySource,
+  /className="min-w-0 space-y-5 sm:space-y-7"/,
+  "Both Today dashboard columns must opt out of intrinsic min-content overflow.",
+);
+assert.match(
+  todaySource,
+  /break-words \[overflow-wrap:anywhere\]/,
+  "Calendar titles and locations must wrap even when providers return long unbroken text.",
+);
+assert.match(
   dropZoneSource,
   /isEmpty \? "min-h-0 sm:min-h-20"/,
   "Empty drop zones should not reserve card-height whitespace on mobile.",
