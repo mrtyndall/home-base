@@ -38,7 +38,7 @@
 - Produces `initialTaskTriagedAt(input: CreateTaskInput, now?: Date): Date | null`.
 - Capture and shared task creation consume the same helper; imported existing reminders are explicitly triaged.
 
-- [ ] **Step 1: Write the failing truth-table test**
+- [x] **Step 1: Write the failing truth-table test**
 
 ```ts
 import assert from "node:assert/strict";
@@ -55,13 +55,13 @@ test("only globally unfiled unscheduled tasks start untriaged", () => {
 });
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npx tsx --test scripts/task-triage-state.test.ts`
 
 Expected: FAIL because the helper and Prisma field do not exist.
 
-- [ ] **Step 3: Add schema and safe backfill migration**
+- [x] **Step 3: Add schema and safe backfill migration**
 
 Add beside `completedAt`:
 
@@ -82,7 +82,7 @@ WHERE "status" = 'open' AND "someday" = false
 
 Do not add a database default; future qualifying tasks must remain null.
 
-- [ ] **Step 4: Implement the shared creation rule**
+- [x] **Step 4: Implement the shared creation rule**
 
 ```ts
 export function initialTaskTriagedAt(input: CreateTaskInput, now = new Date()) {
@@ -94,13 +94,13 @@ export function initialTaskTriagedAt(input: CreateTaskInput, now = new Date()) {
 
 In `createTaskWithAudit`, call it with the resolved Area/Project. In `src/lib/capture/service.ts`, use the same helper in its direct `client.task.create`. Set recurrence successors and imported Apple Reminders to a non-null creation/import timestamp so they cannot appear falsely New.
 
-- [ ] **Step 5: Generate and verify GREEN**
+- [x] **Step 5: Generate and verify GREEN**
 
 Run: `npm run db:generate && npx tsx --test scripts/task-triage-state.test.ts && npx prisma validate`
 
 Expected: PASS and valid schema.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/20260716120000_task_triaged_at/migration.sql src/lib/tasks.ts src/lib/capture/service.ts scripts/import-apple-reminders.ts scripts/task-triage-state.test.ts
@@ -121,7 +121,7 @@ git commit -m "feat: persist task triage state"
 - Produces `getHomeTaskInbox(client = prisma): Promise<HomeTaskInboxData>`.
 - Produces `mergeHomeTaskInboxRows(untriaged, triaged, limit): HomeTaskInboxRow[]`.
 
-- [ ] **Step 1: Write failing fake-client tests**
+- [x] **Step 1: Write failing fake-client tests**
 
 ```ts
 test("loads exact counts and a deterministic five-row working set", async () => {
@@ -138,13 +138,13 @@ test("loads exact counts and a deterministic five-row working set", async () => 
 
 Also assert assigned-but-undated is included, while dated, Someday, completed, and subtasks are excluded.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npx tsx --test scripts/home-task-inbox.test.ts`
 
 Expected: FAIL because the loader is missing.
 
-- [ ] **Step 3: Implement the focused loader with two ordered tiers**
+- [x] **Step 3: Implement the focused loader with two ordered tiers**
 
 ```ts
 export const HOME_TASK_INBOX_LIMIT = 5;
@@ -173,11 +173,11 @@ export async function getHomeTaskInbox(client = prisma) {
 
 Rows expose identity, title, `areaId`, `projectId`, relations, `triagedAt`, `dueDate`, `someday`, and `starred`. Do not approximate the conditional order with one Prisma `orderBy`.
 
-- [ ] **Step 4: Share the loader with Today**
+- [x] **Step 4: Share the loader with Today**
 
 Replace the duplicate `taskInbox` query in `getTodayDashboard()` with `getHomeTaskInbox()`. Return `taskInbox`, `taskInboxTotalCount`, and `taskInboxNewCount`; retain Today’s existing presentation without a second predicate.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 Run: `npx tsx --test scripts/home-task-inbox.test.ts scripts/today-task-inbox.test.ts`
 
@@ -204,7 +204,7 @@ git commit -m "feat: load Home task inbox"
 - Detail and generic API PATCH set it only when destination/schedule fields actually change.
 - No-op assignment/scheduling remain no-ops; title, notes, star, read, and order changes never triage.
 
-- [ ] **Step 1: Extend fakes and write failing assertions**
+- [x] **Step 1: Extend fakes and write failing assertions**
 
 Add `triagedAt: Date | null` to the quick-edit fake record. For changed assignment and changed schedule:
 
@@ -214,13 +214,13 @@ assert.ok(fake.updates[0]?.triagedAt instanceof Date);
 
 Assert no-op writes remain absent. In the PostgreSQL completion test, create an untriaged task, complete it, and assert stored `triagedAt` is non-null; also assert a recurrence successor is triaged.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npx tsx --test scripts/task-quick-edit-api.test.ts`
 
 Expected: FAIL because writes omit `triagedAt`.
 
-- [ ] **Step 3: Update assignment and schedule transactions**
+- [x] **Step 3: Update assignment and schedule transactions**
 
 Select `triagedAt` with the task. Inside actual changed updates add:
 
@@ -230,11 +230,11 @@ triagedAt: task.triagedAt ?? new Date(),
 
 Keep each equality/no-op return before its transaction. Clearing a date later and undoing an assignment must preserve the non-null value.
 
-- [ ] **Step 4: Update completion atomically**
+- [x] **Step 4: Update completion atomically**
 
 Add `triagedAt: task.triagedAt ?? completedAt` to the winning `updateMany` data in `completeTaskById`. Do not create a parallel completion path.
 
-- [ ] **Step 5: Cover detail and generic API task PATCH**
+- [x] **Step 5: Cover detail and generic API task PATCH**
 
 In `updateTaskDetail` and the v1 task PATCH transaction, compare the previous and next `dueDate`, `someday`, `areaId`, and `projectId`. Add `triagedAt: existing.triagedAt ?? new Date()` only when one of those fields changes. Saving title/notes alone must not triage.
 
@@ -246,7 +246,9 @@ Run with the configured disposable test database: `npm run test:task-completion-
 
 Expected: PASS; each successful write still emits exactly one audit notification.
 
-- [ ] **Step 7: Commit**
+Unit/contract coverage passed; the disposable PostgreSQL command remains pending because `TEST_DATABASE_URL` is not configured on this machine.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/app/api/tasks/[taskId]/assignment/route.ts src/app/api/tasks/[taskId]/schedule/route.ts src/app/actions.ts src/app/api/v1/[...path]/route.ts src/lib/tasks.ts scripts/task-quick-edit-api.test.ts scripts/task-completion-postgres.integration.ts
@@ -268,7 +270,7 @@ git commit -m "feat: triage tasks through task actions"
 - Extends `TaskQuickEdit` with `variant: "inbox"`.
 - Produces `onMutation(event: TaskQuickEditMutationEvent)` where `channel` is `location | schedule` and `phase` is `optimistic | committed | rolled-back | undo`.
 
-- [ ] **Step 1: Write failing state tests**
+- [x] **Step 1: Write failing state tests**
 
 ```ts
 test("assignment keeps the row and clears New optimistically", () => {
@@ -288,17 +290,17 @@ test("schedule removes, failure restores, and undo stays triaged", () => {
 
 Also test exact total/new count transitions, Retry payload retention, independent location/schedule operations, and stale same-channel response rejection.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npx tsx --test scripts/home-task-inbox-mutations.test.ts`
 
 Expected: FAIL because the state module is missing.
 
-- [ ] **Step 3: Implement immutable transitions**
+- [x] **Step 3: Implement immutable transitions**
 
 Store bounded visible rows, exact total, exact new count, and per-task rollback snapshots. Assignment replaces path/New/count; schedule/Someday/complete removes the row and decrements counts. Failure restores the snapshot. Undo restores a removed row with `isNew: false`, increments total, and does not increment new count.
 
-- [ ] **Step 4: Expose separate Assign and Schedule triggers**
+- [x] **Step 4: Expose separate Assign and Schedule triggers**
 
 Extend `TaskQuickEdit`:
 
@@ -322,7 +324,7 @@ For `variant="inbox"` render:
 
 Emit events around existing independent `MutationChannel` operations. Keep the lazy destination GET and do not share cancellation across location and schedule channels.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 Run: `npx tsx --test scripts/home-task-inbox-mutations.test.ts scripts/task-quick-edit-coordinator.test.ts scripts/task-quick-edit-ui.test.ts scripts/task-quick-assignment-ui.test.ts`
 
@@ -346,7 +348,7 @@ git commit -m "feat: add optimistic Home inbox actions"
 - Produces `HomeTaskInbox({ data, today })` with exact count, bounded rows, three actions, centralized feedback, and Retry.
 - Produces `homeStatusHeadline(dueCount, inboxCount, newCount)` for deterministic status copy.
 
-- [ ] **Step 1: Write the failing UI/status contract**
+- [x] **Step 1: Write the failing UI/status contract**
 
 ```ts
 assert.equal(homeStatusHeadline(0, 1, 1), "0 due today. 1 new task in Inbox.");
@@ -363,17 +365,17 @@ assert.doesNotMatch(home, /RecentCaptures/);
 
 Also assert the card omits itself at zero, renders at most five rows, displays the exact total, labels only null-`triagedAt` rows New, and links to `/tasks?section=unscheduled#unscheduled`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `npx tsx --test scripts/home-task-inbox-ui.test.ts scripts/home-no-receipts.test.ts`
 
 Expected: FAIL because the card and adaptive branches do not exist.
 
-- [ ] **Step 3: Build the client card**
+- [x] **Step 3: Build the client card**
 
 Use `min-w-0`, wrapping title/path, a restrained teal New treatment, and explicit 44px Assign/Schedule/Complete controls. Completion calls `/api/tasks/:id/complete`, removes optimistically, restores on failure, and exposes Retry through one card-level `aria-live` region so row portals do not collide. Title links to `/tasks/:id`; path uses Project plus Area path, or `Inbox`.
 
-- [ ] **Step 4: Integrate adaptive Home placement and truthful status**
+- [x] **Step 4: Integrate adaptive Home placement and truthful status**
 
 Pass exact Inbox counts into `StatusLine` and gate `clearThroughTomorrow` with `taskInboxTotalCount === 0`. In the left Home column:
 
@@ -386,11 +388,11 @@ Pass exact Inbox counts into `StatusLine` and gate `clearThroughTomorrow` with `
 
 The condition uses due-task count, never calendar-event count. Extract `TodayCard` only if needed to keep the page readable.
 
-- [ ] **Step 5: Preserve canonical capture reconciliation**
+- [x] **Step 5: Preserve canonical capture reconciliation**
 
 Keep `CaptureBar.submitCapture()` calling `router.refresh()` after the POST succeeds. The Home card consumes only loader rows; never insert `rawText`, receipt labels, or `createdItems` into the task list client-side.
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
 Run: `npx tsx --test scripts/home-task-inbox-ui.test.ts scripts/home-task-inbox-mutations.test.ts scripts/home-no-receipts.test.ts scripts/today-hide-empty-calendar.test.ts scripts/task-quick-edit-ui.test.ts`
 
@@ -410,7 +412,7 @@ git commit -m "feat: surface task inbox on Home"
 **Interfaces:**
 - Validates the complete feature and introduces no new product surface.
 
-- [ ] **Step 1: Run automated verification**
+- [x] **Step 1: Run automated verification**
 
 ```bash
 npm test
@@ -437,10 +439,10 @@ Create a global undated task through Capture and verify: receipt remains visible
 
 Repeat at 390×844 and 1440×1000. Confirm no horizontal overflow or dock/capture overlap; long titles and hierarchy paths wrap; focus trap/restoration and Escape work; controls are at least 44px; live announcements are accessible; no action requires a swipe.
 
-- [ ] **Step 5: Request whole-feature review and fix findings**
+- [x] **Step 5: Request whole-feature review and fix findings**
 
 Use `superpowers:requesting-code-review` against the implementation commits. Fix every Critical and Important finding with a regression test, then repeat Step 1.
 
-- [ ] **Step 6: Commit verified fixes only when needed**
+- [x] **Step 6: Commit verified fixes only when needed**
 
 List the reviewed files with `git diff --name-only`, stage each path explicitly, and commit them with `git commit -m "fix: harden Home task inbox"`. Do not create an empty commit when review produces no changes.
