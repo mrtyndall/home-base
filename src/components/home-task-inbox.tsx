@@ -7,7 +7,7 @@ import { ArrowRight, Check } from "lucide-react";
 import {
   createTaskQuickEditMutationOwner,
   TaskQuickEdit,
-  TaskQuickEditMutationStatusHost,
+  TaskQuickEditMutationStatusStack,
   type TaskQuickEditMutationEvent,
   type TaskQuickEditMutationOwner,
 } from "@/components/task-quick-edit";
@@ -37,6 +37,11 @@ type InboxClientModel = {
   owners: Map<string, TaskQuickEditMutationOwner>;
 };
 
+type CompletionOperation = {
+  mutationId: number;
+  phase: "pending" | "success" | "error";
+};
+
 export function HomeTaskInbox({
   data,
   today,
@@ -64,10 +69,9 @@ function HomeTaskInboxClient({
     renderedModel = reconcileClientModel(model, data, incomingSignature);
     setModel(renderedModel);
   }
-  const [completionStatus, setCompletionStatus] = useState<{
-    phase: "idle" | "pending" | "success" | "error";
-    taskId: string | null;
-  }>({ phase: "idle", taskId: null });
+  const [completionOperations, setCompletionOperations] = useState<
+    Record<string, CompletionOperation>
+  >({});
   const completionIds = useRef(new Map<string, number>());
 
   const handleQuickEditMutation = useCallback(
@@ -83,7 +87,10 @@ function HomeTaskInboxClient({
   async function completeTask(taskId: string) {
     const mutationId = (completionIds.current.get(taskId) ?? 0) + 1;
     completionIds.current.set(taskId, mutationId);
-    setCompletionStatus({ phase: "pending", taskId });
+    setCompletionOperations((current) => ({
+      ...current,
+      [taskId]: { mutationId, phase: "pending" },
+    }));
     setModel((current) => ({
       ...current,
       inbox: beginInboxRemoval(
@@ -105,11 +112,14 @@ function HomeTaskInboxClient({
         inbox: commitInboxMutation(
           current.inbox,
           taskId,
-          "location",
+          "completion",
           mutationId,
         ),
       }));
-      setCompletionStatus({ phase: "success", taskId });
+      setCompletionOperations((current) => ({
+        ...current,
+        [taskId]: { mutationId, phase: "success" },
+      }));
       startTransition(() => router.refresh());
     } catch {
       if (completionIds.current.get(taskId) !== mutationId) return;
@@ -118,11 +128,14 @@ function HomeTaskInboxClient({
         inbox: rollbackInboxMutation(
           current.inbox,
           taskId,
-          "location",
+          "completion",
           mutationId,
         ),
       }));
-      setCompletionStatus({ phase: "error", taskId });
+      setCompletionOperations((current) => ({
+        ...current,
+        [taskId]: { mutationId, phase: "error" },
+      }));
     }
   }
 
@@ -201,7 +214,7 @@ function HomeTaskInboxClient({
                 <button
                   type="button"
                   aria-label="Complete task"
-                  disabled={completionStatus.phase === "pending" && completionStatus.taskId === row.id}
+                  disabled={completionOperations[row.id]?.phase === "pending"}
                   onClick={() => void completeTask(row.id)}
                   className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-[#DDE5DD] px-3 text-sm font-medium text-stone-700 transition hover:border-teal-700/40 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 disabled:opacity-50 motion-reduce:transition-none"
                 >
@@ -215,25 +228,33 @@ function HomeTaskInboxClient({
       </div>
 
       <div aria-live="polite" aria-atomic="true" className="mt-2 min-h-5 text-sm text-[#6B7268]">
-        {completionStatus.phase === "pending" ? "Completing task…" : null}
-        {completionStatus.phase === "success" ? "Task completed." : null}
-        {completionStatus.phase === "error" && completionStatus.taskId ? (
-          <span className="flex min-h-11 items-center justify-between gap-3" role="alert">
-            <span>Couldn’t complete task.</span>
-            <button
-              type="button"
-              className="min-h-11 shrink-0 font-semibold text-teal-800"
-              onClick={() => void completeTask(completionStatus.taskId!)}
+        {Object.entries(completionOperations).map(([taskId, operation]) =>
+          operation.phase === "error" ? (
+            <span
+              key={taskId}
+              className="flex min-h-11 items-center justify-between gap-3"
+              role="alert"
             >
-              Retry
-            </button>
-          </span>
-        ) : null}
+              <span>Couldn’t complete task.</span>
+              <button
+                type="button"
+                className="min-h-11 shrink-0 font-semibold text-teal-800"
+                onClick={() => void completeTask(taskId)}
+              >
+                Retry
+              </button>
+            </span>
+          ) : (
+            <span key={taskId} className="block py-1">
+              {operation.phase === "pending" ? "Completing task…" : "Task completed."}
+            </span>
+          ),
+        )}
       </div>
 
-      {Array.from(renderedModel.owners.entries()).map(([taskId, owner]) => (
-        <TaskQuickEditMutationStatusHost key={taskId} mutationOwner={owner} />
-      ))}
+      <TaskQuickEditMutationStatusStack
+        mutationOwners={Array.from(renderedModel.owners.values())}
+      />
     </section>
   );
 }

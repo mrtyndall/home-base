@@ -34,5 +34,17 @@ assert.match(card, /min-w-0/);
 assert.match(card, /break-words/);
 assert.match(card, /aria-live="polite"/);
 assert.match(card, /\/api\/tasks\/\$\{taskId\}\/complete/);
-assert.match(card, /TaskQuickEditMutationStatusHost/);
+assert.match(card, /TaskQuickEditMutationStatusStack/);
+assert.match(card, /completionOperations/);
+assert.match(card, /Object\.entries\(completionOperations\)/);
+assert.equal(
+  card.match(/<TaskQuickEditMutationStatusStack/g)?.length,
+  1,
+  "Home must render exactly one aggregate quick-edit status stack.",
+);
+assert.doesNotMatch(
+  card,
+  /<TaskQuickEditMutationStatusHost/,
+  "Home must not render one overlapping portal per task owner.",
+);
 assert.doesNotMatch(home, /RecentCaptures/);

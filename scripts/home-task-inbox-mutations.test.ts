@@ -141,16 +141,75 @@ test("different-task optimistic mutations compose exact count deltas", () => {
   assert.equal(firstFailed.newCount, 3);
   assert.deepEqual(firstFailed.rows.map((row) => row.id), ["task-1"]);
 
-  const secondFailed = rollbackInboxMutation(firstFailed, "task-2", "location", 1);
+  const secondFailed = rollbackInboxMutation(firstFailed, "task-2", "completion", 1);
   assert.equal(secondFailed.totalCount, 7);
   assert.equal(secondFailed.newCount, 3);
   assert.deepEqual(secondFailed.rows.map((row) => row.id), ["task-1", "task-2"]);
 });
 
+test("assignment and completion with the same mutation ID commit independently in either order", () => {
+  for (const order of ["assignment-first", "completion-first"] as const) {
+    const assigned = beginInboxAssignment(state, "task-1", assignment, 1);
+    const removed = beginInboxRemoval(assigned, "task-1", { kind: "complete" }, 1);
+    const first = order === "assignment-first"
+      ? commitInboxMutation(removed, "task-1", "location", 1)
+      : commitInboxMutation(removed, "task-1", "completion", 1);
+    const committed = order === "assignment-first"
+      ? commitInboxMutation(first, "task-1", "completion", 1)
+      : commitInboxMutation(first, "task-1", "location", 1);
+
+    assert.equal(committed.rows.some((row) => row.id === "task-1"), false);
+    assert.equal(committed.totalCount, 6);
+    assert.equal(committed.newCount, 2);
+    assert.equal(committed.mutations["task-1:location"], undefined);
+    assert.equal(committed.mutations["task-1:completion"]?.status, "committed");
+  }
+});
+
+test("assignment and completion failures roll back independently in either order", () => {
+  for (const order of ["assignment-first", "completion-first"] as const) {
+    const assigned = beginInboxAssignment(state, "task-1", assignment, 1);
+    const removed = beginInboxRemoval(assigned, "task-1", { kind: "complete" }, 1);
+    const first = order === "assignment-first"
+      ? rollbackInboxMutation(removed, "task-1", "location", 1)
+      : rollbackInboxMutation(removed, "task-1", "completion", 1);
+    const restored = order === "assignment-first"
+      ? rollbackInboxMutation(first, "task-1", "completion", 1)
+      : rollbackInboxMutation(first, "task-1", "location", 1);
+
+    assert.deepEqual(restored.rows[0], rows[0]);
+    assert.equal(restored.totalCount, 7);
+    assert.equal(restored.newCount, 3);
+    assert.deepEqual(restored.retries["task-1:location"]?.payload, {
+      kind: "assignment",
+      ...assignment,
+    });
+    assert.deepEqual(restored.retries["task-1:completion"]?.payload, {
+      kind: "complete",
+    });
+  }
+});
+
+test("two simultaneous completion failures each retain their own Retry payload", () => {
+  const first = beginInboxRemoval(state, "task-1", { kind: "complete" }, 1);
+  const both = beginInboxRemoval(first, "task-2", { kind: "complete" }, 1);
+  const firstFailed = rollbackInboxMutation(both, "task-1", "completion", 1);
+  const bothFailed = rollbackInboxMutation(firstFailed, "task-2", "completion", 1);
+
+  assert.deepEqual(bothFailed.retries["task-1:completion"], {
+    mutationId: 1,
+    payload: { kind: "complete" },
+  });
+  assert.deepEqual(bothFailed.retries["task-2:completion"], {
+    mutationId: 1,
+    payload: { kind: "complete" },
+  });
+});
+
 test("a concurrent assignment and another-row removal keep exact New count", () => {
   const assigned = beginInboxAssignment(state, "task-1", assignment, 1);
   const removed = beginInboxRemoval(assigned, "task-2", { kind: "complete" }, 1);
-  const removalFailed = rollbackInboxMutation(removed, "task-2", "location", 1);
+  const removalFailed = rollbackInboxMutation(removed, "task-2", "completion", 1);
   assert.equal(removalFailed.totalCount, 7);
   assert.equal(removalFailed.newCount, 2);
   assert.equal(removalFailed.rows[0]?.path, assignment.path);

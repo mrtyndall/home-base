@@ -399,6 +399,38 @@ function safeStorage() {
 export function TaskQuickEditMutationStatusHost({ mutationOwner }: {
   mutationOwner: TaskQuickEditMutationOwner;
 }) {
+  return <TaskQuickEditMutationStatusStack mutationOwners={[mutationOwner]} />;
+}
+
+export function TaskQuickEditMutationStatusStack({ mutationOwners }: {
+  mutationOwners: TaskQuickEditMutationOwner[];
+}) {
+  const mounted = useSyncExternalStore(
+    useCallback(() => () => {}, []),
+    useCallback(() => true, []),
+    useCallback(() => false, []),
+  );
+
+  if (!mounted) return null;
+  return createPortal(
+    <div
+      aria-live="polite"
+      className="fixed inset-x-3 bottom-[calc(var(--app-dock-clearance)+0.75rem)] z-[80] mx-auto flex max-w-md flex-col gap-2 sm:bottom-6"
+    >
+      {mutationOwners.map((mutationOwner, index) => (
+        <TaskQuickEditMutationStatusItem
+          key={index}
+          mutationOwner={mutationOwner}
+        />
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+function TaskQuickEditMutationStatusItem({ mutationOwner }: {
+  mutationOwner: TaskQuickEditMutationOwner;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const schedule = useSyncExternalStore(
@@ -411,12 +443,6 @@ export function TaskQuickEditMutationStatusHost({ mutationOwner }: {
     mutationOwner.locationChannel.snapshot,
     mutationOwner.locationChannel.snapshot,
   );
-  const mounted = useSyncExternalStore(
-    useCallback(() => () => {}, []),
-    useCallback(() => true, []),
-    useCallback(() => false, []),
-  );
-
   useEffect(() => {
     if (!schedule.undo) return;
     const timer = window.setTimeout(() => {
@@ -435,7 +461,6 @@ export function TaskQuickEditMutationStatusHost({ mutationOwner }: {
     return () => window.clearTimeout(timer);
   }, [location.undo, mutationOwner, router, startTransition]);
 
-  if (!mounted) return null;
   return <TaskQuickEditStatus
     schedule={schedule}
     location={location}
@@ -463,10 +488,10 @@ function TaskQuickEditStatus({ schedule, location, onRetrySchedule, onRetryLocat
     location.undo ? { key: "location", undo: onUndoLocation } : null,
   ].filter((item): item is { key: string; undo: () => void } => item !== null);
   if (errors.length === 0 && undos.length === 0) return null;
-  return createPortal(
-    <div className="fixed inset-x-3 bottom-[calc(var(--app-dock-clearance)+0.75rem)] z-[80] mx-auto flex max-w-md flex-col gap-2 sm:bottom-6">
+  return (
+    <>
       {errors.map((item) => <div key={item.key} role="alert" className="flex min-h-11 items-center gap-3 rounded-[14px] border border-[#DDE5DD] bg-[#F7FAF5] px-4 text-sm text-stone-800 shadow-lg"><span className="min-w-0 flex-1">Couldn’t update task</span><button type="button" onClick={item.retry} className="min-h-11 shrink-0 font-semibold text-teal-800">Retry</button></div>)}
-      {undos.map((item) => <div key={item.key} role="status" aria-live="polite" className="flex min-h-11 items-center gap-4 rounded-[14px] bg-stone-900 px-4 text-sm text-white shadow-lg"><span className="min-w-0 flex-1">Task updated</span><button type="button" onClick={item.undo} className="min-h-11 font-semibold text-teal-200">Undo</button></div>)}
-    </div>, document.body,
+      {undos.map((item) => <div key={item.key} role="status" className="flex min-h-11 items-center gap-4 rounded-[14px] bg-stone-900 px-4 text-sm text-white shadow-lg"><span className="min-w-0 flex-1">Task updated</span><button type="button" onClick={item.undo} className="min-h-11 font-semibold text-teal-200">Undo</button></div>)}
+    </>
   );
 }

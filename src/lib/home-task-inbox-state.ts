@@ -4,7 +4,7 @@ export type HomeTaskInboxStateRow = {
   path: string;
 };
 
-export type InboxMutationChannel = "location" | "schedule";
+export type InboxMutationChannel = "location" | "schedule" | "completion";
 
 export type InboxAssignmentPayload = {
   areaId: string | null;
@@ -103,7 +103,7 @@ export function beginInboxRemoval(
 ): HomeTaskInboxState {
   const index = state.rows.findIndex((row) => row.id === taskId);
   if (index < 0) return state;
-  const channel: InboxMutationChannel = payload.kind === "complete" ? "location" : "schedule";
+  const channel: InboxMutationChannel = payload.kind === "complete" ? "completion" : "schedule";
   const key = mutationKey(taskId, channel);
   const row = state.rows[index];
   const newDelta = row.isNew ? -1 : 0;
@@ -172,9 +172,11 @@ export function rollbackInboxMutation(
     };
   }
 
-  const otherKey = mutationKey(taskId, channel === "location" ? "schedule" : "location");
-  const other = state.mutations[otherKey];
-  if (channel === "location" && other && other.payload.kind !== "assignment") {
+  const otherRemoval = channel === "location"
+    ? findRemovalMutation(state, taskId)
+    : null;
+  if (otherRemoval) {
+    const [otherKey, other] = otherRemoval;
     const adjustedNewDelta = mutation.row.isNew ? -1 : 0;
     return {
       ...state,
@@ -265,7 +267,21 @@ function mutationKey(taskId: string, channel: InboxMutationChannel) {
 }
 
 function onlyChannel(state: HomeTaskInboxState, taskId: string): InboxMutationChannel {
-  return state.mutations[mutationKey(taskId, "location")] ? "location" : "schedule";
+  if (state.mutations[mutationKey(taskId, "location")]) return "location";
+  if (state.mutations[mutationKey(taskId, "schedule")]) return "schedule";
+  return "completion";
+}
+
+function findRemovalMutation(
+  state: HomeTaskInboxState,
+  taskId: string,
+): [string, InboxMutation] | null {
+  for (const channel of ["schedule", "completion"] as const) {
+    const key = mutationKey(taskId, channel);
+    const mutation = state.mutations[key];
+    if (mutation && mutation.payload.kind !== "assignment") return [key, mutation];
+  }
+  return null;
 }
 
 function isCurrent(mutation: InboxMutation | undefined, mutationId: number | undefined): mutation is InboxMutation {
