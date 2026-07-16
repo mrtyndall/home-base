@@ -68,12 +68,15 @@ export class TaskQuickEditMutationOwner<Schedule, Location> {
   ) {
     const bindings = this.requireBindings();
     this.retryPhases[channel] = "optimistic";
-    const mutationId = this.begin(channel, next);
     if (channel === "schedule") {
-      await this.scheduleChannel.mutate(next as Schedule, bindings.writeSchedule);
+      const schedule = next as Schedule;
+      const mutationId = this.begin("schedule", schedule);
+      await this.scheduleChannel.mutate(schedule, bindings.writeSchedule);
       this.finish("schedule", mutationId, this.scheduleChannel.snapshot());
     } else {
-      await this.locationChannel.mutate(next as Location, bindings.writeLocation);
+      const location = next as Location;
+      const mutationId = this.begin("location", location);
+      await this.locationChannel.mutate(location, bindings.writeLocation);
       this.finish("location", mutationId, this.locationChannel.snapshot());
     }
   }
