@@ -45,6 +45,7 @@ async function main() {
         source: "integration",
       },
     });
+    assert.equal(task.triagedAt, null, "the completion fixture must start untriaged");
 
     await admin.$executeRawUnsafe(`
       CREATE OR REPLACE FUNCTION task_completion_test_delay()
@@ -77,6 +78,8 @@ async function main() {
     assert.ok(results.every((result) => result.completed.status === "completed"));
 
     assert.equal(await admin.task.count({ where: { id: task.id, status: "completed" } }), 1);
+    const storedCompletedTask = await admin.task.findUniqueOrThrow({ where: { id: task.id } });
+    assert.ok(storedCompletedTask.triagedAt, "completion must triage the completed task");
     assert.equal(
       await admin.task.count({
         where: { title, status: "open", source: "recurrence" },
@@ -84,6 +87,10 @@ async function main() {
       1,
       "concurrent completion must create exactly one recurrence successor",
     );
+    const successor = await admin.task.findFirstOrThrow({
+      where: { title, status: "open", source: "recurrence" },
+    });
+    assert.ok(successor.triagedAt, "a recurrence successor must be triaged");
     assert.equal(
       await admin.notification.count({ where: { type: "task_completed", body: title } }),
       1,

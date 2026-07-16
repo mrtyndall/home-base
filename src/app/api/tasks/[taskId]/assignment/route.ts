@@ -16,6 +16,7 @@ type AssignmentDataClient = {
       status: string;
       areaId: string | null;
       projectId: string | null;
+      triagedAt: Date | null;
     } | null>;
     update(args: unknown): PromiseLike<{
       id: string;
@@ -64,7 +65,7 @@ export async function taskAssignmentResponse(
 
   const task = await client.task.findUnique({
     where: { id: taskId },
-    select: { id: true, title: true, status: true, areaId: true, projectId: true },
+    select: { id: true, title: true, status: true, areaId: true, projectId: true, triagedAt: true },
   });
   if (!task) {
     return NextResponse.json({ error: "Task not found." }, { status: 404 });
@@ -142,6 +143,7 @@ export async function taskAssignmentResponse(
       data: {
         areaId: destination.areaId,
         projectId: destination.projectId,
+        triagedAt: task.triagedAt ?? new Date(),
       },
     });
 

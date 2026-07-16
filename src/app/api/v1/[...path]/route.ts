@@ -1004,7 +1004,13 @@ export async function PATCH(request: Request, context: RouteCtx) {
       const task = await prisma.$transaction(async (tx) => {
         const current = await tx.task.findUnique({
           where: { id },
-          select: { areaId: true, projectId: true },
+          select: {
+            dueDate: true,
+            someday: true,
+            areaId: true,
+            projectId: true,
+            triagedAt: true,
+          },
         });
         if (!current) return null;
 
@@ -1032,6 +1038,15 @@ export async function PATCH(request: Request, context: RouteCtx) {
               : explicitAreaId,
           projectId: nextProjectId,
         }, tx);
+        const nextDueDate = parsed.dueDate === undefined
+          ? current.dueDate
+          : parseDateOnly(parsed.dueDate);
+        const nextSomeday = parsed.someday ?? current.someday;
+        const triageStateChanged =
+          current.dueDate?.getTime() !== nextDueDate?.getTime() ||
+          current.someday !== nextSomeday ||
+          current.areaId !== destination.areaId ||
+          current.projectId !== destination.projectId;
         const updated = await tx.task.update({
           where: { id },
           data: {
@@ -1042,6 +1057,9 @@ export async function PATCH(request: Request, context: RouteCtx) {
             priority: parsed.priority,
             areaId: destination.areaId,
             projectId: destination.projectId,
+            triagedAt: triageStateChanged
+              ? (current.triagedAt ?? new Date())
+              : undefined,
             parentTaskId: parsed.parentTaskId,
             someday: parsed.someday,
             recurrenceRule: parsed.recurrenceRule,

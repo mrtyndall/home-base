@@ -16,6 +16,7 @@ type ScheduleDataClient = {
       status: string;
       dueDate: Date | null;
       someday: boolean;
+      triagedAt: Date | null;
     } | null>;
     update(args: unknown): PromiseLike<{
       id: string;
@@ -53,7 +54,7 @@ export async function taskScheduleResponse(
 
   const task = await client.task.findUnique({
     where: { id: taskId },
-    select: { id: true, title: true, status: true, dueDate: true, someday: true },
+    select: { id: true, title: true, status: true, dueDate: true, someday: true, triagedAt: true },
   });
   if (!task) {
     return NextResponse.json({ error: "Task not found." }, { status: 404 });
@@ -86,6 +87,7 @@ export async function taskScheduleResponse(
       data: {
         dueDate: nextDueDate,
         someday: somedayValue ? true : false,
+        triagedAt: task.triagedAt ?? new Date(),
       },
     });
 

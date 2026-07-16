@@ -117,6 +117,7 @@ export async function completeTaskById(
       data: {
         status: "completed",
         completedAt,
+        triagedAt: task.triagedAt ?? completedAt,
       },
     });
 

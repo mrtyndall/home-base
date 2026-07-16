@@ -13,6 +13,7 @@ type TaskRecord = {
   projectId: string | null;
   dueDate: Date | null;
   someday: boolean;
+  triagedAt: Date | null;
 };
 
 function quickEditClient(
@@ -27,6 +28,7 @@ function quickEditClient(
     projectId: null,
     dueDate: null,
     someday: false,
+    triagedAt: null,
     ...taskOverrides,
   };
   const areas = [
@@ -186,17 +188,22 @@ test("assignment PATCH derives Area from Project and returns its authoritative p
     task: { id: "task-1", areaId: "radio", projectId: "antenna" },
     displayLabel: "Antenna — Hobbies / Ham Radio",
   });
-  assert.deepEqual(fake.updates, [{ areaId: "radio", projectId: "antenna" }]);
+  assert.deepEqual(
+    { ...fake.updates[0], triagedAt: undefined },
+    { areaId: "radio", projectId: "antenna", triagedAt: undefined },
+  );
+  assert.ok(fake.updates[0]?.triagedAt instanceof Date);
   assert.equal(fake.notifications.length, 1, "one successful write must create exactly one audit notification");
 });
 
-test("assignment PATCH returns Inbox after clearing both destination fields", async () => {
-  const fake = quickEditClient({ areaId: "home" });
+test("assignment PATCH returns Inbox after clearing both destination fields without clearing triage", async () => {
+  const triagedAt = new Date("2026-07-16T12:00:00.000Z");
+  const fake = quickEditClient({ areaId: "home", triagedAt });
   const response = await taskAssignmentResponse("task-1", request({ areaId: null, projectId: null }), fake.client as never);
 
   assert.equal(response.status, 200);
   assert.equal((await response.json()).displayLabel, "Inbox");
-  assert.deepEqual(fake.updates, [{ areaId: null, projectId: null }]);
+  assert.deepEqual(fake.updates, [{ areaId: null, projectId: null, triagedAt }]);
   assert.equal(fake.notifications.length, 1);
 });
 
@@ -271,6 +278,7 @@ test("schedule PATCH returns authoritative date, Someday, and No date labels wit
     assert.equal(response.status, 200);
     assert.equal((await response.json()).displayLabel, label);
     assert.equal(fake.updates.length, 1);
+    assert.ok(fake.updates[0]?.triagedAt instanceof Date);
     assert.equal(fake.notifications.length, 1);
   }
 });
@@ -300,6 +308,7 @@ test("schedule date, Someday, and No date no-ops return authoritative labels wit
     assert.equal(response.status, 200);
     assert.equal((await response.json()).displayLabel, label);
     assert.equal(fake.updates.length, 0);
+    assert.equal(fake.task.triagedAt, null);
     assert.equal(fake.notifications.length, 0);
   }
 });

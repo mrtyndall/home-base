@@ -155,7 +155,15 @@ export async function updateTaskDetail(formData: FormData) {
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, title: true },
+    select: {
+      id: true,
+      title: true,
+      dueDate: true,
+      someday: true,
+      areaId: true,
+      projectId: true,
+      triagedAt: true,
+    },
   });
   if (!task) return;
 
@@ -187,14 +195,22 @@ export async function updateTaskDetail(formData: FormData) {
     areaId: validProject?.areaId ?? areaId,
     projectId: validProject?.id,
   });
+  const nextDueDate = dueDate ? dateOnlyFromString(dueDate) : null;
+  const nextSomeday = task.someday;
+  const triageStateChanged =
+    task.dueDate?.getTime() !== nextDueDate?.getTime() ||
+    task.someday !== nextSomeday ||
+    task.areaId !== destination.areaId ||
+    task.projectId !== destination.projectId;
   const updated = await prisma.task.update({
     where: { id: taskId },
     data: {
-      dueDate: dueDate ? dateOnlyFromString(dueDate) : null,
+      dueDate: nextDueDate,
       dueTime: dueTime || null,
       priority: priority || null,
       areaId: destination.areaId,
       projectId: destination.projectId,
+      triagedAt: triageStateChanged ? (task.triagedAt ?? new Date()) : undefined,
       notes: notes || null,
       tags,
       recurrenceRule: recurrenceRule || null,
