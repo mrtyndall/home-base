@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const homePage = fs.readFileSync("src/app/page.tsx", "utf8");
+const taskInbox = fs.existsSync("src/components/home-task-inbox.tsx")
+  ? fs.readFileSync("src/components/home-task-inbox.tsx", "utf8")
+  : "";
 
 assert.ok(
   !homePage.includes("<RecentCaptures") &&
@@ -17,4 +20,11 @@ assert.ok(
 assert.ok(
   !homePage.includes("CaptureFileActions"),
   "Home should not expose capture filing controls; filing belongs in Inbox.",
+);
+
+assert.ok(
+  !taskInbox.includes("rawText") &&
+    !taskInbox.includes("createdItems") &&
+    !taskInbox.includes("Recently captured"),
+  "Home task rows must come only from the canonical task Inbox loader.",
 );

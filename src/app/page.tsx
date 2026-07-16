@@ -13,6 +13,7 @@ import {
   HomeTaskActions,
 } from "@/components/home-action-buttons";
 import { HomeTodayList } from "@/components/home-today-list";
+import { HomeTaskInbox } from "@/components/home-task-inbox";
 import { prisma } from "@/lib/db";
 import {
   formatDateOnly,
@@ -24,6 +25,7 @@ import {
 import { getTodayDashboard } from "@/lib/today";
 import { projectLastActivityFact } from "@/lib/slippage";
 import { getHomeAttentionItems } from "@/lib/home-attention";
+import { homeStatusHeadline } from "@/lib/home-task-inbox-status";
 import type { ResurfacedItem } from "@/lib/resurfacing";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +50,11 @@ export default async function HomePage() {
     day: "numeric",
     timeZone: "America/New_York",
   }).format(new Date());
+  const taskInboxData = {
+    totalCount: todayData.taskInboxTotalCount,
+    newCount: todayData.taskInboxNewCount,
+    rows: todayData.taskInbox,
+  };
 
   return (
     <div className="space-y-5">
@@ -59,11 +66,14 @@ export default async function HomePage() {
 
       <StatusLine
         dueTodayCount={todayData.dueToday.length}
+        taskInboxTotalCount={taskInboxData.totalCount}
+        taskInboxNewCount={taskInboxData.newCount}
         clearThroughTomorrow={
           todayData.dueToday.length === 0 &&
           todayData.dueTomorrow.length === 0 &&
           todayData.todayEvents.length === 0 &&
-          todayData.tomorrowEvents.length === 0
+          todayData.tomorrowEvents.length === 0 &&
+          taskInboxData.totalCount === 0
         }
         nextCommitment={getNextCommitment(todayData)}
         slippingProjectCount={homeData.slippingProjectCount}
@@ -77,31 +87,13 @@ export default async function HomePage() {
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
         <div className="space-y-5">
-          <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
-            <SectionHeader title="Today" href="/today" />
-            <div className="mt-3">
-              <HomeTodayList
-                events={todayData.todayEvents.map((event) => ({
-                  id: event.id,
-                  title: event.title,
-                  time: formatTime(event.start),
-                }))}
-                tasks={todayData.dueToday.map((task) => ({
-                  id: task.id,
-                  title: task.title,
-                  detail: [
-                    task.area?.name ?? "Inbox",
-                    task.project?.name,
-                    task.dueDate ? formatDateOnly(task.dueDate) : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" / "),
-                  starred: task.starred,
-                }))}
-              />
-            </div>
-          </section>
-
+          {todayData.dueToday.length === 0 ? (
+            <HomeTaskInbox data={taskInboxData} today={todayData.today} />
+          ) : null}
+          <TodayCard data={todayData} />
+          {todayData.dueToday.length > 0 ? (
+            <HomeTaskInbox data={taskInboxData} today={todayData.today} />
+          ) : null}
           <UpcomingCard items={todayData.upcomingCommitments} />
         </div>
 
@@ -131,6 +123,35 @@ type ReadyToday = Awaited<ReturnType<typeof getTodayDashboard>> & {
 };
 
 type HomeTask = ReadyToday["dueToday"][number];
+
+function TodayCard({ data }: { data: ReadyToday }) {
+  return (
+    <section className="rounded-[14px] border border-[#E2E6DF] bg-white p-4">
+      <SectionHeader title="Today" href="/today" />
+      <div className="mt-3">
+        <HomeTodayList
+          events={data.todayEvents.map((event) => ({
+            id: event.id,
+            title: event.title,
+            time: formatTime(event.start),
+          }))}
+          tasks={data.dueToday.map((task) => ({
+            id: task.id,
+            title: task.title,
+            detail: [
+              task.area?.name ?? "Inbox",
+              task.project?.name,
+              task.dueDate ? formatDateOnly(task.dueDate) : null,
+            ]
+              .filter(Boolean)
+              .join(" / "),
+            starred: task.starred,
+          }))}
+        />
+      </div>
+    </section>
+  );
+}
 
 function UpcomingCard({
   items,
@@ -189,11 +210,15 @@ function UpcomingCard({
 
 function StatusLine({
   dueTodayCount,
+  taskInboxTotalCount,
+  taskInboxNewCount,
   clearThroughTomorrow,
   nextCommitment,
   slippingProjectCount,
 }: {
   dueTodayCount: number;
+  taskInboxTotalCount: number;
+  taskInboxNewCount: number;
   clearThroughTomorrow: boolean;
   nextCommitment: string;
   slippingProjectCount: number;
@@ -213,7 +238,11 @@ function StatusLine({
           <p className="font-serif text-[27px] font-medium leading-[1.25] tracking-[-0.01em] text-stone-950">
             {clearThroughTomorrow
               ? "Nothing due through tomorrow."
-              : `${dueTodayCount} due today.`}
+              : homeStatusHeadline(
+                  dueTodayCount,
+                  taskInboxTotalCount,
+                  taskInboxNewCount,
+                )}
           </p>
           <p className="mt-2 text-[15px] leading-normal text-[#6B7268]">
             {clearThroughTomorrow
