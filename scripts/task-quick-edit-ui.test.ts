@@ -32,6 +32,9 @@ assert.match(component, /onMutation\?:\s*\(event:\s*TaskQuickEditMutationEvent\)
 assert.match(component, /aria-label=["']Assign task["'][\s\S]{0,400}min-h-11[\s\S]{0,500}showDialog\(["']move["']/);
 assert.match(component, /aria-label=["']Schedule task["'][\s\S]{0,400}min-h-11[\s\S]{0,500}showDialog\(["']quick["']/);
 assert.match(component, /MutationPhase\s*=\s*["']optimistic["']\s*\|\s*["']committed["']\s*\|\s*["']rolled-back["']\s*\|\s*["']undo["']/);
+assert.match(component, /mutationOwner\?:\s*TaskQuickEditMutationOwner/);
+assert.match(component, /export function TaskQuickEditMutationStatusHost/);
+assert.match(component, /variant === ["']inbox["'][\s\S]*mutationOwner/, "Inbox mutations must use an owner that can outlive the visual row.");
 assert.ok(!detail.includes("assignmentProjects"), "Detail must not eagerly query assignment options.");
 assert.ok(!scheduling.includes("areaGroups"), "List quick edit must not receive eager Area options.");
 assert.ok(!scheduling.includes("projects:"), "List quick edit must not receive eager Project options.");

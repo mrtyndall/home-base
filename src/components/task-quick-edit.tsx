@@ -30,12 +30,14 @@ import {
 } from "@/lib/task-quick-edit";
 import {
   LatestRequestCoordinator,
-  MutationChannel,
   type ChannelSnapshot,
   readRecentDestinationIds,
   runLatestRequest,
   writeRecentDestinationId,
 } from "@/lib/task-quick-edit-coordinator";
+import {
+  TaskQuickEditMutationOwner as GenericTaskQuickEditMutationOwner,
+} from "@/lib/task-quick-edit-mutation-owner";
 
 type Destination = {
   id: string;
@@ -56,6 +58,11 @@ type MutationPhase = "optimistic" | "committed" | "rolled-back" | "undo";
 export type TaskQuickEditMutationEvent =
   | { taskId: string; channel: "location"; phase: MutationPhase; mutationId: number; value: LocationValue }
   | { taskId: string; channel: "schedule"; phase: MutationPhase; mutationId: number; value: TaskScheduleValue };
+export type TaskQuickEditMutationOwner = GenericTaskQuickEditMutationOwner<TaskScheduleValue, LocationValue>;
+
+export function createTaskQuickEditMutationOwner(schedule: TaskScheduleValue, location: LocationValue) {
+  return new GenericTaskQuickEditMutationOwner(schedule, location, sameSchedule, sameLocation);
+}
 
 export function TaskQuickEdit({
   taskId,
@@ -64,6 +71,7 @@ export function TaskQuickEdit({
   today,
   variant = "trigger",
   onMutation,
+  mutationOwner,
 }: {
   taskId: string;
   location: LocationValue;
@@ -71,22 +79,20 @@ export function TaskQuickEdit({
   today: string;
   variant?: "facts" | "trigger" | "inbox";
   onMutation?: (event: TaskQuickEditMutationEvent) => void;
+  mutationOwner?: TaskQuickEditMutationOwner;
 }) {
-  const router = useRouter();
   const dialogTitleId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const locationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const scheduleTriggerRef = useRef<HTMLButtonElement | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const scheduleUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const locationUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestCoordinator = useRef(new LatestRequestCoordinator());
-  const mutationIds = useRef({ location: 0, schedule: 0 });
-  const activeMutationIds = useRef({ location: 0, schedule: 0 });
   const destinationTaskId = useRef<string | null>(null);
-  const scheduleChannel = useRef(new MutationChannel(schedule, sameSchedule)).current;
-  const locationChannel = useRef(new MutationChannel(location, sameLocation)).current;
+  const internalMutationOwner = useRef(createTaskQuickEditMutationOwner(schedule, location)).current;
+  const owner = mutationOwner ?? internalMutationOwner;
+  const scheduleChannel = owner.scheduleChannel;
+  const locationChannel = owner.locationChannel;
   const scheduleState = useSyncExternalStore(scheduleChannel.subscribe, scheduleChannel.snapshot, scheduleChannel.snapshot);
   const locationState = useSyncExternalStore(locationChannel.subscribe, locationChannel.snapshot, locationChannel.snapshot);
   const mounted = useSyncExternalStore(
@@ -101,11 +107,8 @@ export function TaskQuickEdit({
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [pickingDate, setPickingDate] = useState(false);
-  const [, startTransition] = useTransition();
 
   useEffect(() => () => {
-    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
-    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
     requestCoordinator.current.cancel();
   }, []);
 
@@ -216,20 +219,18 @@ export function TaskQuickEdit({
     return { areaId: result.task?.areaId ?? next.areaId, projectId: result.task?.projectId ?? next.projectId, label: result.displayLabel ?? next.label };
   }
 
+  owner.bind({ taskId, writeSchedule, writeLocation, onMutation });
+  if (variant === "inbox" && !mutationOwner) {
+    throw new Error("Inbox TaskQuickEdit requires a mutationOwner mounted above the removable row");
+  }
+
   async function changeSchedule(next: TaskScheduleValue) {
     if (sameSchedule(next, scheduleState.value)) {
       closeDialog();
       return;
     }
-    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
     closeDialog();
-    const mutationId = beginMutationEvent("schedule", next);
-    await scheduleChannel.mutate(next, writeSchedule);
-    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
-    if (scheduleChannel.snapshot().undo) {
-      scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
-      startTransition(() => router.refresh());
-    }
+    await owner.mutateSchedule(next);
   }
 
   async function changeLocation(next: LocationValue) {
@@ -237,106 +238,10 @@ export function TaskQuickEdit({
       closeDialog();
       return;
     }
-    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
     closeDialog();
-    const mutationId = beginMutationEvent("location", next);
-    await locationChannel.mutate(next, writeLocation);
-    finishMutationEvent("location", mutationId, locationChannel.snapshot());
+    await owner.mutateLocation(next);
     if (locationChannel.snapshot().undo) {
       setRecentIds(writeRecentDestinationId(safeStorage(), next.projectId ?? next.areaId ?? "inbox"));
-      locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
-      startTransition(() => router.refresh());
-    }
-  }
-
-  async function retrySchedule() {
-    const retryValue = scheduleChannel.snapshot().retryValue;
-    if (!retryValue) return;
-    const mutationId = beginMutationEvent("schedule", retryValue);
-    await scheduleChannel.retry(writeSchedule);
-    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
-    if (scheduleChannel.snapshot().undo) {
-      scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
-      startTransition(() => router.refresh());
-    }
-  }
-
-  async function retryLocation() {
-    const retryValue = locationChannel.snapshot().retryValue;
-    if (!retryValue) return;
-    const mutationId = beginMutationEvent("location", retryValue);
-    await locationChannel.retry(writeLocation);
-    finishMutationEvent("location", mutationId, locationChannel.snapshot());
-    if (locationChannel.snapshot().undo) {
-      locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
-      startTransition(() => router.refresh());
-    }
-  }
-
-  async function undoSchedule() {
-    if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
-    const previous = scheduleChannel.snapshot().undo?.previous;
-    if (!previous) return;
-    const mutationId = nextMutationId("schedule");
-    onMutation?.({ taskId, channel: "schedule", phase: "undo", mutationId, value: previous });
-    await scheduleChannel.undo(writeSchedule);
-    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
-    if (scheduleChannel.snapshot().undo) scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
-    startTransition(() => router.refresh());
-  }
-
-  async function undoLocation() {
-    if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
-    const previous = locationChannel.snapshot().undo?.previous;
-    if (!previous) return;
-    const mutationId = nextMutationId("location");
-    onMutation?.({ taskId, channel: "location", phase: "undo", mutationId, value: previous });
-    await locationChannel.undo(writeLocation);
-    finishMutationEvent("location", mutationId, locationChannel.snapshot());
-    if (locationChannel.snapshot().undo) locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
-    startTransition(() => router.refresh());
-  }
-
-  function nextMutationId(channel: "location" | "schedule") {
-    const mutationId = mutationIds.current[channel] + 1;
-    mutationIds.current[channel] = mutationId;
-    activeMutationIds.current[channel] = mutationId;
-    return mutationId;
-  }
-
-  function beginMutationEvent(channel: "schedule", value: TaskScheduleValue): number;
-  function beginMutationEvent(channel: "location", value: LocationValue): number;
-  function beginMutationEvent(channel: "location" | "schedule", value: LocationValue | TaskScheduleValue) {
-    const mutationId = nextMutationId(channel);
-    if (channel === "schedule") {
-      onMutation?.({ taskId, channel, phase: "optimistic", mutationId, value: value as TaskScheduleValue });
-    } else {
-      onMutation?.({ taskId, channel, phase: "optimistic", mutationId, value: value as LocationValue });
-    }
-    return mutationId;
-  }
-
-  function finishMutationEvent(
-    channel: "schedule",
-    mutationId: number,
-    snapshot: ChannelSnapshot<TaskScheduleValue>,
-  ): void;
-  function finishMutationEvent(
-    channel: "location",
-    mutationId: number,
-    snapshot: ChannelSnapshot<LocationValue>,
-  ): void;
-  function finishMutationEvent(
-    channel: "location" | "schedule",
-    mutationId: number,
-    snapshot: ChannelSnapshot<LocationValue> | ChannelSnapshot<TaskScheduleValue>,
-  ) {
-    if (activeMutationIds.current[channel] !== mutationId) return;
-    const phase = snapshot.error ? "rolled-back" : "committed";
-    if (channel === "schedule") {
-      onMutation?.({ taskId, channel, phase, mutationId, value: snapshot.value as TaskScheduleValue });
-    } else {
-      onMutation?.({ taskId, channel, phase, mutationId, value: snapshot.value as LocationValue });
     }
   }
 
@@ -464,14 +369,9 @@ export function TaskQuickEdit({
         document.body,
       ) : null}
 
-      {mounted ? <TaskQuickEditStatus
-        schedule={scheduleState}
-        location={locationState}
-        onRetrySchedule={() => void retrySchedule()}
-        onRetryLocation={() => void retryLocation()}
-        onUndoSchedule={() => void undoSchedule()}
-        onUndoLocation={() => void undoLocation()}
-      /> : null}
+      {mounted && variant !== "inbox"
+        ? <TaskQuickEditMutationStatusHost mutationOwner={owner} />
+        : null}
     </div>
   );
 }
@@ -494,6 +394,56 @@ function sameLocation(a: LocationValue, b: LocationValue) {
 
 function safeStorage() {
   try { return typeof window === "undefined" ? null : window.localStorage; } catch { return null; }
+}
+
+export function TaskQuickEditMutationStatusHost({ mutationOwner }: {
+  mutationOwner: TaskQuickEditMutationOwner;
+}) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const schedule = useSyncExternalStore(
+    mutationOwner.scheduleChannel.subscribe,
+    mutationOwner.scheduleChannel.snapshot,
+    mutationOwner.scheduleChannel.snapshot,
+  );
+  const location = useSyncExternalStore(
+    mutationOwner.locationChannel.subscribe,
+    mutationOwner.locationChannel.snapshot,
+    mutationOwner.locationChannel.snapshot,
+  );
+  const mounted = useSyncExternalStore(
+    useCallback(() => () => {}, []),
+    useCallback(() => true, []),
+    useCallback(() => false, []),
+  );
+
+  useEffect(() => {
+    if (!schedule.undo) return;
+    const timer = window.setTimeout(() => {
+      mutationOwner.scheduleChannel.clearUndo();
+      startTransition(() => router.refresh());
+    }, 6000);
+    return () => window.clearTimeout(timer);
+  }, [mutationOwner, router, schedule.undo, startTransition]);
+
+  useEffect(() => {
+    if (!location.undo) return;
+    const timer = window.setTimeout(() => {
+      mutationOwner.locationChannel.clearUndo();
+      startTransition(() => router.refresh());
+    }, 6000);
+    return () => window.clearTimeout(timer);
+  }, [location.undo, mutationOwner, router, startTransition]);
+
+  if (!mounted) return null;
+  return <TaskQuickEditStatus
+    schedule={schedule}
+    location={location}
+    onRetrySchedule={() => void mutationOwner.retrySchedule()}
+    onRetryLocation={() => void mutationOwner.retryLocation()}
+    onUndoSchedule={() => void mutationOwner.undoSchedule().then(() => startTransition(() => router.refresh()))}
+    onUndoLocation={() => void mutationOwner.undoLocation().then(() => startTransition(() => router.refresh()))}
+  />;
 }
 
 function TaskQuickEditStatus({ schedule, location, onRetrySchedule, onRetryLocation, onUndoSchedule, onUndoLocation }: {

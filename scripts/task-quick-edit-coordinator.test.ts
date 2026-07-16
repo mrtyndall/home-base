@@ -7,6 +7,7 @@ import {
   runLatestRequest,
   writeRecentDestinationId,
 } from "../src/lib/task-quick-edit-coordinator";
+import { TaskQuickEditMutationOwner } from "../src/lib/task-quick-edit-mutation-owner";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -140,4 +141,45 @@ test("recent destination storage failures are contained", () => {
   const broken = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
   assert.deepEqual(readRecentDestinationIds(broken), []);
   assert.deepEqual(writeRecentDestinationId(broken, "area-1"), []);
+});
+
+test("an external mutation owner retains Retry and Undo after the visual client detaches", async () => {
+  let fail = true;
+  const events: string[] = [];
+  const owner = new TaskQuickEditMutationOwner(
+    "none",
+    "Inbox",
+    (left, right) => left === right,
+    (left, right) => left === right,
+  );
+  owner.bind({
+    taskId: "task-1",
+    writeSchedule: async (value) => {
+      if (fail) throw new Error("offline");
+      return value;
+    },
+    writeLocation: async (value) => value,
+    onMutation: (event) => events.push(`${event.channel}:${event.phase}`),
+  });
+
+  await owner.mutateSchedule("Today");
+  assert.equal(owner.scheduleChannel.snapshot().retryValue, "Today");
+
+  // The row UI is now absent; Retry and Undo remain commands on the external owner.
+  fail = false;
+  await owner.retrySchedule();
+  assert.ok(owner.scheduleChannel.snapshot().undo);
+  fail = true;
+  await owner.undoSchedule();
+  assert.equal(owner.scheduleChannel.snapshot().value, "Today");
+  assert.equal(owner.scheduleChannel.snapshot().retryValue, "none");
+  fail = false;
+  await owner.retrySchedule();
+  assert.equal(owner.scheduleChannel.snapshot().value, "none");
+  assert.deepEqual(events, [
+    "schedule:optimistic", "schedule:rolled-back",
+    "schedule:optimistic", "schedule:committed",
+    "schedule:undo", "schedule:rolled-back",
+    "schedule:undo", "schedule:committed",
+  ]);
 });
