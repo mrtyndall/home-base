@@ -45,11 +45,17 @@ type Destination = {
   projectId: string | null;
 };
 
-type LocationValue = {
+export type LocationValue = {
   areaId: string | null;
   projectId: string | null;
   label: string;
 };
+
+type MutationPhase = "optimistic" | "committed" | "rolled-back" | "undo";
+
+export type TaskQuickEditMutationEvent =
+  | { taskId: string; channel: "location"; phase: MutationPhase; mutationId: number; value: LocationValue }
+  | { taskId: string; channel: "schedule"; phase: MutationPhase; mutationId: number; value: TaskScheduleValue };
 
 export function TaskQuickEdit({
   taskId,
@@ -57,12 +63,14 @@ export function TaskQuickEdit({
   schedule,
   today,
   variant = "trigger",
+  onMutation,
 }: {
   taskId: string;
   location: LocationValue;
   schedule: TaskScheduleValue;
   today: string;
-  variant?: "facts" | "trigger";
+  variant?: "facts" | "trigger" | "inbox";
+  onMutation?: (event: TaskQuickEditMutationEvent) => void;
 }) {
   const router = useRouter();
   const dialogTitleId = useId();
@@ -74,6 +82,8 @@ export function TaskQuickEdit({
   const scheduleUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locationUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestCoordinator = useRef(new LatestRequestCoordinator());
+  const mutationIds = useRef({ location: 0, schedule: 0 });
+  const activeMutationIds = useRef({ location: 0, schedule: 0 });
   const destinationTaskId = useRef<string | null>(null);
   const scheduleChannel = useRef(new MutationChannel(schedule, sameSchedule)).current;
   const locationChannel = useRef(new MutationChannel(location, sameLocation)).current;
@@ -213,7 +223,9 @@ export function TaskQuickEdit({
     }
     if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
     closeDialog();
+    const mutationId = beginMutationEvent("schedule", next);
     await scheduleChannel.mutate(next, writeSchedule);
+    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
     if (scheduleChannel.snapshot().undo) {
       scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
       startTransition(() => router.refresh());
@@ -227,7 +239,9 @@ export function TaskQuickEdit({
     }
     if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
     closeDialog();
+    const mutationId = beginMutationEvent("location", next);
     await locationChannel.mutate(next, writeLocation);
+    finishMutationEvent("location", mutationId, locationChannel.snapshot());
     if (locationChannel.snapshot().undo) {
       setRecentIds(writeRecentDestinationId(safeStorage(), next.projectId ?? next.areaId ?? "inbox"));
       locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
@@ -236,7 +250,11 @@ export function TaskQuickEdit({
   }
 
   async function retrySchedule() {
+    const retryValue = scheduleChannel.snapshot().retryValue;
+    if (!retryValue) return;
+    const mutationId = beginMutationEvent("schedule", retryValue);
     await scheduleChannel.retry(writeSchedule);
+    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
     if (scheduleChannel.snapshot().undo) {
       scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
       startTransition(() => router.refresh());
@@ -244,7 +262,11 @@ export function TaskQuickEdit({
   }
 
   async function retryLocation() {
+    const retryValue = locationChannel.snapshot().retryValue;
+    if (!retryValue) return;
+    const mutationId = beginMutationEvent("location", retryValue);
     await locationChannel.retry(writeLocation);
+    finishMutationEvent("location", mutationId, locationChannel.snapshot());
     if (locationChannel.snapshot().undo) {
       locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
       startTransition(() => router.refresh());
@@ -253,16 +275,69 @@ export function TaskQuickEdit({
 
   async function undoSchedule() {
     if (scheduleUndoTimer.current) clearTimeout(scheduleUndoTimer.current);
+    const previous = scheduleChannel.snapshot().undo?.previous;
+    if (!previous) return;
+    const mutationId = nextMutationId("schedule");
+    onMutation?.({ taskId, channel: "schedule", phase: "undo", mutationId, value: previous });
     await scheduleChannel.undo(writeSchedule);
+    finishMutationEvent("schedule", mutationId, scheduleChannel.snapshot());
     if (scheduleChannel.snapshot().undo) scheduleUndoTimer.current = setTimeout(() => scheduleChannel.clearUndo(), 6000);
     startTransition(() => router.refresh());
   }
 
   async function undoLocation() {
     if (locationUndoTimer.current) clearTimeout(locationUndoTimer.current);
+    const previous = locationChannel.snapshot().undo?.previous;
+    if (!previous) return;
+    const mutationId = nextMutationId("location");
+    onMutation?.({ taskId, channel: "location", phase: "undo", mutationId, value: previous });
     await locationChannel.undo(writeLocation);
+    finishMutationEvent("location", mutationId, locationChannel.snapshot());
     if (locationChannel.snapshot().undo) locationUndoTimer.current = setTimeout(() => locationChannel.clearUndo(), 6000);
     startTransition(() => router.refresh());
+  }
+
+  function nextMutationId(channel: "location" | "schedule") {
+    const mutationId = mutationIds.current[channel] + 1;
+    mutationIds.current[channel] = mutationId;
+    activeMutationIds.current[channel] = mutationId;
+    return mutationId;
+  }
+
+  function beginMutationEvent(channel: "schedule", value: TaskScheduleValue): number;
+  function beginMutationEvent(channel: "location", value: LocationValue): number;
+  function beginMutationEvent(channel: "location" | "schedule", value: LocationValue | TaskScheduleValue) {
+    const mutationId = nextMutationId(channel);
+    if (channel === "schedule") {
+      onMutation?.({ taskId, channel, phase: "optimistic", mutationId, value: value as TaskScheduleValue });
+    } else {
+      onMutation?.({ taskId, channel, phase: "optimistic", mutationId, value: value as LocationValue });
+    }
+    return mutationId;
+  }
+
+  function finishMutationEvent(
+    channel: "schedule",
+    mutationId: number,
+    snapshot: ChannelSnapshot<TaskScheduleValue>,
+  ): void;
+  function finishMutationEvent(
+    channel: "location",
+    mutationId: number,
+    snapshot: ChannelSnapshot<LocationValue>,
+  ): void;
+  function finishMutationEvent(
+    channel: "location" | "schedule",
+    mutationId: number,
+    snapshot: ChannelSnapshot<LocationValue> | ChannelSnapshot<TaskScheduleValue>,
+  ) {
+    if (activeMutationIds.current[channel] !== mutationId) return;
+    const phase = snapshot.error ? "rolled-back" : "committed";
+    if (channel === "schedule") {
+      onMutation?.({ taskId, channel, phase, mutationId, value: snapshot.value as TaskScheduleValue });
+    } else {
+      onMutation?.({ taskId, channel, phase, mutationId, value: snapshot.value as LocationValue });
+    }
   }
 
   function keepFocusInside(event: KeyboardEvent<HTMLDivElement>) {
@@ -289,6 +364,27 @@ export function TaskQuickEdit({
         <div className="grid min-w-0 gap-2 sm:grid-cols-2">
           <FactButton ref={locationTriggerRef} label="Location" value={locationState.value.label} icon={<FolderInput size={15} />} onClick={() => showDialog("move", locationTriggerRef.current)} />
           <FactButton ref={scheduleTriggerRef} label="Schedule" value={displayTaskSchedule(scheduleState.value)} icon={<CalendarDays size={15} />} onClick={() => showDialog("quick", scheduleTriggerRef.current)} />
+        </div>
+      ) : variant === "inbox" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            ref={locationTriggerRef}
+            type="button"
+            aria-label="Assign task"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-[#DDE5DD] px-3 text-sm font-medium text-stone-700"
+            onClick={() => showDialog("move", locationTriggerRef.current)}
+          >
+            <FolderInput size={16} /><span>Assign</span>
+          </button>
+          <button
+            ref={scheduleTriggerRef}
+            type="button"
+            aria-label="Schedule task"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-[#DDE5DD] px-3 text-sm font-medium text-stone-700"
+            onClick={() => showDialog("quick", scheduleTriggerRef.current)}
+          >
+            <CalendarDays size={16} /><span>Schedule</span>
+          </button>
         </div>
       ) : (
         <button
