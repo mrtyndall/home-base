@@ -8,7 +8,7 @@ import {
 } from "@/lib/dates";
 import { getDailyResurfacedItem } from "@/lib/resurfacing";
 import { getRoutinesWithState } from "@/lib/routines";
-import { getTodayTaskInboxLimit } from "@/lib/today-task-inbox";
+import { getHomeTaskInbox } from "@/lib/home-task-inbox";
 import { mergeUpcomingCommitments } from "@/lib/upcoming-commitments";
 import { flattenAreaOptions } from "@/lib/hierarchy";
 
@@ -44,7 +44,7 @@ export async function getTodayDashboard() {
       dueTomorrow,
       todayEvents,
       tomorrowEvents,
-      taskInbox,
+      taskInboxData,
       recentCaptures,
       nextTask,
       nextEvent,
@@ -115,21 +115,7 @@ export async function getTodayDashboard() {
         orderBy: { start: "asc" },
         take: 6,
       }),
-      prisma.task.findMany({
-        where: {
-          status: "open",
-          someday: false,
-          dueDate: null,
-          parentTaskId: null,
-        },
-        include: { area: true, project: true },
-        orderBy: [
-          { sortOrder: "asc" },
-          { updatedAt: "desc" },
-          { createdAt: "desc" },
-        ],
-        take: getTodayTaskInboxLimit(),
-      }),
+      getHomeTaskInbox(),
       prisma.$queryRaw<Capture[]>`
         SELECT
           id,
@@ -262,7 +248,9 @@ export async function getTodayDashboard() {
       starredCount,
       dueToday: dueToday.map(withAreaPath),
       dueTomorrow: dueTomorrow.map(withAreaPath),
-      taskInbox: taskInbox.map(withAreaPath),
+      taskInbox: taskInboxData.rows.map(withAreaPath),
+      taskInboxTotalCount: taskInboxData.totalCount,
+      taskInboxNewCount: taskInboxData.newCount,
       todayEvents,
       tomorrowEvents,
       upcomingCommitments: mergeUpcomingCommitments(
