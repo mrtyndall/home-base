@@ -425,11 +425,13 @@ git diff --check
 
 Expected: every command exits 0.
 
-- [ ] **Step 2: Apply migration to the configured development database**
+- [x] **Step 2: Apply migration to the configured Railway production database**
 
 Run: `npm run db:deploy`
 
 Expected: `20260716120000_task_triaged_at` applies and historical Inbox tasks are non-null.
+
+Railway startup logs confirmed the migration applied successfully and the service reached Ready.
 
 - [ ] **Step 3: Verify behavior at 440×956**
 
