@@ -42,27 +42,30 @@ export function mergeHomeTaskInboxRows(
 export async function getHomeTaskInbox(
   client = prisma,
 ): Promise<HomeTaskInboxData> {
-  const [totalCount, newCount, untriaged, triaged] = await Promise.all([
-    client.task.count({ where: taskInboxWhere }),
-    client.task.count({ where: { ...taskInboxWhere, triagedAt: null } }),
-    client.task.findMany({
-      where: { ...taskInboxWhere, triagedAt: null },
-      include: { area: true, project: true },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      take: HOME_TASK_INBOX_LIMIT,
-    }),
-    client.task.findMany({
-      where: { ...taskInboxWhere, triagedAt: { not: null } },
-      include: { area: true, project: true },
-      orderBy: [
-        { sortOrder: "asc" },
-        { updatedAt: "desc" },
-        { createdAt: "desc" },
-        { id: "asc" },
-      ],
-      take: HOME_TASK_INBOX_LIMIT,
-    }),
-  ]);
+  const [totalCount, newCount, untriaged, triaged] = await client.$transaction(
+    async (transaction) => Promise.all([
+      transaction.task.count({ where: taskInboxWhere }),
+      transaction.task.count({ where: { ...taskInboxWhere, triagedAt: null } }),
+      transaction.task.findMany({
+        where: { ...taskInboxWhere, triagedAt: null },
+        include: { area: true, project: true },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        take: HOME_TASK_INBOX_LIMIT,
+      }),
+      transaction.task.findMany({
+        where: { ...taskInboxWhere, triagedAt: { not: null } },
+        include: { area: true, project: true },
+        orderBy: [
+          { sortOrder: "asc" },
+          { updatedAt: "desc" },
+          { createdAt: "desc" },
+          { id: "asc" },
+        ],
+        take: HOME_TASK_INBOX_LIMIT,
+      }),
+    ]),
+    { isolationLevel: "RepeatableRead" },
+  );
 
   return {
     totalCount,

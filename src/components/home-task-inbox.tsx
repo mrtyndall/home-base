@@ -32,6 +32,7 @@ const HOME_TASK_INBOX_LIMIT = 5;
 
 type InboxClientModel = {
   serverSignature: string;
+  pendingServer: { signature: string; data: HomeTaskInboxData } | null;
   inbox: HomeTaskInboxState;
   details: Map<string, DisplayRow>;
   owners: Map<string, TaskQuickEditMutationOwner>;
@@ -65,7 +66,10 @@ function HomeTaskInboxClient({
   const incomingSignature = serverSignature(data);
   const [model, setModel] = useState(() => createClientModel(data));
   let renderedModel = model;
-  if (model.serverSignature !== incomingSignature) {
+  if (
+    model.serverSignature !== incomingSignature &&
+    model.pendingServer?.signature !== incomingSignature
+  ) {
     renderedModel = reconcileClientModel(model, data, incomingSignature);
     setModel(renderedModel);
   }
@@ -73,15 +77,23 @@ function HomeTaskInboxClient({
     Record<string, CompletionOperation>
   >({});
   const completionIds = useRef(new Map<string, number>());
+  const focusTargetRef = useRef<HTMLElement | null>(null);
+
+  const moveFocusToInbox = useCallback(() => {
+    window.requestAnimationFrame(() => focusTargetRef.current?.focus());
+  }, []);
 
   const handleQuickEditMutation = useCallback(
     (event: TaskQuickEditMutationEvent) => {
-      setModel((current) => ({
-        ...current,
-        inbox: reduceQuickEditMutation(current.inbox, event),
-      }));
+      setModel((current) => settleClientInbox(
+        current,
+        reduceQuickEditMutation(current.inbox, event),
+      ));
+      if (event.channel === "schedule" && event.phase === "optimistic") {
+        moveFocusToInbox();
+      }
     },
-    [],
+    [moveFocusToInbox],
   );
 
   async function completeTask(taskId: string) {
@@ -100,6 +112,7 @@ function HomeTaskInboxClient({
         mutationId,
       ),
     }));
+    moveFocusToInbox();
 
     try {
       const response = await fetch(`/api/tasks/${taskId}/complete`, {
@@ -107,15 +120,15 @@ function HomeTaskInboxClient({
       });
       if (!response.ok) throw new Error("Completion failed");
       if (completionIds.current.get(taskId) !== mutationId) return;
-      setModel((current) => ({
-        ...current,
-        inbox: commitInboxMutation(
+      setModel((current) => settleClientInbox(
+        current,
+        commitInboxMutation(
           current.inbox,
           taskId,
           "completion",
           mutationId,
         ),
-      }));
+      ));
       setCompletionOperations((current) => ({
         ...current,
         [taskId]: { mutationId, phase: "success" },
@@ -123,15 +136,15 @@ function HomeTaskInboxClient({
       startTransition(() => router.refresh());
     } catch {
       if (completionIds.current.get(taskId) !== mutationId) return;
-      setModel((current) => ({
-        ...current,
-        inbox: rollbackInboxMutation(
+      setModel((current) => settleClientInbox(
+        current,
+        rollbackInboxMutation(
           current.inbox,
           taskId,
           "completion",
           mutationId,
         ),
-      }));
+      ));
       setCompletionOperations((current) => ({
         ...current,
         [taskId]: { mutationId, phase: "error" },
@@ -142,7 +155,12 @@ function HomeTaskInboxClient({
   const rows = renderedModel.inbox.rows.slice(0, HOME_TASK_INBOX_LIMIT);
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-[14px] border border-[#DDE5DD] bg-white p-4">
+    <section
+      ref={focusTargetRef}
+      tabIndex={-1}
+      aria-label="Task Inbox status"
+      className="min-w-0 overflow-hidden rounded-[14px] border border-[#DDE5DD] bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700"
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -272,6 +290,7 @@ function createClientModel(data: HomeTaskInboxData): InboxClientModel {
   }
   return {
     serverSignature: serverSignature(data),
+    pendingServer: null,
     inbox: createInboxState(data),
     details,
     owners,
@@ -283,6 +302,38 @@ function reconcileClientModel(
   data: HomeTaskInboxData,
   signature: string,
 ): InboxClientModel {
+  const inbox = reconcileHomeTaskInbox(current.inbox, stateInput(data));
+  const deferred = inbox.deferredServer !== null;
+  if (deferred) {
+    return {
+      ...current,
+      serverSignature: current.serverSignature,
+      pendingServer: { signature, data },
+      inbox,
+    };
+  }
+  return applyCanonicalClientModel({ ...current, inbox }, data, signature);
+}
+
+function settleClientInbox(
+  current: InboxClientModel,
+  inbox: HomeTaskInboxState,
+): InboxClientModel {
+  if (inbox.deferredServer || !current.pendingServer) {
+    return { ...current, inbox };
+  }
+  return applyCanonicalClientModel(
+    { ...current, inbox },
+    current.pendingServer.data,
+    current.pendingServer.signature,
+  );
+}
+
+function applyCanonicalClientModel(
+  current: InboxClientModel,
+  data: HomeTaskInboxData,
+  signature: string,
+): InboxClientModel {
   const details = new Map(current.details);
   const owners = new Map(current.owners);
   for (const row of data.rows as DisplayRow[]) {
@@ -290,8 +341,9 @@ function reconcileClientModel(
     if (!owners.has(row.id)) owners.set(row.id, createOwner(row));
   }
   return {
+    ...current,
     serverSignature: signature,
-    inbox: reconcileHomeTaskInbox(current.inbox, stateInput(data)),
+    pendingServer: null,
     details,
     owners,
   };

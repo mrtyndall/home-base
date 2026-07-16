@@ -117,6 +117,16 @@ export function displayTaskSchedule(value: TaskScheduleValue | null | undefined)
   return `${monthName} ${day}`;
 }
 
+export function taskQuickEditPendingMessages(pending: {
+  schedule: boolean;
+  location: boolean;
+}) {
+  return [
+    pending.schedule ? "Scheduling task…" : null,
+    pending.location ? "Assigning task…" : null,
+  ].filter((message): message is string => message !== null);
+}
+
 export type OptimisticOperationState<Value, Payload> = {
   value: Value;
   previousValue: Value;

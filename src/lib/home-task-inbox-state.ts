@@ -41,6 +41,7 @@ export type HomeTaskInboxState = {
   rowOrder: string[];
   mutations: Record<string, InboxMutation>;
   retries: Record<string, RetryPayload>;
+  deferredServer: HomeTaskInboxInput | null;
 };
 
 type HomeTaskInboxInput = {
@@ -49,15 +50,18 @@ type HomeTaskInboxInput = {
   newCount: number;
 };
 
+export const HOME_TASK_INBOX_VISIBLE_LIMIT = 5;
+
 export function createHomeTaskInboxState(input: HomeTaskInboxInput): HomeTaskInboxState {
   return {
     rows: cloneRows(input.rows),
     totalCount: input.totalCount,
     newCount: input.newCount,
-    visibleLimit: input.rows.length,
+    visibleLimit: HOME_TASK_INBOX_VISIBLE_LIMIT,
     rowOrder: input.rows.map((row) => row.id),
     mutations: {},
     retries: {},
+    deferredServer: null,
   };
 }
 
@@ -139,13 +143,17 @@ export function commitInboxMutation(
   const mutation = state.mutations[key];
   if (!isCurrent(mutation, mutationId)) return state;
   if (mutation.payload.kind === "assignment" || mutation.status === "undo") {
-    return { ...state, mutations: withoutKey(state.mutations, key), retries: withoutKey(state.retries, key) };
+    return settleDeferredServer({
+      ...state,
+      mutations: withoutKey(state.mutations, key),
+      retries: withoutKey(state.retries, key),
+    });
   }
-  return {
+  return settleDeferredServer({
     ...state,
     mutations: { ...state.mutations, [key]: { ...mutation, status: "committed" } },
     retries: withoutKey(state.retries, key),
-  };
+  });
 }
 
 export function rollbackInboxMutation(
@@ -160,7 +168,7 @@ export function rollbackInboxMutation(
   const retry = { mutationId: mutation.mutationId, payload: mutation.payload };
 
   if (mutation.status === "undo") {
-    return {
+    return settleDeferredServer({
       ...state,
       rows: state.rows.filter((row) => row.id !== taskId),
       totalCount: state.totalCount - mutation.totalDelta,
@@ -169,7 +177,7 @@ export function rollbackInboxMutation(
         ? { ...withoutKey(state.mutations, key), [key]: mutation.undoOf }
         : withoutKey(state.mutations, key),
       retries: { ...state.retries, [key]: retry },
-    };
+    });
   }
 
   const otherRemoval = channel === "location"
@@ -178,7 +186,7 @@ export function rollbackInboxMutation(
   if (otherRemoval) {
     const [otherKey, other] = otherRemoval;
     const adjustedNewDelta = mutation.row.isNew ? -1 : 0;
-    return {
+    return settleDeferredServer({
       ...state,
       newCount: state.newCount - mutation.newDelta + adjustedNewDelta - other.newDelta,
       mutations: {
@@ -186,17 +194,17 @@ export function rollbackInboxMutation(
         [otherKey]: { ...other, row: { ...mutation.row }, newDelta: adjustedNewDelta },
       },
       retries: { ...state.retries, [key]: retry },
-    };
+    });
   }
 
-  return {
+  return settleDeferredServer({
     ...state,
     rows: insertInOrder(state, mutation.row),
     totalCount: state.totalCount - mutation.totalDelta,
     newCount: state.newCount - mutation.newDelta,
     mutations: withoutKey(state.mutations, key),
     retries: { ...state.retries, [key]: retry },
-  };
+  });
 }
 
 export function undoInboxRemoval(
@@ -232,14 +240,38 @@ export function undoInboxRemoval(
 }
 
 export function reconcileHomeTaskInbox(state: HomeTaskInboxState, server: HomeTaskInboxInput): HomeTaskInboxState {
-  if (Object.values(state.mutations).some((mutation) => mutation.status !== "committed")) return state;
+  if (hasPendingRecovery(state)) {
+    return { ...state, deferredServer: cloneInput(server) };
+  }
+  return applyServerState(state, server);
+}
+
+function applyServerState(state: HomeTaskInboxState, server: HomeTaskInboxInput): HomeTaskInboxState {
   return {
     ...state,
     rows: cloneRows(server.rows.slice(0, state.visibleLimit)),
     totalCount: server.totalCount,
     newCount: server.newCount,
     rowOrder: mergeOrder(server.rows.map((row) => row.id), state.rowOrder),
-    retries: {},
+    deferredServer: null,
+  };
+}
+
+function settleDeferredServer(state: HomeTaskInboxState) {
+  return state.deferredServer && !hasPendingRecovery(state)
+    ? applyServerState(state, state.deferredServer)
+    : state;
+}
+
+function hasPendingRecovery(state: HomeTaskInboxState) {
+  return Object.values(state.mutations).some((mutation) => mutation.status !== "committed");
+}
+
+function cloneInput(input: HomeTaskInboxInput): HomeTaskInboxInput {
+  return {
+    rows: cloneRows(input.rows),
+    totalCount: input.totalCount,
+    newCount: input.newCount,
   };
 }
 

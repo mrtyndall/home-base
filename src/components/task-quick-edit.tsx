@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   displayTaskSchedule,
+  taskQuickEditPendingMessages,
   taskDatePresets,
   type TaskScheduleValue,
 } from "@/lib/task-quick-edit";
@@ -479,6 +480,10 @@ function TaskQuickEditStatus({ schedule, location, onRetrySchedule, onRetryLocat
   onUndoSchedule: () => void;
   onUndoLocation: () => void;
 }) {
+  const pendingMessages = taskQuickEditPendingMessages({
+    schedule: schedule.pending,
+    location: location.pending,
+  });
   const errors = [
     schedule.error ? { key: "schedule", retry: onRetrySchedule } : null,
     location.error ? { key: "location", retry: onRetryLocation } : null,
@@ -487,9 +492,10 @@ function TaskQuickEditStatus({ schedule, location, onRetrySchedule, onRetryLocat
     schedule.undo ? { key: "schedule", undo: onUndoSchedule } : null,
     location.undo ? { key: "location", undo: onUndoLocation } : null,
   ].filter((item): item is { key: string; undo: () => void } => item !== null);
-  if (errors.length === 0 && undos.length === 0) return null;
+  if (pendingMessages.length === 0 && errors.length === 0 && undos.length === 0) return null;
   return (
     <>
+      {pendingMessages.map((message) => <div key={message} role="status" className="min-h-11 rounded-[14px] border border-[#DDE5DD] bg-[#F7FAF5] px-4 py-3 text-sm text-stone-800 shadow-lg">{message}</div>)}
       {errors.map((item) => <div key={item.key} role="alert" className="flex min-h-11 items-center gap-3 rounded-[14px] border border-[#DDE5DD] bg-[#F7FAF5] px-4 text-sm text-stone-800 shadow-lg"><span className="min-w-0 flex-1">Couldn’t update task</span><button type="button" onClick={item.retry} className="min-h-11 shrink-0 font-semibold text-teal-800">Retry</button></div>)}
       {undos.map((item) => <div key={item.key} role="status" className="flex min-h-11 items-center gap-4 rounded-[14px] bg-stone-900 px-4 text-sm text-white shadow-lg"><span className="min-w-0 flex-1">Task updated</span><button type="button" onClick={item.undo} className="min-h-11 font-semibold text-teal-200">Undo</button></div>)}
     </>

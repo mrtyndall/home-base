@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { taskQuickEditPendingMessages } from "../src/lib/task-quick-edit";
 
 const componentPath = "src/components/task-quick-edit.tsx";
 const component = existsSync(componentPath) ? readFileSync(componentPath, "utf8") : "";
@@ -39,3 +40,9 @@ assert.ok(!detail.includes("assignmentProjects"), "Detail must not eagerly query
 assert.ok(!scheduling.includes("areaGroups"), "List quick edit must not receive eager Area options.");
 assert.ok(!scheduling.includes("projects:"), "List quick edit must not receive eager Project options.");
 assert.match(projectDetail, /<summary[^>]*min-w-0[^>]*[\s\S]{0,250}\[overflow-wrap:anywhere\]/, "Project Area disclosure must wrap unbroken hierarchy paths.");
+assert.deepEqual(
+  taskQuickEditPendingMessages({ schedule: true, location: true }),
+  ["Scheduling task…", "Assigning task…"],
+  "Aggregate status must announce each pending mutation channel distinctly.",
+);
+assert.match(component, /taskQuickEditPendingMessages/);

@@ -92,6 +92,7 @@ test("loads exact counts and a deterministic five-row working set", async () => 
   }
 
   const fakeClient = {
+    $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(fakeClient),
     task: {
       count: async ({ where }: { where: Record<string, unknown> }) => {
         seenCounts.push(where);
@@ -186,6 +187,7 @@ test("loads exact counts and a deterministic five-row working set", async () => 
 test("propagates task inbox read failures", async () => {
   const readFailure = new Error("read failed");
   const fakeClient = {
+    $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(fakeClient),
     task: {
       count: async () => {
         throw readFailure;
@@ -195,4 +197,34 @@ test("propagates task inbox read failures", async () => {
   };
 
   await assert.rejects(getHomeTaskInbox(fakeClient as never), readFailure);
+});
+
+test("loads counts and both row tiers inside one repeatable-read transaction", async () => {
+  const calls: string[] = [];
+  const transactionOptions: unknown[] = [];
+  const transactionClient = {
+    task: {
+      count: async () => { calls.push("count"); return 0; },
+      findMany: async () => { calls.push("findMany"); return []; },
+    },
+  };
+  const fakeClient = {
+    task: {
+      count: async () => { throw new Error("read escaped transaction"); },
+      findMany: async () => { throw new Error("read escaped transaction"); },
+    },
+    $transaction: async (
+      operation: (tx: typeof transactionClient) => Promise<unknown>,
+      options: unknown,
+    ) => {
+      transactionOptions.push(options);
+      return operation(transactionClient);
+    },
+  };
+
+  await getHomeTaskInbox(fakeClient as never);
+
+  assert.equal(transactionOptions.length, 1);
+  assert.deepEqual(transactionOptions[0], { isolationLevel: "RepeatableRead" });
+  assert.deepEqual(calls.sort(), ["count", "count", "findMany", "findMany"]);
 });

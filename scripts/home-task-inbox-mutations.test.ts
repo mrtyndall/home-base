@@ -109,6 +109,58 @@ test("server reconciliation preserves pending channels and replaces idle server 
   assert.equal(reconciled.newCount, 4);
 });
 
+test("deferred assignment reconciliation applies the latest canonical rows on commit", () => {
+  const pending = beginInboxAssignment(state, "task-1", assignment, 11);
+  const firstCapture = { id: "capture-1", isNew: true, path: "Inbox" };
+  const latestCapture = { id: "capture-2", isNew: true, path: "Inbox" };
+  const firstDeferred = reconcileHomeTaskInbox(pending, {
+    rows: [firstCapture, ...rows], totalCount: 8, newCount: 4,
+  });
+  const latestDeferred = reconcileHomeTaskInbox(firstDeferred, {
+    rows: [latestCapture, firstCapture, ...rows], totalCount: 9, newCount: 5,
+  });
+
+  const committed = commitInboxMutation(latestDeferred, "task-1", "location", 11);
+
+  assert.deepEqual(committed.rows.map((row) => row.id), ["capture-2", "capture-1", "task-1", "task-2"]);
+  assert.equal(committed.totalCount, 9);
+  assert.equal(committed.newCount, 5);
+});
+
+test("deferred schedule reconciliation applies canonical rows on rollback without another refresh", () => {
+  const pending = beginInboxRemoval(state, "task-1", { kind: "schedule", ...today }, 12);
+  const capture = { id: "capture-1", isNew: true, path: "Inbox" };
+  const deferred = reconcileHomeTaskInbox(pending, {
+    rows: [capture, ...rows], totalCount: 8, newCount: 4,
+  });
+
+  const rolledBack = rollbackInboxMutation(deferred, "task-1", "schedule", 12);
+
+  assert.deepEqual(rolledBack.rows.map((row) => row.id), ["capture-1", "task-1", "task-2"]);
+  assert.equal(rolledBack.totalCount, 8);
+  assert.equal(rolledBack.newCount, 4);
+  assert.deepEqual(rolledBack.retries["task-1:schedule"]?.payload, { kind: "schedule", ...today });
+});
+
+test("reconciliation grows a one-row working set to three rows", () => {
+  const initial = createHomeTaskInboxState({ rows: rows.slice(0, 1), totalCount: 1, newCount: 1 });
+  const canonical = [...rows, { id: "task-3", isNew: false, path: "Work" }];
+  const reconciled = reconcileHomeTaskInbox(initial, { rows: canonical, totalCount: 3, newCount: 1 });
+  assert.deepEqual(reconciled.rows.map((row) => row.id), ["task-1", "task-2", "task-3"]);
+});
+
+test("reconciliation grows a three-row working set to the configured five-row maximum", () => {
+  const canonical = Array.from({ length: 5 }, (_, index) => ({
+    id: `task-${index + 1}`,
+    isNew: index === 0,
+    path: "Inbox",
+  }));
+  const initial = createHomeTaskInboxState({ rows: canonical.slice(0, 3), totalCount: 3, newCount: 1 });
+  const reconciled = reconcileHomeTaskInbox(initial, { rows: canonical, totalCount: 5, newCount: 1 });
+  assert.deepEqual(reconciled.rows.map((row) => row.id), canonical.map((row) => row.id));
+  assert.equal(reconciled.visibleLimit, 5);
+});
+
 test("Someday and completion use the same exact removal accounting", () => {
   for (const kind of ["someday", "complete"] as const) {
     const payload = kind === "someday"
