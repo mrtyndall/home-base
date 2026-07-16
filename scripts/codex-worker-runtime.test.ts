@@ -56,10 +56,11 @@ test("Codex child has no Home Base secret and no built-in tools", () => {
     home: "/home/homebase",
     tmpdir: "/tmp",
   });
-  assert.equal(options.config?.features?.shell_tool, false);
-  assert.equal(options.config?.features?.unified_exec, false);
-  assert.equal(options.config?.features?.apps, false);
-  assert.equal(options.config?.features?.multi_agent, false);
+  const features = options.config?.features as Record<string, unknown>;
+  assert.equal(features.shell_tool, false);
+  assert.equal(features.unified_exec, false);
+  assert.equal(features.apps, false);
+  assert.equal(features.multi_agent, false);
   assert.equal(options.config?.web_search, "disabled");
   assert.equal(options.env?.CODEX_HOME, "/data/codex");
   assert.equal("HOME_BASE_API_TOKEN" in (options.env ?? {}), false);
