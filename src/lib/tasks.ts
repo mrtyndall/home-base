@@ -26,6 +26,15 @@ export type CreateTaskInput = {
   captureId?: string | null;
 };
 
+export function initialTaskTriagedAt(
+  input: CreateTaskInput,
+  now = new Date(),
+) {
+  return input.dueDate || input.someday || input.areaId || input.projectId
+    ? now
+    : null;
+}
+
 export async function createTask(
   input: CreateTaskInput,
   actor: WriteActor,
@@ -51,6 +60,11 @@ export async function createTaskWithAudit(
       priority: input.priority ?? undefined,
       areaId: destination.areaId,
       projectId: destination.projectId,
+      triagedAt: initialTaskTriagedAt({
+        ...input,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+      }),
       parentTaskId: input.parentTaskId ?? undefined,
       someday: input.someday ?? undefined,
       recurrenceRule: input.recurrenceRule ?? undefined,
@@ -134,6 +148,7 @@ export async function completeTaskById(
             someday: task.someday,
             recurrenceRule: task.recurrenceRule,
             reminderOffsets: task.reminderOffsets ?? Prisma.JsonNull,
+            triagedAt: completedAt,
             source: "recurrence",
             captureId: task.captureId,
           },

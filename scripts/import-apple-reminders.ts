@@ -90,6 +90,7 @@ async function importReminder(reminder: NormalizedReminder, inputPath: string) {
     : await resolveAreaId(reminder.areaName);
 
   return getPrisma().$transaction(async (tx) => {
+    const importedAt = new Date();
     const capture = await tx.capture.create({
       data: {
         rawText: buildRawText(reminder),
@@ -108,7 +109,8 @@ async function importReminder(reminder: NormalizedReminder, inputPath: string) {
         title: reminder.title,
         notes: reminder.notes,
         status: reminder.completed ? "completed" : "open",
-        completedAt: reminder.completed ? new Date() : undefined,
+        completedAt: reminder.completed ? importedAt : undefined,
+        triagedAt: importedAt,
         dueDate: reminder.dueDate,
         dueTime: reminder.dueTime,
         priority: reminder.priority,

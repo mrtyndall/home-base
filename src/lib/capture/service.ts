@@ -16,7 +16,11 @@ import { boostResurfaceByMatch } from "@/lib/resurfacing";
 import { createPersonRecord, findPersonByMatch } from "@/lib/people";
 import { syncReferenceMentions } from "@/lib/reference-mentions";
 import { completeRoutineByMatch } from "@/lib/routines";
-import { completeTaskByMatch, setTaskStarredByMatch } from "@/lib/tasks";
+import {
+  completeTaskByMatch,
+  initialTaskTriagedAt,
+  setTaskStarredByMatch,
+} from "@/lib/tasks";
 import { resolveVerifiedDestination } from "@/lib/destinations";
 import {
   captureInputSchema,
@@ -540,18 +544,27 @@ async function createTask(
     areaId,
     projectId: project?.id,
   }, context.client);
+  const dueDate = parseDateOnly(action.due_date);
+  const someday = action.someday ?? false;
 
   const task = await context.client.task.create({
     data: {
       title: action.title,
       notes: action.notes,
-      dueDate: parseDateOnly(action.due_date),
+      dueDate,
       dueTime: action.due_time,
       priority: action.priority,
       reminderOffsets: action.reminder_offsets as Prisma.InputJsonValue,
       areaId: destination.areaId,
       projectId: destination.projectId,
-      someday: action.someday ?? false,
+      someday,
+      triagedAt: initialTaskTriagedAt({
+        title: action.title,
+        dueDate,
+        areaId: destination.areaId,
+        projectId: destination.projectId,
+        someday,
+      }),
       starred: action.starred ?? false,
       source: context.writeSource,
       captureId: context.captureId,
