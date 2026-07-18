@@ -145,8 +145,13 @@ export default async function AreaPage({ params, searchParams }: AreaPageProps) 
                 href={`/areas/${child.id}`}
                 className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 transition hover:bg-[#F7F9F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-700"
               >
-                <span className="min-w-0 break-words text-sm font-medium text-stone-900 [overflow-wrap:anywhere]">
-                  {child.name}
+                <span className="min-w-0">
+                  <span className="block break-words text-sm font-medium text-stone-900 [overflow-wrap:anywhere]">
+                    {child.name}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-stone-500">
+                    {child._count.tasks} open task{child._count.tasks === 1 ? "" : "s"} · {child._count.projects} active project{child._count.projects === 1 ? "" : "s"}
+                  </span>
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-stone-500">
                   View area <ChevronRight size={14} />
@@ -463,6 +468,14 @@ async function loadArea(areaId: string) {
       prisma.area.findMany({
         where: { status: "active", isSystem: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        include: {
+          _count: {
+            select: {
+              tasks: { where: { status: "open" } },
+              projects: { where: { status: { in: ["active", "someday", "parked"] } } },
+            },
+          },
+        },
       }),
     ]);
     const mentions = notes.length ? await loadReferenceMentions("entity_note", notes.map((note) => note.id)) : new Map();

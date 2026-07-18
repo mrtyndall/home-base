@@ -1366,34 +1366,37 @@ export async function dismissCapture(formData: FormData) {
   const captureId = getTrimmedString(formData, "captureId");
   if (!captureId) return;
 
-  const capture = await prisma.capture.findUnique({
-    where: { id: captureId },
-    select: { id: true, rawText: true, status: true },
-  });
-  if (!capture || capture.status === "dismissed") return;
+  await prisma.$transaction(async (transaction) => {
+    const capture = await transaction.capture.findUnique({
+      where: { id: captureId },
+      select: { id: true, rawText: true },
+    });
+    if (!capture) return;
 
-  await prisma.capture.update({
-    where: { id: capture.id },
-    data: { status: "dismissed" },
-  });
+    const dismissed = await transaction.capture.updateMany({
+      where: { id: capture.id, status: "active" },
+      data: { status: "dismissed" },
+    });
+    if (dismissed.count === 0) return;
 
-  await prisma.notification.create({
-    data: {
-      type: "capture_dismissed",
-      title: "Capture archived",
-      body:
-        capture.rawText.length > 120
-          ? `${capture.rawText.slice(0, 117)}...`
-          : capture.rawText,
-      sourceRef: { type: "capture", id: capture.id, source: "manual" },
-    },
+    await transaction.notification.create({
+      data: {
+        type: "capture_dismissed",
+        title: "Capture archived",
+        body:
+          capture.rawText.length > 120
+            ? `${capture.rawText.slice(0, 117)}...`
+            : capture.rawText,
+        sourceRef: { type: "capture", id: capture.id, source: "manual" },
+      },
+    });
   });
 
   revalidatePath("/");
   revalidatePath("/today");
   revalidatePath("/projects");
   revalidatePath("/search");
-  revalidatePath(`/captures/${capture.id}`);
+  revalidatePath(`/captures/${captureId}`);
 }
 
 export async function convertPendingCapture(formData: FormData) {

@@ -84,7 +84,7 @@ export function CaptureFileActions({
 
   return (
     <details ref={detailsRef} className="relative">
-      <summary className="inline-flex h-[30px] cursor-pointer list-none items-center rounded-full border border-teal-700/40 bg-white px-3 text-[13px] font-medium text-teal-800 transition hover:border-teal-700 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex h-11 cursor-pointer list-none items-center rounded-full border border-teal-700/40 bg-white px-3 text-[13px] font-medium text-teal-800 transition hover:border-teal-700 sm:h-[30px] [&::-webkit-details-marker]:hidden">
         {label}
       </summary>
       <button

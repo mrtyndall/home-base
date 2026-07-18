@@ -40,6 +40,23 @@ assert.match(dismissAction, /aria-modal="true"/);
 assert.match(dismissAction, />\s*Keep capture\s*</);
 assert.match(dismissAction, />\s*Dismiss capture\s*</);
 assert.match(dismissAction, /min-h-11|h-11/);
+assert.match(dismissAction, /event\.key !== "Tab"/, "The modal must keep keyboard focus inside itself.");
+assert.match(dismissAction, /triggerRef\.current\?\.focus\(\)/, "Closing must restore focus to the Dismiss trigger.");
+assert.match(
+  fs.readFileSync("src/components/capture-file-actions.tsx", "utf8"),
+  /h-11[^"]*sm:h-\[30px\]/,
+  "File and Dismiss must be peer-sized 44px controls on mobile.",
+);
+assert.match(
+  dismissCaptureBody,
+  /prisma\.\$transaction/,
+  "Capture status and its audit notification must commit atomically.",
+);
+assert.match(
+  dismissCaptureBody,
+  /capture\.updateMany\([\s\S]*status: "active"[\s\S]*status: "dismissed"/,
+  "Dismissal must use a conditional state transition so retries and concurrent submits are idempotent.",
+);
 assert.match(
   todayPage,
   /<CaptureDismissAction captureId=\{capture\.id\} \/>/,

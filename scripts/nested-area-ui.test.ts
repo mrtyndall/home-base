@@ -43,6 +43,16 @@ assert.match(
   /href=\{`\/areas\/\$\{child\.id\}`\}/,
   "Each subarea must remain directly navigable from its parent.",
 );
+assert.match(
+  areaDetail,
+  /child\._count\.tasks[\s\S]*child\._count\.projects/,
+  "Subarea rows must summarize open tasks and active projects.",
+);
+assert.match(
+  areaDetail,
+  /_count:[\s\S]*tasks:[\s\S]*status: "open"[\s\S]*projects:[\s\S]*status: \{ in: \["active", "someday", "parked"\] \}/,
+  "Area loading must source scoped activity counts for subarea summaries.",
+);
 
 assert.match(newProject, /<AreaPicker/, "Global Project creation must use the hierarchy picker.");
 assert.match(newProject, /defaultAreaId=\{scopedArea\?\.id\}/, "Area-scoped creation must preselect its Area.");
