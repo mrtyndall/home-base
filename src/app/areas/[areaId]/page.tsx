@@ -65,6 +65,7 @@ export default async function AreaPage({ params, searchParams }: AreaPageProps) 
   const areaPath = flattenAreaOptions(area.allAreas).find((option) => option.id === area.id)?.path ?? area.name;
   const areaBreadcrumb = buildAreaBreadcrumb(area.allAreas, area.id);
   const excludedAreaIds = collectDescendantAreaIds(area.allAreas, area.id);
+  const childAreas = area.allAreas.filter((candidate) => candidate.parentAreaId === area.id);
 
   return (
     <div className="space-y-6">
@@ -132,6 +133,29 @@ export default async function AreaPage({ params, searchParams }: AreaPageProps) 
 
       <CheckInFeed parentType="area" parentId={area.id} checkIns={area.checkIns} />
       <AreaHubOverview area={area} />
+      {childAreas.length > 0 ? (
+        <section className="space-y-2.5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
+            Subareas
+          </h2>
+          <div className="divide-y divide-[#EEF1EC] overflow-hidden rounded-[14px] border border-[#E2E6DF] bg-white">
+            {childAreas.map((child) => (
+              <Link
+                key={child.id}
+                href={`/areas/${child.id}`}
+                className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 transition hover:bg-[#F7F9F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-700"
+              >
+                <span className="min-w-0 break-words text-sm font-medium text-stone-900 [overflow-wrap:anywhere]">
+                  {child.name}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs text-stone-500">
+                  View area <ChevronRight size={14} />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <EntityDepth
         parentType="area"
         parentId={area.id}

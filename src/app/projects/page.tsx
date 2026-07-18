@@ -18,7 +18,6 @@ import { ProjectOverflowMenu } from "@/components/project-actions";
 import { SetupNotice } from "@/components/setup-notice";
 import { checkInSnippet, getLatestCheckIns } from "@/lib/checkins";
 import { projectLastActivityFact } from "@/lib/slippage";
-import { buildAreaTree, type AreaTreeNode } from "@/lib/hierarchy";
 import { countGlobalInbox } from "@/lib/global-inbox";
 
 export const dynamic = "force-dynamic";
@@ -66,8 +65,7 @@ export default async function ProjectsPage() {
 }
 
 function AreaShelves({ areas, globalInboxCount }: { areas: AreaListItem[]; globalInboxCount: number }) {
-  const areasById = new Map(areas.map((area) => [area.id, area]));
-  const tree = buildAreaTree(areas);
+  const rootAreas = areas.filter((area) => area.parentAreaId === null);
   return (
     <section className="space-y-4">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9AA096]">
@@ -86,7 +84,7 @@ function AreaShelves({ areas, globalInboxCount }: { areas: AreaListItem[]; globa
         </span>
         <span aria-label={`${globalInboxCount} items`} className="shrink-0 rounded-full border border-[#D4E5DE] bg-white px-2.5 py-1 text-xs font-semibold tabular-nums text-teal-800">{globalInboxCount}</span>
       </Link>
-      {areas.length === 0 ? (
+      {rootAreas.length === 0 ? (
         <div className="rounded-[18px] border border-dashed border-[#D8DDD5] bg-white/60 p-6 sm:p-8">
           <h3 className="font-serif text-[22px] font-medium text-stone-950">
             Create your first area
@@ -105,45 +103,12 @@ function AreaShelves({ areas, globalInboxCount }: { areas: AreaListItem[]; globa
         </div>
       ) : (
         <div className="space-y-3">
-          {tree.map((node) => (
-            <AreaTreeBranch key={node.id} node={node} areasById={areasById} depth={0} />
+          {rootAreas.map((area) => (
+            <AreaCard key={area.id} area={area} />
           ))}
         </div>
       )}
     </section>
-  );
-}
-
-function AreaTreeBranch({
-  node,
-  areasById,
-  depth,
-}: {
-  node: AreaTreeNode;
-  areasById: Map<string, AreaListItem>;
-  depth: number;
-}) {
-  const area = areasById.get(node.id);
-  if (!area) return null;
-  const indentationStep = depth > 0 && depth <= 3 ? 12 : 0;
-
-  return (
-    <div style={{ paddingInlineStart: `${indentationStep}px` }}>
-      <AreaCard area={area} />
-      {node.children.length > 0 ? (
-        <details open className="group mt-1">
-          <summary className="flex h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-[#7B8278] [&::-webkit-details-marker]:hidden">
-            <span aria-hidden="true" className="transition group-open:rotate-90">›</span>
-            {node.children.length} subarea{node.children.length === 1 ? "" : "s"}
-          </summary>
-          <div className="space-y-3">
-            {node.children.map((child) => (
-              <AreaTreeBranch key={child.id} node={child} areasById={areasById} depth={depth + 1} />
-            ))}
-          </div>
-        </details>
-      ) : null}
-    </div>
   );
 }
 

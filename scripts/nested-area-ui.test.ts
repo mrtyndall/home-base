@@ -19,26 +19,30 @@ assert.match(picker, /option\.path/, "AreaPicker must label nested choices with 
 assert.match(picker, />\s*No area yet\s*</, "A nullable AreaPicker must lead with No area yet.");
 assert.match(picker, /min-h-11|h-11/, "AreaPicker controls must preserve a 44px mobile target.");
 
-assert.match(projects, /buildAreaTree/, "The Areas index must render the Area hierarchy.");
-assert.match(projects, /depth/, "The Areas index must visually distinguish nested depth.");
-assert.doesNotMatch(
-  projects,
-  /Math\.min\(depth, 3\)[\s\S]{0,240}paddingInlineStart/,
-  "Nested rows must not cumulatively apply their absolute depth as padding.",
-);
 assert.match(
   projects,
-  /depth > 0 && depth <= 3 \? 12 : 0/,
-  "Recursive indentation must add at most three 12px steps globally.",
+  /const rootAreas = areas\.filter\(\(area\) => area\.parentAreaId === null\)/,
+  "The Areas index must derive a root-only navigation list.",
 );
 assert.doesNotMatch(
   projects,
-  /className="space-y-3 border-l[^"]*pl-/,
-  "Nested containers must not add uncapped padding beyond the three depth steps.",
+  /AreaTreeBranch|buildAreaTree/,
+  "Nested Areas must live on their parent page instead of expanding on the root index.",
 );
 assert.match(areaDetail, /areaPath/, "Area detail must expose its hierarchy breadcrumb.");
 assert.match(areaDetail, /excludedAreaIds/, "Area reparenting must exclude the current Area and descendants.");
 assert.match(areaDetail, /action=\{updateAreaParent\}/, "Area detail must offer reparenting.");
+assert.match(
+  areaDetail,
+  /const childAreas = area\.allAreas\.filter\(\(candidate\) => candidate\.parentAreaId === area\.id\)/,
+  "Area detail must derive immediate active children from its hierarchy context.",
+);
+assert.match(areaDetail, />\s*Subareas\s*</, "Parent Areas must expose their immediate subareas.");
+assert.match(
+  areaDetail,
+  /href=\{`\/areas\/\$\{child\.id\}`\}/,
+  "Each subarea must remain directly navigable from its parent.",
+);
 
 assert.match(newProject, /<AreaPicker/, "Global Project creation must use the hierarchy picker.");
 assert.match(newProject, /defaultAreaId=\{scopedArea\?\.id\}/, "Area-scoped creation must preselect its Area.");
