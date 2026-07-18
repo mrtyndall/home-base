@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Ellipsis, Plus } from "lucide-react";
 import {
-  dismissCapture,
   dismissCaptureReviewProposal,
   parkAreaById,
   retireAreaById,
@@ -17,6 +16,7 @@ import { AreaPicker } from "@/components/area-picker";
 import { InboxFilingControl } from "@/components/inbox-filing-control";
 import { dismissReview, markReviewDone, snoozeReviewOneDay } from "@/app/review-actions";
 import { CaptureFileActions } from "@/components/capture-file-actions";
+import { CaptureDismissAction } from "@/components/capture-dismiss-action";
 import { CheckInFeed } from "@/components/check-in-feed";
 import { EntityDepth } from "@/components/entity-depth";
 import { SetupNotice } from "@/components/setup-notice";
@@ -255,7 +255,7 @@ function GlobalInbox({ data }: { data: GlobalInboxData }) {
                   <EditableCaptureText capture={capture} />
                   <div className="flex flex-wrap gap-1.5">
                     <CaptureFileActions captureId={capture.id} areas={activeAreas} projects={destinationProjects} label="File as…" />
-                    <form action={dismissCapture}><input type="hidden" name="captureId" value={capture.id} /><SmallAction>Dismiss</SmallAction></form>
+                    <CaptureDismissAction captureId={capture.id} />
                   </div>
                 </div>
               ))}

@@ -10,6 +10,7 @@ import { getRecentCaptureHref } from "@/lib/today-capture-actions";
 import { ResurfacedMemory } from "@/components/resurfaced-memory";
 import { TodayRoutinesLine } from "@/components/today-routines";
 import { CaptureFileActions } from "@/components/capture-file-actions";
+import { CaptureDismissAction } from "@/components/capture-dismiss-action";
 import { selectActionableCaptures } from "@/lib/actionable-captures";
 
 export const dynamic = "force-dynamic";
@@ -307,12 +308,15 @@ function RecentCapturesStrip({
                 </Link>
                 <p className="mt-0.5 text-xs text-[#9AA096]">{outcome}</p>
               </div>
-              <CaptureFileActions
-                captureId={capture.id}
-                areas={areas}
-                projects={projects}
-                align="right"
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <CaptureFileActions
+                  captureId={capture.id}
+                  areas={areas}
+                  projects={projects}
+                  align="right"
+                />
+                <CaptureDismissAction captureId={capture.id} />
+              </div>
             </div>
           );
         })}
